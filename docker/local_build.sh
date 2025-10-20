@@ -2,7 +2,7 @@
 
 set -xu
 
-docker network create --attachable -d bridge radiusdesk-bridge || exit 1
+# docker network create --attachable -d bridge radiusdesk-bridge || exit 1
 
 source ./.env
 
