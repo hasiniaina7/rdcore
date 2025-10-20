@@ -15,10 +15,12 @@ RUN apt-get update && \
         subversion \
         freeradius \
         freeradius-mysql \
+        freeradius-utils \
         libdatetime-perl \
         git \
         curl \
         unzip \
+        sudo \
         language-pack-en-base && \
     # Cleanup après apt-get
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -41,20 +43,23 @@ RUN ln -s /var/www/rdcore/AmpConf/build/production/AmpConf /var/www/html/conf_de
 RUN ln -s /var/www/rdcore/login/rd_client/build/production/AmpConf /var/www/html/usage
 RUN ln -s /var/www/rdcore/cake4/rd_cake/setup/scripts/reporting /var/www/html/reporting
 
-# Create requried directories
-RUN mkdir -p /var/www/html/cake4/rd_cake/logs
-RUN mkdir -p /var/www/html/cake4/rd_cake/webroot/files/imagecache
-RUN mkdir -p /var/www/html/cake4/rd_cake/tmp
+# Create requried directories (target the real path before symlinks)
+RUN mkdir -p /var/www/rdcore/cake4/rd_cake/logs
+RUN mkdir -p /var/www/rdcore/cake4/rd_cake/webroot/files/imagecache
+RUN mkdir -p /var/www/rdcore/cake4/rd_cake/tmp
 
 # Set permissions pour l'utilisateur FPM/Nginx (www-data)
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/tmp
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/logs
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/webroot/img/realms
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/webroot/img/dynamic_details
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/webroot/img/dynamic_photos
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/webroot/img/access_providers
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/webroot/img/hardwares
-RUN chown -R www-data:www-data /var/www/html/cake4/rd_cake/webroot/files/imagecache
+RUN chown -R www-data:www-data /var/www/rdcore/cake4/rd_cake/tmp && \
+    chown -R www-data:www-data /var/www/rdcore/cake4/rd_cake/logs && \
+    for dir in \
+        /var/www/rdcore/cake4/rd_cake/webroot/img/realms \
+        /var/www/rdcore/cake4/rd_cake/webroot/img/dynamic_details \
+        /var/www/rdcore/cake4/rd_cake/webroot/img/dynamic_photos \
+        /var/www/rdcore/cake4/rd_cake/webroot/img/access_providers \
+        /var/www/rdcore/cake4/rd_cake/webroot/img/hardwares \
+        /var/www/rdcore/cake4/rd_cake/webroot/files/imagecache; do \
+        if [ -d "$dir" ]; then chown -R www-data:www-data "$dir"; fi; \
+    done
 
 # Setup Cron jobs
 RUN cp /var/www/rdcore/cake4/rd_cake/setup/cron/cron4 /etc/cron.d/ && \
@@ -81,6 +86,10 @@ COPY ./freeradius.service /lib/systemd/system/
 
 # supervisord allows multiple processes to be started with a single process
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./entrypoint.sh /usr/local/bin/radiusdesk-entrypoint.sh
+RUN chmod +x /usr/local/bin/radiusdesk-entrypoint.sh
+RUN printf "www-data ALL=(ALL) NOPASSWD: /var/www/html/cake4/rd_cake/setup/scripts/radmin_wrapper.pl, /var/www/html/cake4/rd_cake/setup/scripts/radscenario.pl, /usr/bin/radmin, /usr/bin/radclient, /usr/sbin/service, /usr/sbin/freeradius\n" > /etc/sudoers.d/radiusdesk \
+    && chmod 0440 /etc/sudoers.d/radiusdesk
 
 # Config PHP pour FPM/CLI (chemins Debian)
 COPY ./php.ini /etc/php/8.2/fpm/php.ini
@@ -90,7 +99,7 @@ COPY ./php.ini /etc/php/8.2/cli/php.ini
 RUN cp -R /var/www/rdcore/rd/build/production/Rd/* /var/www/html/
 
 # entrypoint run script when container starts - ignores what is in command
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/radiusdesk-entrypoint.sh"]
 
 # Only expose radiusdesk web front end to Teaefik and Freeradius UDP ports that bypass traefik
 EXPOSE 80/tcp
