@@ -6,32 +6,38 @@ services:
       args:
         radiusdesk_volume: ${RADIUSDESK_VOLUME}
     container_name: radiusdesk
-
     environment:
-      - "PHP_INI_SCAN_DIR=:/p/gd"
-      - "PHP.cgi.fix_pathinfo=1"
-      - "PHP_SELF=/index.php"
-      - "PHP_INI_SCAN_DIR=:/p/sqlite3"
+      - "DATABASE_HOST=rdmariadb"
+      - "DATABASE_HOST_CAKE3=rdmariadb"
+      - "DEBUG=true"
     restart: always
     depends_on:
       - "rdmariadb"
-
     ports:
       - "80:80"
       - "1812:1812/udp"
       - "1813:1813/udp"
+    volumes:
+      # 1. Montages de vos dossiers de code locaux pour le développement
+      - ../AmpConf:/var/www/rdcore/AmpConf
+      - ../cake4:/var/www/rdcore/cake4
+      - ../login:/var/www/rdcore/login
+      - ../rd:/var/www/rdcore/rd
+
+      # 2. Volume Anonyme pour masquer le dossier critique 'vendor'
+      #    Ceci permet au conteneur d'utiliser ses propres dépendances compilées
+      #    lors du build (celles de l'image Docker).
+      - /var/www/rdcore/cake4/rd_cake/vendor
 
   rdmariadb:
     container_name: radiusdesk-mariadb
     image: docker.io/bitnami/mariadb:latest
-
     restart: always
     environment:
       - "ALLOW_EMPTY_PASSWORD=yes"
       - "MARIADB_USER=rd"
       - "MARIADB_DATABASE=rd"
-      - "MARDIADB_PASSWORD=rd"
-
+      - "MARIADB_PASSWORD=rd" # Correction de la faute de frappe "MARDIADB"
     volumes:
       - ${RADIUSDESK_VOLUME}/db_conf/my_custom.cnf:/opt/bitnami/mariadb/conf/my_custom.cnf:ro
       - rd_data:/bitnami/mariadb

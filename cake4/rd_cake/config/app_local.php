@@ -40,7 +40,7 @@ return [
      */
     'Datasources' => [
         'default' => [
-            'host'          => 'localhost',
+            'host'          => env('DATABASE_HOST', 'rdmariadb'),
             'className'     => 'Cake\Database\Connection',
             'driver'        => 'Cake\Database\Driver\Mysql',
             'persistent'    => false,
@@ -81,7 +81,7 @@ return [
         */
         
         'cake3' => [
-            'host' => 'localhost',
+            'host' => env('DATABASE_HOST_CAKE3', env('DATABASE_HOST', 'rdmariadb')),
             'className' => 'Cake\Database\Connection',
             'driver' => 'Cake\Database\Driver\Mysql',
             'persistent' => false,

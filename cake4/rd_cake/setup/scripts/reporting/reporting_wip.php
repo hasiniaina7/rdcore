@@ -1,6 +1,6 @@
 <?php
 //Some global variables
-$servername = "localhost";
+$servername = getenv('DATABASE_HOST') ?: 'rdmariadb';
 $username   = "rd";
 $password   = "rd";
 $conn       = false;
