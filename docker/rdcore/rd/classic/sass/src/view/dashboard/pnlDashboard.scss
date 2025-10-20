@@ -1,0 +1,29 @@
+@include treelist-ui(
+    $ui: 'nav2',
+    $padding: 0 10px,
+    $background-color: #323d4d,
+    $toolstrip-background-color: #323d4d,
+    $tool-selected-color: #02d537,
+    $tool-selected-background-color: #587da9,
+    $tool-float-indicator-width: 4px,
+    $tool-float-indicator-color: blue,
+
+
+    $item-line-height: 44px,
+    $item-icon-color: #acacac,
+    $item-expander-color: #acacac,
+    $item-text-color: #acacac,
+    $item-text-font-size: 17px,
+    $item-icon-font-size: 22px,
+    $item-icon-width: 25px,
+    $item-expander-font-size: 17px,
+    $item-expander-width: 30px,
+
+    $row-over-background-color: grey,
+    $row-indicator-width: 6px,
+    $row-indicator-selected-color: $base-color,
+    $row-indicator-selected-over-color: lighten($base-color, 10%),
+    $row-indicator-over-color: lighten($base-color, 10%),
+
+    $row-selected-background-color: #3f505f
+);

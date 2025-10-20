@@ -1,0 +1,564 @@
+<?php
+
+namespace App\Controller;
+use App\Controller\AppController;
+
+use Cake\Core\Configure;
+use Cake\Core\Configure\Engine\PhpConfig;
+
+use Cake\Utility\Inflector;
+use Cake\I18n\FrozenTime;
+
+class WireguardServersController extends AppController{
+
+    protected $main_model   = 'WireguardServers';
+    protected  $fields  	= [
+        'sessions'  => 'sum(WireguardStats.sessions_active)',
+    ];
+    protected   $deadAfter = 600; //600 seconds
+    
+    public function initialize():void{  
+        parent::initialize();
+
+        $this->loadModel('WireguardServers'); 
+       // $this->loadModel('AccelStats');
+       // $this->loadModel('AccelSessions');
+      //  $this->loadModel('AccelArrivals');
+    
+        $this->loadComponent('Aa');
+        $this->loadComponent('GridButtonsFlat');
+        $this->loadComponent('CommonQueryFlat', [ //Very important to specify the Model
+            'model' => 'WireguardServers'
+        ]);        
+         $this->loadComponent('JsonErrors'); 
+         $this->loadComponent('TimeCalculations');
+         $this->loadComponent('Unknowns');
+         $this->Authentication->allowUnauthenticated(['getConfigForServer','submitReport']);          
+    }
+    
+    public function getConfigForServer(){ 
+    
+        $req_q    = $this->request->getQuery(); //q_data is the query data   
+        if(isset($req_q['mac'])){
+            $mac       = $this->request->getQuery('mac');
+            $ent_srv   = $this->{$this->main_model}->find()->where([$this->main_model.'.mac' => $mac])->contain(['WireguardInstances'])->first();
+            if($ent_srv){
+                
+                $config = $this->_return_config($ent_srv);          
+                $this->_update_fetched_info($ent_srv);              
+                
+                $this->set([
+                    'data'      => $config,
+                    'success'   => true
+                ]);
+                $this->viewBuilder()->setOption('serialize', true);
+                  
+            }else{
+                $this->Unknowns->RecordUnknownWireguard();
+            }   
+                      
+        }else{
+            $this->JsonErrors->errorMessage("MAC Address of server not specified",'error');
+        }
+    }
+    
+    public function submitReport(){ 
+    
+        $req_d		= $this->request->getData();
+        $reply_data = [];
+        
+        //--We store the data as JSON strings since ther are arrays.
+        foreach (array_keys($req_d['stat']) as $key){
+                 
+            if($key == 'sessions'){
+                $s_list = $req_d['stat'][$key];
+                foreach($s_list as $s){
+                    if($s['name'] == 'active'){
+                        $req_d['stat']['sessions_active'] = $s['value'];
+                    }
+                }              
+            }
+            
+            if(($key == 'core')||($key == 'sessions')||($key == 'pppoe')){
+                $req_d['stat'][$key] = json_encode($req_d['stat'][$key]);
+            }
+            
+            if(preg_match('/^radius/', $key)){ //,"radius(1, 164.160.89.129)"
+                $radius_nr = preg_replace('/^radius\(/','',$key);
+                $radius_nr = preg_replace('/,.*/','',$radius_nr);
+                $radius_ip = preg_replace('/.*,\s+/','',$key);
+                $radius_ip = preg_replace('/\)$/','',$radius_ip);
+                array_push($req_d['stat'][$key], ['name' => 'ip', 'value' => $radius_ip]);            
+                $req_d['stat']['radius'.$radius_nr] = json_encode($req_d['stat'][$key]);     
+            }
+            
+            if(preg_match('/^mem/', $key)){    // "mem(rss\/virt)":"5632\/244536 kB"
+                $req_d['stat']['mem'] = $req_d['stat'][$key];
+            }             
+        }
+        
+        if(isset($req_d['mac'])){
+            $mac = $req_d['mac'];
+            
+            //MESHdesk and APdesk will include 'mode'
+            $e_s = false;
+            if(isset($req_d['mode'])){
+                if($req_d['mode'] == 'mesh'){
+                    $val = $mac.'_mpppoe_%';
+                    $e_s = $this->{'WireguardServers'}->find()->where(['WireguardServers.mac LIKE' => $val])->first();   
+                }  
+            
+                if($req_d['mode'] == 'ap'){
+                    $val = $mac.'_apppoe_%';
+                    $e_s = $this->{'WireguardServers'}->find()->where(['WireguardServers.mac LIKE' => $val])->first();   
+                }          
+                
+            }else{
+                $e_s = $this->{'WireguardServers'}->find()->where(['WireguardServers.mac' => $mac])->first();
+            }         
+            if($e_s){ 
+            
+                $server_id = $e_s->id;
+                $req_d['stat']['wireguard_server_id'] = $e_s->id;
+                                        
+                $e_s->last_contact = FrozenTime::now();
+                $e_s->last_contact_from_ip = $this->request->clientIp();
+                $this->{'WireguardServers'}->save($e_s);
+                
+                //--Do the stats entry-- 
+                $e_stats = $this->{'WireguardStats'}->find()->where(['WireguardStats.wireguard_server_id' => $e_s->id])->first();
+                if($e_stats){
+                    $this->{'WireguardStats'}->patchEntity($e_stats, $req_d['stat']);    
+                }else{                  
+                    $e_stats = $this->{'WireguardStats'}->newEntity($req_d['stat']);
+                }
+                $this->{'WireguardStats'}->save($e_stats);
+                
+                //--Do the sessions entry--
+                foreach($req_d['sessions'] as $session){ 
+                
+                    foreach(array_keys($session) as $key){              
+                         if(str_contains($key , '-')){                        
+                            $new_key = str_replace('-','_',$key);
+                            $session[$new_key] = $session[$key];
+                         }
+                    }
+                    if(array_key_exists('rate_limit',$session)){
+                       //Do nothing 
+                    }else{
+                       $session['rate_limit'] = 'No Limit';  
+                    }
+                                               
+                    $mac        = $session['calling_sid'];                                
+                    $e_session  =  $this->{'WireguardSessions'}->find()->where(['WireguardSessions.wireguard_server_id' => $server_id,'WireguardSessions.calling_sid' => $mac])->first();
+                    if($e_session){
+                        $this->{'WireguardSessions'}->patchEntity($e_session,$session);    
+                    }else{ 
+                        $session['wireguard_server_id'] = $server_id;                 
+                        $e_session                  = $this->{'WireguardSessions'}->newEntity($session);
+                    }
+                    $this->{'WireguardSessions'}->save($e_session);             
+                }
+                
+                //See if there are any sessions to terminate
+                $terminate_list = $this->{'WireguardSessions'}->find()->where(['WireguardSessions.disconnect_flag' => true,'WireguardSessions.wireguard_server_id' => $server_id])->all();
+                if(count($terminate_list)>0){
+                    $reply_data['terminate'] = [];
+                    foreach($terminate_list as $t){
+                        array_push($reply_data['terminate'],$t->sid);
+                        //Clear the flag 
+                        $t->disconnect_flag = false;
+                        $t->setDirty('modified', true); //Dont update the modified field
+                        //Save it
+                        $this->{'WireguardSessions'}->save($t);
+                    }              
+                }
+                
+                //See if the restart_service_flag is set and clear it
+                if($e_s->restart_service_flag){
+                    $reply_data['restart_service'] = true;
+                    $e_s->restart_service_flag = false;
+                    //$e_s->setDirty('modified', true);
+                    $this->{'WireguardServers'}->save($e_s);             
+                }                                        
+            }     
+        }
+                
+        $this->set([
+            'success'   => true,
+            'data'      => $reply_data
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);
+    }
+   
+	public function index(){
+	
+		$user = $this->_ap_right_check();
+        if (!$user) {
+            return;
+        }
+        
+        $dead_after = $this->deadAfter;
+    
+    	$req_q    = $this->request->getQuery(); //q_data is the query data
+        $cloud_id = $req_q['cloud_id'];
+        $query 	  = $this->{$this->main_model}->find()->contain(['WireguardStats','WireguardInstances']);      
+        $this->CommonQueryFlat->build_cloud_query($query,$cloud_id);
+        
+        $ft_fresh = FrozenTime::now();
+        $ft_fresh = $ft_fresh->subSecond($this->deadAfter);//Below 10 minutes is fresh
+        
+        
+        if((isset($req_q['only_online']))&&($req_q['only_online'] =='true')){
+            $query->where(['WireguardServers.last_contact >=' => $ft_fresh ]);
+        }
+        
+        
+        $limit  = 50;   //Defaults
+        $page   = 1;
+        $offset = 0;
+        if(isset($req_q['limit'])){
+            $limit  = $req_q['limit'];
+            $page   = $req_q['page'];
+            $offset = $req_q['start'];
+        }
+       
+           
+        $query->page($page);
+        $query->limit($limit);
+        $query->offset($offset);
+        
+        $total  = $query->count();       
+        $q_r    = $query->all();
+        $items  = [];
+
+        foreach($q_r as $i){               
+			$i->update		= true;
+			$i->delete		= true;		
+			$i->state		= 'up';
+
+			$i->modified_in_words = $this->TimeCalculations->time_elapsed_string($i->modified);
+			$i->created_in_words = $this->TimeCalculations->time_elapsed_string($i->created);
+			
+			if($i->config_fetched == null){
+			    $i->config_state= 'never';
+			}else{
+			    $i->config_fetched_human = $this->TimeCalculations->time_elapsed_string($i->config_fetched);
+                if ($i->config_fetched <= $ft_fresh) {
+                    $i->config_state = 'down';
+                } else {
+                    $i->config_state = 'up';
+                }		
+			}
+			
+			if($i->last_contact == null){
+			    $i->state= 'never';
+			}else{
+			    $i->last_contact_human = $this->TimeCalculations->time_elapsed_string($i->last_contact);
+                if ($i->last_contact <= $ft_fresh) {
+                    $i->state = 'down';
+                } else {
+                    $i->state = 'up';
+                }		
+			}
+						
+			if($i->wireguard_stat){
+			    $i->sessions_active = $i->wireguard_stat->sessions_active;
+			    $i->uptime = $i->wireguard_stat->uptime;
+			    $i->wireguard_stat->core = json_decode($i->wireguard_stat->core);
+			    $i->wireguard_stat->sessions = json_decode($i->wireguard_stat->sessions);
+			    $i->wireguard_stat->pppoe = json_decode($i->wireguard_stat->pppoe);
+			    $i->wireguard_stat->radius1 = json_decode($i->wireguard_stat->radius1);
+			    $i->wireguard_stat->radius2 = json_decode($i->wireguard_stat->radius2);		    
+			}else{
+			    $i->sessions_active = 0;
+			    $i->uptime = 0;
+			}	
+					
+            array_push($items,$i);
+        }
+        
+        $t_q    = $query->select($this->fields)->first();
+        
+        $this->set([
+            'items' => $items,
+            'success' => true,
+            'totalCount' => $total,
+            'metaData'		=> [
+            	'count'	    => $total,
+            	'sessions'  => $t_q->sessions
+            ]
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);
+    }
+
+    public function add(){
+    	$user = $this->_ap_right_check();
+        if (!$user) {
+            return;
+        }
+        $this->_addOrEdit('add');   
+    }
+    
+    public function edit(){
+    	$user = $this->_ap_right_check();
+        if (!$user) {
+            return;
+        }
+        $this->_addOrEdit('edit');      
+    }
+     
+    private function _addOrEdit($type= 'add') {
+    
+    	$req_d  = $this->request->getData();
+         
+        if($type == 'add'){ 
+            $entity = $this->{$this->main_model}->newEntity($req_d);
+        }
+       
+        if($type == 'edit'){
+            $entity = $this->{$this->main_model}->get($this->request->getData('id'));
+            $this->{$this->main_model}->patchEntity($entity, $req_d);
+        }
+              
+        if ($this->{$this->main_model}->save($entity)) {
+            $this->set([
+                'success' 	=> true,
+                'data'		=> $entity
+            ]);
+            $this->viewBuilder()->setOption('serialize', true);
+            //Delete (if there are any) WireguardArrivals with that MAC Address
+            $this->{'WireguardArrivals'}->deleteAll(['WireguardArrivals.mac' => $entity->mac]);
+            
+            
+        } else {
+            $message = 'Error';           
+            $errors = $entity->getErrors();
+            $a = [];
+            foreach(array_keys($errors) as $field){
+                $detail_string = '';
+                $error_detail =  $errors[$field];
+                foreach(array_keys($error_detail) as $error){
+                    $detail_string = $detail_string." ".$error_detail[$error];   
+                }
+                $a[$field] = $detail_string;
+            }
+            
+            $this->set([
+                'errors'    => $a,
+                'success'   => false,
+                'message'   => __('Could not create item'),
+            ]);
+            $this->viewBuilder()->setOption('serialize', true);
+        }
+	}
+	
+	 public function restart($id = null) {
+		if (!$this->request->is('post')) {
+			throw new MethodNotAllowedException();
+		}
+		
+		$user = $this->_ap_right_check();
+        if (!$user) {
+            return;
+        }
+        		
+		$req_d		= $this->request->getData();
+			
+	    if(isset($req_d['id'])){   //Single item delete       
+            $entity     = $this->{$this->main_model}->get($req_d['id']);
+            if($entity->restart_service_flag == 0){
+                $entity->restart_service_flag = 1;
+            }else{
+                $entity->restart_service_flag = 0;
+            }
+            $entity->setDirty('modified', true);
+            $this->{$this->main_model}->save($entity);
+        }else{
+            foreach($req_d as $d){
+                $entity     = $this->{$this->main_model}->get($d['id']);  
+                if($entity->restart_service_flag == 0){
+                    $entity->restart_service_flag = 1;
+                }else{
+                    $entity->restart_service_flag = 0;
+                }
+                $entity->setDirty('modified', true);
+                $this->{$this->main_model}->save($entity);
+            }
+        }         
+        $this->set([
+            'success' => true
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);
+	}
+	
+   	public function delete($id = null) {
+		if (!$this->request->is('post')) {
+			throw new MethodNotAllowedException();
+		}
+		
+		$user = $this->_ap_right_check();
+        if (!$user) {
+            return;
+        }
+        		
+		$req_d		= $this->request->getData();
+			
+	    if(isset($req_d['id'])){   //Single item delete       
+            $entity     = $this->{$this->main_model}->get($req_d['id']);   
+            $this->{$this->main_model}->delete($entity);
+
+        }else{
+            foreach($req_d as $d){
+                $entity     = $this->{$this->main_model}->get($d['id']);  
+                $this->{$this->main_model}->delete($entity);
+            }
+        }         
+        $this->set([
+            'success' => true
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);
+	}
+   
+    public function menuForGrid(){
+    
+    	$user = $this->_ap_right_check();
+        if(!$user){
+            return;
+        }
+        
+        $user = $this->Aa->user_for_token($this);
+        if(!$user){   //If not a valid user
+            return;
+        }
+        
+        $menu = $this->GridButtonsFlat->returnButtons(false,'wireguardServers');
+        $this->set([
+            'items'         => $menu,
+            'success'       => true
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);
+    }
+    
+    private function _update_fetched_info($ent_srv){
+        //--Update the fetched info--
+        $data = [];
+		$data['id'] 			        = $ent_srv->id;
+		$data['config_fetched']         = FrozenTime::now();
+		$data['last_contact_from_ip']   = $this->getRequest()->clientIp();
+        $this->{'WireguardServers'}->patchEntity($ent_srv, $data);
+        $this->{'WireguardServers'}->save($ent_srv);      
+    }
+    
+    private function _return_config($ent_srv){
+    
+        $config     = [];      
+        $upstream   = $ent_srv->uplink_interface;        
+        $instances  = [];
+        
+        
+        foreach($ent_srv->wireguard_instances as $instance){
+            
+            $wg_if       = 'wg'.$instance->interface_number;
+            $private_key = $instance->private_key;            
+            $interface   = [
+                'PrivateKey'    => $instance->private_key,
+                'ListenPort'    => $instance->listen_port,
+                'SaveConfig'    => false,
+            ];
+            
+            //--Address--
+            $address     = [];
+            if($instance->ipv4_enabled){
+                $address[] = $instance->ipv4_address.'/'.$instance->ipv4_mask;
+            }
+            if($instance->ipv6_enabled){
+                $address[] = $instance->ipv6_address.'/'.$instance->ipv6_prefix;
+            }
+            $interface['Address'] = $address;
+            
+            
+            if($instance->nat_enabled){
+
+                $post_up   = ["ufw route allow in on $wg_if out on $upstream"];
+                $post_down = ["ufw route delete allow in on $wg_if out on $upstream"];
+                if($instance->ipv4_enabled){
+                    $post_up[]   = "iptables  -t nat -I POSTROUTING -o $upstream -j MASQUERADE";
+                    $post_down[] = "iptables  -t nat -D POSTROUTING -o $upstream -j MASQUERADE";
+                }
+                if($instance->ipv6_enabled){
+                    $post_up[]   = "ip6tables -t nat -I POSTROUTING -o $upstream -j MASQUERADE";
+                    $post_down[] = "ip6tables -t nat -D POSTROUTING -o $upstream -j MASQUERADE";
+                }
+                if($instance->sqm_enabled){
+                    $post_up[]   = "/usr/local/sbin/cake-wg.sh $wg_if start $instance->upload_mb $instance->download_mb";
+                    $post_down[] = "/usr/local/sbin/cake-wg.sh $wg_if stop";
+                }
+                $interface['PostUp']   = $post_up;
+                $interface['PostDown'] = $post_down;
+            }
+        
+            $instances[] = [
+                'Name'      => $wg_if,          
+                'Interface' => $interface,
+                'Peers'     => []
+            ];
+        
+        }
+        
+        if($instances){
+            return $config['wireguardInstances'] = $instances;
+        }
+        
+         /* 
+        $wg_if      = 'wg4';
+        $upstream   = 'enp0s3';
+        $ip4_subnet = "10.12.0.1/24";
+        $ip6_subnet = "fd24:609a:6c18::1/64";
+        $private_key= "SKPKvq6vAb9qEGRb/h7NGmx3P4uzVDjde7k0BomLwE4=";
+        $tcp_port   = 51824;
+        $bw_up      = '3mbit';
+        $bw_down    = '3mbit';
+           
+        $reply_data = [
+            'wireguardInstances' => [
+                [
+                  'interface' => [
+                    'name'          => "$wg_if",
+                    'Address'       => [$ip4_subnet,$ip6_subnet],
+                    'SaveConfig'   => false,
+                    'ListenPort'   => $tcp_port,
+                    'PrivateKey'   => "$private_key",
+                    'PostUp'       => [
+                      "ufw route allow in on wg4 out on $upstream",
+                      "iptables  -t nat -I POSTROUTING -o $upstream -j MASQUERADE",
+                      "ip6tables -t nat -I POSTROUTING -o $upstream -j MASQUERADE",
+                      "/usr/local/sbin/cake-wg.sh $wg_if start $bw_up $bw_down"
+                    ],
+                    'PreDown' => [
+                      "ufw route delete allow in on wg4 out on $upstream",
+                      "iptables  -t nat -D POSTROUTING -o $upstream -j MASQUERADE",
+                      "ip6tables -t nat -D POSTROUTING -o $upstream -j MASQUERADE",
+                      "/usr/local/sbin/cake-wg.sh $wg_if stop"
+                    ]
+                  ],
+                  "peers"=> []
+                ]
+            ]    
+        ];
+                
+        $this->set([
+            'success'   => true,
+            'data'      => $reply_data
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);
+        
+        return;
+        */      
+        
+        return $config;   
+    }
+    
+}
+
+?>
