@@ -32,59 +32,32 @@ if(exists($ARGV[2])){
 if($arg1 eq 'stats'){
     my $return_val = `radmin -e "stats client $arg2 $arg3"`;
     print($return_val);
-}
-
-#___ Start ____
-if($arg1 eq 'start'){
+} elsif($arg1 eq 'start'){
     system("service freeradius start");
-}
-
-#___ Stop ____
-if($arg1 eq 'stop')
+} elsif($arg1 eq 'stop'){
     system("service freeradius stop");
-}
-
-#___ Reload ____
-if($arg1 eq 'reload'){
-    system("service freeradius force-reload");   
-}
-
-
-#___ Uptime ____
-if($arg1 eq 'uptime'){
+} elsif($arg1 eq 'reload'){
+    system("service freeradius force-reload");
+} elsif($arg1 eq 'uptime'){
     my $return_val = `radmin -e "show uptime"`;
     print($return_val);
-}
-
-#___ Version ____
-if($arg1 eq 'version'){
+} elsif($arg1 eq 'version'){
     my $return_val = `radmin -e "show version"`;
     print($return_val);
-}
-
-#___ Clients ____
-if($arg1 eq 'clients'){
+} elsif($arg1 eq 'clients'){
     my $return_val = `radmin -e "show client list"`;
     print($return_val);
-}
-
-
-#____ Modules ____
-if($arg1 eq 'modules'){
+} elsif($arg1 eq 'modules'){
     my $return_val = `radmin -e "show module list"`;
     print($return_val);
-}
-
-#____ Modules ____
-if($arg1 eq 'debug'){
-
+} elsif($arg1 eq 'debug'){
     if(($arg2 eq 'level')||($arg2 eq 'condition')){
         my $return_val = `radmin -e "show debug $arg2"`;
         print($return_val);
     }
 
     if(($arg2 eq 'start')||($arg2 eq 'stop')){
-        my $level = 0; #Defualt is to stop
+        my $level = 0; #Default is to stop
         if($arg2 eq 'start'){
             $level = 4;
         }
@@ -100,4 +73,3 @@ if($arg1 eq 'debug'){
         $return_val = `radmin -e "debug condition '$arg3'"`;
     }
 }
-
