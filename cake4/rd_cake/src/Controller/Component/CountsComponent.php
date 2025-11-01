@@ -10,17 +10,29 @@ declare(strict_types=1);
 namespace App\Controller\Component;
 
 use Cake\Controller\Component;
+use Cake\Controller\ComponentRegistry; 
+
 use Cake\Cache\Cache;
+
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 
-class CountsComponent extends Component
-{
+class CountsComponent extends Component {
+
+    protected $components 	= ['Aa'];
+    
     protected $_defaultConfig = [
         // Multi-tenant defaults
         'cloudField'     => 'cloud_id',
         'systemWideId'   => -1,         // set to null to disable system-wide fallback
     ];
+    
+    public function __construct(ComponentRegistry $registry, array $config = [])
+    {
+        parent::__construct($registry, $config);
+        // Use the registry from a component, not loadComponent()
+        $this->CommonQueryFlat = $registry->load('CommonQueryFlat');
+    }
 
     /**
      * Resolve a Table from a name or pass-through a Table instance.
@@ -76,4 +88,118 @@ class CountsComponent extends Component
         }
         return $out;
     }
+    
+    public function countPermanentUsers(int $cloudId): array {
+
+        $PermanentUsers = TableRegistry::getTableLocator()->get('PermanentUsers');
+
+        // Base scoped query (cloud, realm, etc.)
+        $base = $PermanentUsers->find();
+        $this->CommonQueryFlat->setConfig([
+            'model'   => 'PermanentUsers',
+            'sort_by' => 'PermanentUsers.username',
+        ], false);
+        $this->CommonQueryFlat->build_cloud_query($base, $cloudId);
+        
+        // Total users (under scope)
+        $total = (clone $base)->count();
+
+        // Online = users with at least one open session
+        // Use DISTINCT to avoid double-counting users with multiple open sessions
+        $online = (clone $base)
+            ->distinct(['PermanentUsers.id'])
+            ->innerJoin(
+                ['Radaccts' => 'radacct'], // alias => table name
+                [
+                    'Radaccts.username = PermanentUsers.username',
+                    'Radaccts.acctstoptime IS' => null,
+                ]
+            )
+            ->count();
+            
+        // Suspended users
+        $suspended = (clone $base)
+            ->where(['PermanentUsers.admin_state' => 'suspended'])
+            ->count();
+
+        // Terminated users
+        $terminated = (clone $base)
+            ->where(['PermanentUsers.admin_state' => 'terminated'])
+            ->count();
+
+        return [
+            'total'      => (int)$total,
+            'online'     => (int)$online,
+            'suspended'  => (int)$suspended,
+            'terminated' => (int)$terminated,
+        ];
+
+    }
+    
+    public function countVouchers(int $cloudId): array {
+
+        $PermanentUsers = TableRegistry::getTableLocator()->get('Vouchers');
+
+        // Base scoped query (cloud, realm, etc.)
+        $base = $PermanentUsers->find();
+        $this->CommonQueryFlat->setConfig([
+            'model'     => 'Vouchers',
+            'sort_by'   => 'Vouchers.name'
+        ], false);
+        $this->CommonQueryFlat->build_cloud_query($base, $cloudId);
+        
+        // Total users (under scope)
+        $total = (clone $base)->count();
+
+        $online = (clone $base)
+            ->distinct(['Vouchers.id'])
+            ->innerJoin(
+                ['Radaccts' => 'radacct'], // alias => table name
+                [
+                    'Radaccts.username = Vouchers.name',
+                    'Radaccts.acctstoptime IS' => null,
+                ]
+            )
+            ->count();
+            
+        return [
+            'total'      => (int)$total,
+            'online'     => (int)$online
+        ];
+
+    }
+    
+    public function countRadaccts(int $cloudId): int {
+    
+        $where = [];
+    
+        //====== CLOUD's Realms FILTER =====  
+      	$Realms       = TableRegistry::getTableLocator()->get('Realms');	
+      	$realm_list   = [];
+      	$found_realm  = false;
+     	$realms       = $Realms->find()->where(['Realms.cloud_id' => $cloudId])->all();
+      	foreach($realms as $realm){
+      		$found_realm  = true;
+          	$realm_list[] = $realm->name;
+          	$apRealmList  = $this->Aa->realmCheck(true);
+          	if($apRealmList){
+          	    $realm_list = $apRealmList;
+          	}        	
+     	}
+     	if($found_realm){ 	
+     		array_push($where, ["Radaccts.realm IN" => $realm_list]);
+     	}else{
+     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
+        	return false;
+     	}      
+        //====== END Realm FILTER =====  
+        array_push($where,"Radaccts.acctstoptime IS NULL");
+    
+        $Radaccts   = TableRegistry::getTableLocator()->get('Radaccts');
+        $base       = $Radaccts->find();
+        $base->where($where);      
+        $total      = (clone $base)->count();       
+        return $total;  
+    }
+        
 }

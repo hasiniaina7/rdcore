@@ -8,6 +8,7 @@ Ext.define('Rd.view.wireguard.gridWireguardInstances' ,{
     stateEvents :['groupclick','columnhide'],
     border      : false,
     padding     : 0,
+    wireguard_server_id : null, //We have to specify this
     viewConfig  : {
         loadMask    :true
     },
@@ -99,15 +100,16 @@ Ext.define('Rd.view.wireguard.gridWireguardInstances' ,{
         'Ext.toolbar.Paging',
         'Ext.ux.ProgressBarPager',
         'Rd.view.wireguard.vcWireguardInstances',
-        'Rd.view.wireguard.pnlWireguardInstanceAddEdit'
+        'Rd.view.wireguard.pnlWireguardInstanceAddEdit',
+        'Rd.view.wireguard.gridWireguardPeers'
     ],
     controller  : 'vcWireguardInstances',
-    urlMenu     : '/cake4/rd_cake/wireguard-servers/menu-for-grid.json',  
+    urlMenu     : '/cake4/rd_cake/wireguard-instances/menu-for-grid.json',  
     initComponent: function(){
         var me      = this;
         me.tbar     = Ext.create('Rd.view.components.ajaxToolbar',{'url': me.urlMenu}); 
         me.store    = Ext.create('Rd.store.sWireguardInstances');        
-        me.store.getProxy().setExtraParam('wireguard_server_id',me.wireguard_server_id);
+        me.store.getProxy().setExtraParam('server_id',me.wireguard_server_id);
         
         var dash    = '<span class="rd-dash">—</span>';
         var chip    = function(cls, iconCls, text){
@@ -293,7 +295,7 @@ Ext.define('Rd.view.wireguard.gridWireguardInstances' ,{
             {
                 xtype       : 'actioncolumn',
                 text        : 'Actions',
-                width       : 100,
+                width       : 80,
                 stateId     : 'StateGridAccS9',
                 items       : [					 
                     { 
@@ -316,14 +318,7 @@ Ext.define('Rd.view.wireguard.gridWireguardInstances' ,{
                         handler: function(view, rowIndex, colIndex, item, e, record, row) {
                             this.fireEvent('itemClick', view, rowIndex, colIndex, item, e, record, row, 'restart');
                         }
-                    },
-					{  
-                        iconCls : 'txtBlue x-fa fa-chain',
-                        tooltip : 'Show Active Peers',
-						handler: function(view, rowIndex, colIndex, item, e, record, row) {
-                            this.fireEvent('itemClick', view, rowIndex, colIndex, item, e, record, row, 'peers');
-                        }
-					}
+                    }
 				]
 	        }      
         ]; 

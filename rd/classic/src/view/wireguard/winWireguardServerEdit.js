@@ -6,7 +6,7 @@ Ext.define('Rd.view.wireguard.winWireguardServerEdit', {
     resizable   : true,
     title       : 'Edit Wireguard Server',
     width       : 500,
-    height      : 350,
+    height      : 400,
     plain       : true,
     border      : false,
     layout      : 'fit',
@@ -55,6 +55,16 @@ Ext.define('Rd.view.wireguard.winWireguardServerEdit', {
                     fieldLabel  : 'Name',
                     allowBlank  : false,
                     blankText   : 'Specify A Name',
+                    margin      : Rd.config.fieldMargin +5,
+                    labelClsExtra   : 'lblRdReq'
+                },
+                {
+                    name        : 'ip_address',
+                    xtype       : 'textfield',
+                    fieldLabel  : 'IP Address',
+                    allowBlank  : false,
+                    vtype       : 'IPAny',
+                    blankText   : 'Public IP Address of server',
                     margin      : Rd.config.fieldMargin +5,
                     labelClsExtra   : 'lblRdReq'
                 }, 

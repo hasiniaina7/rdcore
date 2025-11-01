@@ -1,25 +1,28 @@
 Ext.define('Rd.view.activityMonitor.gridRadpostauths' ,{
-    extend:'Ext.grid.Panel',
-    alias : 'widget.gridRadpostauths',
-    multiSelect: true,
-    store : 'sRadpostauths',
-    stateful: true,
-    stateId: 'StateGridRadpostauths',
-    stateEvents:['groupclick','columnhide'],
-    border: false,
-    requires: [
+    extend      :'Ext.grid.Panel',
+    alias       : 'widget.gridRadpostauths',
+    multiSelect : true,
+    store       : 'sRadpostauths',
+    stateful    : true,
+    stateId     : 'StateGridRadpostauths',
+    stateEvents : ['groupclick','columnhide'],
+    border      : false,
+    padding     : 0,
+    ui          : 'light',
+    columnLines : false,
+    rowLines    : false,
+    stripeRows  : true,
+    requires    : [
         'Rd.view.components.ajaxToolbar'
     ],
-    viewConfig: {
+    viewConfig  : {
         loadMask:true
     },
-    urlMenu: '/cake4/rd_cake/radpostauths/menu_for_grid.json',
+    urlMenu     : '/cake4/rd_cake/radpostauths/menu_for_grid.json',
     plugins     : 'gridfilters',  //*We specify this 
     initComponent: function(){
-        var me      = this;
-        
-        me.tbar     = Ext.create('Rd.view.components.ajaxToolbar',{'url': me.urlMenu});
-        
+        var me      = this;       
+        me.tbar     = Ext.create('Rd.view.components.ajaxToolbar',{'url': me.urlMenu});     
         me.bbar     =  [
             {
                  xtype       : 'pagingtoolbar',

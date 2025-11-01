@@ -91,16 +91,43 @@ Ext.define('Rd.controller.cMainRadius', {
         }
         return added;      
     },
-    actionBackButton: function(){
-        var me              = this;                           
-        var pnlDashboard    = me.getViewP().down('pnlDashboard');
-        var new_data        = Ext.Object.merge(pnlDashboard.down('#tbtHeader').getData(),{fa_value:'&#xf1ce;', value : 'RADIUS'});
-        pnlDashboard.down('#tbtHeader').update(new_data);
-        var pnl             = me.getViewP().down('#pnlCenter');
-        var item            = pnl.down('#tabMainRadius');
-        pnl.setActiveItem(item);
-        pnl.getEl().slideIn('r');     
-    },   
+    
+    actionBackButton: function () {
+        var me = this,
+            vp = me.getViewP(),
+            pnlDashboard = vp.down('pnlDashboard'),
+            header = pnlDashboard.down('#tbtHeader'),
+            pnl = vp.down('#pnlCenter'),
+            tab = pnl.down('#tabMainRadius'),
+            dv = tab.down('dataview'),
+            store = dv.getStore();
+
+        header.update(Ext.apply({}, {fa_value:'&#xf1ce;', value : 'RADIUS'}, header.getData()));
+
+        // avoid empty flash during load
+        store.clearOnLoad = false;
+        dv.setLoading('Loading…');
+
+        // ensure the incoming card is hidden before activation
+        tab.on('afterrender', function () { tab.getEl().hide(); }, { single: true });
+
+        store.load({
+            callback: function () {
+                dv.setLoading(false);
+
+                // switch card (no animation here)
+                pnl.setActiveItem(tab);
+
+                // now animate the newly active card
+                var el = tab.getEl();
+                if (el) {
+                el.slideIn('r', { duration: 250, easing: 'easeOut' });
+                }
+            },
+            scope: me
+        });
+    }, 
+          
     itemClicked: function(view, record, item, index, e){
         var me = this;
 
@@ -121,12 +148,24 @@ Ext.define('Rd.controller.cMainRadius', {
                 var added = Ext.getApplication().runAction(column.controller,'Index',pnl,id);
                 if(!added){
                     pnl.setActiveItem(item);
-                }else{
+                }else{                
                     pnl.setActiveItem(id);
+                    // now animate the newly active card                    
+                    var i   = pnl.down('#'+id);
+                    var el  = i.getEl();
+                    if (el) {
+                        el.slideIn('l', { duration: 250, easing: 'easeOut' });
+                    }
                 }
             }else{
-                pnl.setActiveItem(item);
+                pnl.setActiveItem(item);               
+                // now animate the newly active card
+                var el = item.getEl();
+                if (el) {
+                el.slideIn('l', { duration: 250, easing: 'easeOut' });
+                }                
             }
         }
-    }
+    }   
+       
 });

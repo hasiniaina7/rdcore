@@ -6,7 +6,7 @@ Ext.define('Rd.view.wireguard.winWireguardServerAdd', {
     resizable   : true,
     title       : 'Add Wireguard Server',
     width       : 500,
-    height      : 350,
+    height      : 400,
     plain       : true,
     border      : false,
     layout      : 'fit',
@@ -58,6 +58,16 @@ Ext.define('Rd.view.wireguard.winWireguardServerAdd', {
                     blankText   : 'Specify A Name',
                     margin      : Rd.config.fieldMargin +5,
                     labelClsExtra   : 'lblRdReq'
+                },
+                {
+                    name        : 'ip_address',
+                    xtype       : 'textfield',
+                    fieldLabel  : 'IP Address',
+                    allowBlank  : false,
+                    vtype       : 'IPAny',
+                    blankText   : 'Public IP Address of server',
+                    margin      : Rd.config.fieldMargin +5,
+                    labelClsExtra   : 'lblRdReq'
                 },                         	
 				{
                     name        : 'mac',
@@ -78,7 +88,7 @@ Ext.define('Rd.view.wireguard.winWireguardServerAdd', {
                     allowBlank  : false,
                     margin      : Rd.config.fieldMargin +5,
                     labelClsExtra   : 'lblRdReq'
-                }              
+                }                                          
             ]
         });
         me.items = frmData; 

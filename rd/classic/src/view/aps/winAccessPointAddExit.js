@@ -80,73 +80,75 @@ Ext.define('Rd.view.aps.winAccessPointAddExit', {
         if(found_bridge == true){
             var radios = [
                     { 
-                        boxLabel: "<i class=\"fa fa-tag\"></i> "+'Layer2 Tagged Ethernet Bridge',   
-                        name    : 'exit_type', 
-                        inputValue: 'tagged_bridge'
+                        boxLabel    : "<i class=\"fa fa-tag\"></i> "+'Layer2 Tagged Ethernet Bridge',   
+                        name        : 'exit_type', 
+                        inputValue  : 'tagged_bridge'
                     },
                     { 
-                        boxLabel: "<i class=\"fa fa-tag\"></i> "+'Layer3 Tagged Ethernet Bridge',   
-                        name    : 'exit_type', 
-                        inputValue: 'tagged_bridge_l3' 
+                        boxLabel    : "<i class=\"fa fa-tag\"></i> "+'Layer3 Tagged Ethernet Bridge',   
+                        name        : 'exit_type', 
+                        inputValue  : 'tagged_bridge_l3'
                     },
                     { 
-                        boxLabel: "<i class=\"fa fa-arrows-alt\"></i> "+i18n("sNAT_plus_DHCP"),
-                        name    : 'exit_type', 
-                        inputValue: 'nat' 
+                        boxLabel    : "<i class=\"fa fa-arrows-alt\"></i> "+i18n("sNAT_plus_DHCP"),
+                        name        : 'exit_type', 
+                        inputValue  : 'nat',
+                        checked     : true
                     },
                     {   
-                        boxLabel:"<i class=\"fa fa-key\"></i> "+i18n("sCaptive_Portal"),
-                        name    : 'exit_type', 
-                        inputValue: 'captive_portal' 
+                        boxLabel    :"<i class=\"fa fa-key\"></i> "+i18n("sCaptive_Portal"),
+                        name        : 'exit_type', 
+                        inputValue  : 'captive_portal'
                     },
                     { 
-                        boxLabel: "<i class=\"fa fa-quote-right\"></i> "+i18n('sOpenVPN_Bridge'),
-                        name: 'exit_type', 
-                        inputValue: 'openvpn_bridge' 
+                        boxLabel    : "<i class=\"fa fa-quote-right\"></i> "+i18n('sOpenVPN_Bridge'),
+                        name        : 'exit_type', 
+                        inputValue  : 'openvpn_bridge'
                     },
                     { 
                         boxLabel    : "<i class=\"fa fa-link\"></i> "+'PPPoE Server',
                         name        : 'exit_type', 
-                        inputValue  : 'pppoe_server' 
+                        inputValue  : 'pppoe_server'
                    }        
                 ];
         }else{
             var radios = [
                     { 
-                        boxLabel: "<i class=\"fa fa-bars\"></i> "+i18n("sEthernet_bridge"),          
-                        name    : 'exit_type', 
-                        inputValue: 'bridge',
-                        checked: true 
+                        boxLabel    : "<i class=\"fa fa-bars\"></i> "+i18n("sEthernet_bridge"),          
+                        name        : 'exit_type', 
+                        inputValue  : 'bridge',
+                        checked     : true
                     },              
                     { 
-                        boxLabel: "<i class=\"fa fa-tag\"></i> "+'Layer2 Tagged Ethernet Bridge',   
-                        name    : 'exit_type', 
-                        inputValue: 'tagged_bridge'
+                        boxLabel    : "<i class=\"fa fa-tag\"></i> "+'Layer2 Tagged Ethernet Bridge',   
+                        name        : 'exit_type', 
+                        inputValue  : 'tagged_bridge'
                     },
                     { 
-                        boxLabel: "<i class=\"fa fa-tag\"></i> "+'Layer3 Tagged Ethernet Bridge',   
-                        name    : 'exit_type', 
-                        inputValue: 'tagged_bridge_l3' 
+                        boxLabel    : "<i class=\"fa fa-tag\"></i> "+'Layer3 Tagged Ethernet Bridge',   
+                        name        : 'exit_type', 
+                        inputValue  : 'tagged_bridge_l3'
                     },
                     { 
-                        boxLabel: "<i class=\"fa fa-arrows-alt\"></i> "+i18n("sNAT_plus_DHCP"),
-                        name    : 'exit_type', 
-                        inputValue: 'nat' 
+                        boxLabel    : "<i class=\"fa fa-arrows-alt\"></i> "+i18n("sNAT_plus_DHCP"),
+                        name        : 'exit_type', 
+                        inputValue  : 'nat',
+                     //   boxLabelCls	: 'boxLabelRd'  
                     },
                     {   
-                        boxLabel:"<i class=\"fa fa-key\"></i> "+i18n("sCaptive_Portal"),
-                        name    : 'exit_type', 
-                        inputValue: 'captive_portal' 
+                        boxLabel    :"<i class=\"fa fa-key\"></i> "+i18n("sCaptive_Portal"),
+                        name        : 'exit_type', 
+                        inputValue  : 'captive_portal' 
                     },
                     { 
-                        boxLabel: "<i class=\"fa fa-quote-right\"></i> "+i18n('sOpenVPN_Bridge'),
-                        name: 'exit_type', 
-                        inputValue: 'openvpn_bridge' 
+                        boxLabel    : "<i class=\"fa fa-quote-right\"></i> "+i18n('sOpenVPN_Bridge'),
+                        name        : 'exit_type', 
+                        inputValue  : 'openvpn_bridge'
                    },
                    { 
                         boxLabel    : "<i class=\"fa fa-link\"></i> "+'PPPoE Server',
                         name        : 'exit_type', 
-                        inputValue  : 'pppoe_server' 
+                        inputValue  : 'pppoe_server'
                    }        
                 ];
         }
@@ -168,14 +170,43 @@ Ext.define('Rd.view.aps.winAccessPointAddExit', {
                 margin          : Rd.config.fieldMargin
             },
             defaultType: 'textfield',
-            items:[{
-                xtype       : 'radiogroup',
-                fieldLabel  : i18n("sExit_point_type"),
-                columns     : 2,
-                vertical    : true,
-                itemId      : 'rgrpExitType',
-                items       : radios
-            }],
+            items:[
+                {
+                    xtype       : 'radiogroup',
+                    fieldLabel  : i18n("sExit_point_type"),
+                    columns     : 2,
+                    vertical    : true,
+                    itemId      : 'rgrpExitType',
+                    items       : radios
+                },
+                {
+                    xtype       : 'radiogroup',
+                    fieldLabel  : 'Apply to Admin State',
+                    columns     : 2,
+                    vertical    : true,
+                    itemId      : 'rgrpAdminState',
+                    items       : [
+                        {   
+                            boxLabel    : "<i class=\"fa fa-play\"></i> Active (Recommended)",
+                            name        : 'admin_state', 
+                            inputValue  : 'active',
+                            checked     : true,
+                        //    boxLabelCls	: 'boxLabelRd' 
+                        },
+                        { 
+                            boxLabel    : "<i class=\"fa fa-pause\"></i> Suspended",
+                            name        : 'admin_state', 
+                            inputValue  : 'suspended'
+                       },
+                       { 
+                            boxLabel    : "<i class=\"fa fa-stop\"></i> Inactive",
+                            name        : 'admin_state', 
+                            inputValue  : 'inactive'
+                       }                   
+                    ]
+                },
+                
+            ],
             buttons: buttons
         });
         return frmType;
@@ -325,6 +356,13 @@ Ext.define('Rd.view.aps.winAccessPointAddExit', {
                                     xtype   : 'textfield',
                                     name    : 'type',
                                     hidden  : true
+                                },
+                                {
+                                    itemId  : 'txtAdminState',
+                                    xtype   : 'textfield',
+                                    name    : 'admin_state',
+                                    hidden  : true,
+                                    value   : 'active'
                                 }, 
                                 {
                                     xtype       : 'numberfield',

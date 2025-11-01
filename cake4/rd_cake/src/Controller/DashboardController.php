@@ -808,7 +808,7 @@ class DashboardController extends AppController{
         $this->viewBuilder()->setOption('serialize', true);      
     }
     
-    
+    //==== Users ====
     public function usersItems(){
         $user = $this->Aa->user_for_token($this);
         if(!$user){
@@ -823,37 +823,50 @@ class DashboardController extends AppController{
         }
         //FIXME This needs some more work in terms of components which should be listed per Access Provider
 
-        $cloudId = (int)$this->request->getQuery('cloud_id');
-        
-        $totals = $this->Counts->totals([
-                ['table' => 'PermanentUsers', 'key' => 'users'],
-                ['table' => 'Vouchers',       'key' => 'vouchers'],
-             //   ['table' => 'Radaccts',       'key' => 'radacct']
-            ], $cloudId);
-        
-        $items = [];
-        $items[] =  [
-            'column1'   => 
+        $cloudId = (int)$this->request->getQuery('cloud_id');  
+        if($cloudId){
+            $r_and_c = $this->Aa->rights_and_components_on_cloud();
+            $right   = $r_and_c['rights'];
+            $comps   = $r_and_c['components'];
+        } 
+                
+        $firstRow = [];  
+            
+        if($comps['cmp_permanent_users']){
+            $tUsers = $this->Counts->countPermanentUsers($cloudId);
+            $firstRow['column1']   = 
               [
                 'name'          => 'Permanent Users',
                 'controller'    => 'cPermanentUsers',
                 'id'            => 'pnlUsersPermanentUsers',
                 'glyph'         => 'xf2c0',
-                'total'         => $totals['users'],
-                'desc'          => 'Users that are known to us',
+                'total'         => $tUsers['total'],
+                'online'        => $tUsers['online'],
+                'suspended'     => $tUsers['suspended'],
+                'terminated'    => $tUsers['terminated'],     
+                'desc'          => 'Regular users with personal login details.',
                 'accent'        => 'blue'            
-              ],
-            'column2' => 
+              ];         
+        }            
+        if($comps['cmp_vouchers']){
+            $tVouchers = $this->Counts->countVouchers($cloudId);
+            $firstRow['column2']   = 
               [
                 'name'          => 'Vouchers',
                 'controller'    => 'cVouchers',
                 'id'            => 'pnlUsersVouchers',
                 'glyph'         => 'xf145',
-                'total'         => $totals['vouchers'],
-                'desc'          => 'Use and forget style users',
+                'total'         => $tVouchers['total'],
+                'online'        => $tVouchers['online'],
+                'desc'          => 'Easy to create and use for short visits.',
                 'accent'        => 'teal'
-              ]
-        ];
+            ];                    
+        }          
+        
+        $items      = [];
+        $items[]    =  $firstRow;
+        
+        $sessions = $this->Counts->countRadaccts($cloudId);
         
         $items[] =  [
             'column1'   => 
@@ -862,8 +875,9 @@ class DashboardController extends AppController{
                 'controller'    => 'cActivityMonitor',
                 'id'            => 'pnlUsersActivityMonitor',
                 'glyph'         => 'xf0e7',
-               // 'total'         => $totals['profiles'],
-                'desc'          => 'Active and historical RADIUS sessions',
+                'total'         => $sessions,
+                'sessions'      => $sessions,
+                'desc'          => 'Current sessions and connection history at a glance.',
                 'accent'        => 'purple'           
               ]
         ];
@@ -875,7 +889,7 @@ class DashboardController extends AppController{
         $this->viewBuilder()->setOption('serialize', true);    
     }
     
-    
+    //==== RADIUS ====
     public function radiusItems(){
         $user = $this->Aa->user_for_token($this);
         if(!$user){
@@ -955,6 +969,8 @@ class DashboardController extends AppController{
     
     }
     
+    
+    //==== Other ====
     public function otherItems(){
     
         $user = $this->Aa->user_for_token($this);
@@ -1102,7 +1118,7 @@ class DashboardController extends AppController{
                     'id'            => 'pnlOtherHomeServerPools',
                     'glyph'         => 'xf1ce',
                //     'total'         => $this->Counts->countForCloud('HomeServers',$cloudId),
-                    'desc'          => 'FIXME Description',
+                    'desc'          => 'Mange upstream RADIUS servers',
                     'accent'        => 'blue'
                   ],
                   'column2' => 
@@ -1112,7 +1128,7 @@ class DashboardController extends AppController{
                     'id'            => 'pnlOtherPrivatePsks',
                     'glyph'         => 'xf023',
                     'total'         => $this->Counts->countForCloud('PrivatePsks',$cloudId),
-                    'desc'          => 'FIXME Description',
+                    'desc'          => 'Private PSKs - No RADIUS',
                     'accent'        => 'teal'
                   ]
             ];
@@ -1125,7 +1141,7 @@ class DashboardController extends AppController{
                         'id'            => 'pnlOtherPrivatePsks',
                         'glyph'         => 'xf023',
                         'total'         => $this->Counts->countForCloud('PrivatePsks',$cloudId),
-                        'desc'          => 'FIXME Description',
+                        'desc'          => 'Private PSKs - No RADIUS',
                         'accent'        => 'blue'
                     ]
             ];
@@ -1140,7 +1156,7 @@ class DashboardController extends AppController{
                     'id'            => 'pnlOtherLogin',
                     'glyph'         => 'xf0a9',
                     'total'         => $this->Counts->countForCloud('DynamicDetails',$cloudId),
-                    'desc'          => 'FIXME Description',
+                    'desc'          => 'Configurable, Powerfull, Modern. Support for Mikrotik and CoovaChilli',
                     'accent'        => 'blue'
                   ],
                 'column2' => 
@@ -1150,7 +1166,7 @@ class DashboardController extends AppController{
                     'id'            => 'pnlOtherPasspoint',
                     'glyph'         => 'xf1eb',
                     'total'         => $this->Counts->countForCloud('PasspointProfiles',$cloudId),
-                    'desc'          => 'FIXME Description',
+                    'desc'          => 'Quick and easy Hotspot 2.0 profiles',
                     'accent'        => 'teal'
                   ]
             ];
@@ -1163,7 +1179,7 @@ class DashboardController extends AppController{
                     'id'            => 'pnlOtherPasspointUplinks',
                     'glyph'         => 'xf1eb',
                     'total'         => $this->Counts->countForCloud('PasspointUplinks',$cloudId),
-                    'desc'          => 'FIXME Description',
+                    'desc'          => 'Predefined uplinks available to WAN-By-WiFi configurations',
                     'accent'        => 'purple'
                   ]
             ];
@@ -1177,7 +1193,7 @@ class DashboardController extends AppController{
                 'id'            => 'pnlOtherOpenvpnServers',
                 'glyph'         => 'xf10e',
                 'total'         => $this->Counts->countForCloud('OpenvpnServers',$cloudId),
-                 'desc'          => 'FIXME Description',
+                 'desc'          => 'OpenVPN tunnel and PKI management',
                  'accent'        => 'blue'
               ],
             'column2' => 
@@ -1187,7 +1203,7 @@ class DashboardController extends AppController{
                 'id'            => 'pnlOtherAccel',
                 'glyph'         => 'xf10e',
                 'total'         => $this->Counts->countForCloud('AccelServers',$cloudId),
-                'desc'          => 'FIXME Description',
+                'desc'          => 'Accel-ppp for PPPoE and L2TPv2 connections',
                 'accent'        => 'teal'
               ]
         ];
@@ -1199,8 +1215,8 @@ class DashboardController extends AppController{
                 'controller'    => 'cWireguard',
                 'id'            => 'pnlOtherWireguard',
                 'glyph'         => 'xf10e',
-                //'total'         => $this->Counts->countForCloud('PasspointUplinks',$cloudId),
-                'desc'          => 'FIXME Description',
+                'total'         => $this->Counts->countForCloud('WireguardServers',$cloudId),
+                'desc'          => 'Manage Wireguard servers, instances and peers',
                 'accent'        => 'purple'
               ]
         ];
@@ -1480,8 +1496,7 @@ class DashboardController extends AppController{
         }
     
     	return $items;  
-    }
-    
+    }    
     
     private function _nav_tree_blank(){
         

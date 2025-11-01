@@ -5,8 +5,13 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
     store : 'sPermanentUsers',
     stateful: true,
     stateId: 'StateGridPermanentUsers',
-    stateEvents:['groupclick','columnhide'],
-    border: false,
+    stateEvents :['groupclick','columnhide'],
+    border      : false,
+    padding     : 0,
+    ui          : 'light',
+    columnLines : false,
+    rowLines    : false,
+    stripeRows  : true,
     requires: [
         'Rd.view.components.ajaxToolbar',
         'Ext.toolbar.Paging',
@@ -31,8 +36,8 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
                { text: 'Change Password', glyph: Rd.config.icnLock,   handler: function(){
                     me.fireEvent('menuItemClick',me,'password');
                }},
-               { text: 'Enable/Disable',  glyph: Rd.config.icnLight,  handler: function(){
-                    me.fireEvent('menuItemClick',me,'disable');
+               { text: 'Change Admin State',  glyph: Rd.config.icnGears,  handler: function(){
+                    me.fireEvent('menuItemClick',me,'admin_state');
                }},
                { text: 'Test RADIUS',     glyph: Rd.config.icnRadius, handler: function(){
                     me.fireEvent('menuItemClick',me,'radius');
@@ -103,7 +108,7 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
                 hidden      : true,
                 filter      : {type: 'string'},stateId: 'StateGridPermanentUsers11'
             },
-            { 
+          /*  { 
                 text        : i18n('sActive'),
                 tdCls       : 'gridTree',   
                 xtype       : 'templatecolumn', 
@@ -118,6 +123,28 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
                         yesText         : 'Yes',
                         noText          : 'No'
                 },stateId: 'StateGridPermanentUsers12'
+            },*/
+             {
+              text        : "<i class='fa fa-cog'></i> Admin State",
+              dataIndex   : 'admin_state',
+              width       : 140,
+              sortable    : true,
+              filter      : {
+                type: 'list',
+                options: [
+                  ['active',     'Active'    ],
+                  ['suspended',  'Suspended' ],
+                  ['terminated', 'Terminated']
+                ]
+              },
+              renderer    : function(v) {
+                const cls = {
+                  active    : 'rd-badge rd-badge--green',
+                  suspended : 'rd-badge rd-badge--amber',
+                  terminated: 'rd-badge rd-badge--gray'
+                }[(v || '').toLowerCase()] || 'rd-badge';
+                return `<span class="${cls}">${Ext.String.capitalize(v)}</span>`;
+              }
             },   
             { 
                 text        : i18n('sLast_accept_time'),

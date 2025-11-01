@@ -151,7 +151,8 @@ class GridButtonsRbaComponent extends Component {
                     'ui'        => $this->GridButtonsBase->btnUiMail
                 ],
                 $this->GridButtonsBase->btnPassword,
-                $this->GridButtonsBase->btnEnable,
+              //  $this->GridButtonsBase->btnEnable,
+                $this->GridButtonsBase->btnAdminState,
                 $this->GridButtonsBase->btnRadius,
                 $this->GridButtonsBase->btnGraph,
                 $this->GridButtonsBase->btnByod,
@@ -175,7 +176,8 @@ class GridButtonsRbaComponent extends Component {
             array_push($items,$this->GridButtonsBase->btnPassword);      
         }
         if(in_array('enableDisable', $allowedActions)){
-            array_push($items,$this->GridButtonsBase->btnEnable);      
+            //array_push($items,$this->GridButtonsBase->btnEnable);
+            array_push($items,$this->GridButtonsBase->btnAdminState);    
         }
         
         //'btnRadius',

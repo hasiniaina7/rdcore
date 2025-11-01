@@ -15,6 +15,8 @@ Ext.define('Rd.controller.cMainUsers', {
             me.store = Ext.create('Ext.data.Store',{
                 storeId : 'myStore',
                 fields  : ['column1','column2'], 
+                reloadOnClear: false,
+                trackRemoved: false,
                 proxy   : {
                     type   :'ajax',
                     url    : me.getUrlGetContent(),
@@ -50,7 +52,22 @@ Ext.define('Rd.controller.cMainUsers', {
                                 '<div class="rd-tile-title">{column1.name}</div>',
                                 '<div class="rd-tile-desc">{column1.desc}</div>',
                               '</div>',
-                              '<div class="rd-tile-stat">{column1.total}</div>',
+                             // '<div class="rd-tile-stat">{column1.total}</div>',
+                              '<div class="rd-tile-stat">',
+                                  '{column1.total}',
+                                  '<tpl if="column1.online &gt; 0">',
+                                    '<span class="rd-badge rd-badge-online" title="{column1.online} online">{column1.online} online</span>',
+                                  '</tpl>',
+                                  '<tpl if="column1.sessions &gt; 0">',
+                                    '<span class="rd-badge rd-badge-online" title="{column1.sessions} online">{column1.sessions} sessions</span>',
+                                  '</tpl>',
+                                  '<tpl if="column1.suspended &gt; 0">',
+                                    '<span class="rd-badge rd-badge--amber" title="{column1.suspended} online">{column1.suspended} suspended</span>',
+                                  '</tpl>',
+                                  '<tpl if="column1.terminated &gt; 0">',
+                                    '<span class="rd-badge rd-badge--gray" title="{column1.terminated} online">{column1.terminated} terminated</span>',
+                                  '</tpl>',
+                                '</div>',
                             '</div>',
                           '</tpl>',
 
@@ -63,7 +80,13 @@ Ext.define('Rd.controller.cMainUsers', {
                                 '<div class="rd-tile-title">{column2.name}</div>',
                                 '<div class="rd-tile-desc">{column2.desc}</div>',
                               '</div>',
-                              '<div class="rd-tile-stat">{column2.total}</div>',
+                             // '<div class="rd-tile-stat">{column2.total}</div>',
+                                '<div class="rd-tile-stat">',
+                                  '{column2.total}',
+                                  '<tpl if="column2.online &gt; 0">',
+                                    '<span class="rd-badge rd-badge-online" title="{column2.online} online">{column2.online} online</span>',
+                                  '</tpl>',
+                                '</div>',
                             '</div>',
                           '</tpl>',
                         '</div>',
@@ -75,8 +98,7 @@ Ext.define('Rd.controller.cMainUsers', {
                     scope: me
                 }
             });
-            
-                     
+                                 
             var tp = Ext.create('Ext.panel.Panel',
             	{          
 	            	border      : false,
@@ -91,16 +113,42 @@ Ext.define('Rd.controller.cMainUsers', {
         }
         return added;      
     },
-    actionBackButton: function(){
-        var me              = this;                           
-        var pnlDashboard    = me.getViewP().down('pnlDashboard');
-        var new_data        = Ext.Object.merge(pnlDashboard.down('#tbtHeader').getData(),{fa_value:'&#xf1ce;', value : 'RADIUS'});
-        pnlDashboard.down('#tbtHeader').update(new_data);
-        var pnl             = me.getViewP().down('#pnlCenter');
-        var item            = pnl.down('#tabMainUsers');
-        pnl.setActiveItem(item);
-        pnl.getEl().slideIn('r');     
-    },   
+    actionBackButton: function () {
+        var me = this,
+            vp = me.getViewP(),
+            pnlDashboard = vp.down('pnlDashboard'),
+            header = pnlDashboard.down('#tbtHeader'),
+            pnl = vp.down('#pnlCenter'),
+            tab = pnl.down('#tabMainUsers'),
+            dv = tab.down('dataview'),
+            store = dv.getStore();
+
+        header.update(Ext.apply({}, { fa_value: '&#xf2c0;', value: 'Users' }, header.getData()));
+
+        // avoid empty flash during load
+        store.clearOnLoad = false;
+        dv.setLoading('Loading…');
+
+        // ensure the incoming card is hidden before activation
+        tab.on('afterrender', function () { tab.getEl().hide(); }, { single: true });
+
+        store.load({
+            callback: function () {
+                dv.setLoading(false);
+
+                // switch card (no animation here)
+                pnl.setActiveItem(tab);
+
+                // now animate the newly active card
+                var el = tab.getEl();
+                if (el) {
+                el.slideIn('r', { duration: 250, easing: 'easeOut' });
+                }
+            },
+            scope: me
+        });
+    }, 
+          
     itemClicked: function(view, record, item, index, e){
         var me = this;
 
@@ -121,47 +169,24 @@ Ext.define('Rd.controller.cMainUsers', {
                 var added = Ext.getApplication().runAction(column.controller,'Index',pnl,id);
                 if(!added){
                     pnl.setActiveItem(item);
-                }else{
+                }else{                
                     pnl.setActiveItem(id);
+                    // now animate the newly active card                    
+                    var i   = pnl.down('#'+id);
+                    var el  = i.getEl();
+                    if (el) {
+                        el.slideIn('l', { duration: 250, easing: 'easeOut' });
+                    }
                 }
             }else{
-                pnl.setActiveItem(item);
+                pnl.setActiveItem(item);               
+                // now animate the newly active card
+                var el = item.getEl();
+                if (el) {
+                el.slideIn('l', { duration: 250, easing: 'easeOut' });
+                }                
             }
         }
-    }
-    /*
-    actionIndex: function(pnl,itemId){
-        var me      = this;
-        var item    = pnl.down('#'+itemId);
-        var added   = false;
-        if(!item){
-            var tp = Ext.create('Ext.tab.Panel',
-            	{          
-	            	border  : false,
-	                itemId  : itemId,
-	                plain	: true,
-	                cls     : 'subSubTab', //Make darker
-	            });      
-            pnl.add(tp);
-            Ext.Ajax.request({
-                url     : me.getUrlGetContent(),
-                method  : 'GET',
-                params  : { item_id : itemId },
-                success : function (response) {
-                    var jsonData = Ext.JSON.decode(response.responseText);
-                    if (jsonData.success) {
-                        var items = jsonData.items;
-                        tp.add(items);
-                        // Set the first tab active, if there are any tabs
-                        if (tp.items.getCount() > 0) {
-                            tp.setActiveTab(0);
-                        }
-                    }
-                },
-                scope: me
-            });
-            added = true;
-        }
-        return added;      
-    }*/
+    }   
+    
 });

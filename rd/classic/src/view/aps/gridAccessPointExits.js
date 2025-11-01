@@ -53,24 +53,34 @@ Ext.define('Rd.view.aps.gridAccessPointExits' ,{
                     text        : i18n('sType'),
                     dataIndex   : 'type',
                     stateId     : 'StateGridAccessPointExitsId2',
-                    width       : 180,
+                    width       : 200,
                     renderer: function (v, m, rec) {
                         // keep your mapping but show as label w/ status dot
+                        
+                        //add a chip for suspend and inactive admin_state
+                        var txtAdminState = '';
+                        if(rec.get('admin_state') == 'inactive'){
+                            txtAdminState = ' '+chip('rd-chip--muted', 'fa fa-stop', 'For inactive');
+                        }
+                        if(rec.get('admin_state') == 'suspended'){
+                            txtAdminState = ' '+chip('rd-chip--warning', 'fa fa-pause', 'For suspended');
+                        }
+                        
                         switch (v) {
                             case 'bridge':
-                                return dot('rd-dot--gray')   + 'Bridge';
+                                return dot('rd-dot--gray')   + 'Bridge' + txtAdminState;
                             case 'captive_portal':
-                                return dot('rd-dot--purple') + 'Captive Portal';
+                                return dot('rd-dot--purple') + 'Captive Portal' + txtAdminState;
                             case 'nat':
-                                return dot('rd-dot--green')  + 'NAT + DHCP';
+                                return dot('rd-dot--green')  + 'NAT + DHCP' + txtAdminState;
                             case 'tagged_bridge':
-                                return dot('rd-dot--blue')   + 'L2 Tagged Bridge ' + chip('rd-chip--muted', 'fa fa-hashtag', 'VLAN ' + (rec.get('vlan')||''));
+                                return dot('rd-dot--blue')   + 'L2 Tagged Bridge ' + chip('rd-chip--muted', 'fa fa-hashtag', 'VLAN ' + (rec.get('vlan')||'')) + txtAdminState;
                             case 'openvpn_bridge':
-                                return dot('rd-dot--blue')   + 'OpenVPN Bridge';
+                                return dot('rd-dot--blue')   + 'OpenVPN Bridge' + txtAdminState;
                             case 'tagged_bridge_l3':
-                                return dot('rd-dot--blue')   + 'L3 Tagged Bridge ' + chip('rd-chip--muted', 'fa fa-hashtag', 'VLAN ' + (rec.get('vlan')||''));
+                                return dot('rd-dot--blue')   + 'L3 Tagged Bridge ' + chip('rd-chip--muted', 'fa fa-hashtag', 'VLAN ' + (rec.get('vlan')||'')) + txtAdminState;
                             case 'pppoe_server':
-                                return dot('rd-dot--blue')   + 'PPPoE Server (Accel)';
+                                return dot('rd-dot--blue')   + 'PPPoE Server (Accel) ' + txtAdminState;
                             default:
                                 return Ext.htmlEncode(v || '');
                         }

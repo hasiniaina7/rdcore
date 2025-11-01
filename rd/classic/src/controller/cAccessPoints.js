@@ -85,36 +85,6 @@ Ext.define('Rd.controller.cAccessPoints', {
         }
         return added;      
     },  
-    
-    /*actionIndex: function(pnl){
-        var me      = this;
-
-        pnl.add({ 
-            xtype   : 'gridApProfiles',
-            itemId  : 'ap_profiles',
-	        title   : 'AP Profiles',
-            border  : false,
-            plain   : true,
-            glyph   : Rd.config.icnProfile,
-            padding : Rd.config.gridSlim,
-            tabConfig   : {
-                ui : 'tab-blue'
-            }   
-        });
-
-        pnl.add({  
-            xtype   : 'gridApLists', 
-            itemId  : 'aps', 
-            title   : 'APs',
-            glyph   : Rd.config.icnCube,
-            padding : Rd.config.gridSlim,
-            tabConfig : {
-                ui : 'tab-orange'
-            }    
-        });
-        return;     
-    },*/
-
     views:  [
         'aps.gridApProfiles', 
         'aps.gridApLists',
@@ -406,7 +376,7 @@ Ext.define('Rd.controller.cAccessPoints', {
         var name    = "New Ap"; 
 		var apProfileId = '';
 		var apProfile   = '';
-       Ext.getApplication().runAction('cAccessPointAp','Index',id,{name:name,apProfileId:apProfileId,apProfile:apProfile,store:store});
+        Ext.getApplication().runAction('cAccessPointAp','Index',id,{name:name,apProfileId:apProfileId,apProfile:apProfile,store:store});
     },
     delAp:   function(btn){
         var me      = this;
@@ -444,7 +414,7 @@ Ext.define('Rd.controller.cAccessPoints', {
                                 Ext.ux.Constants.clsWarn,
                                 Ext.ux.Constants.msgWarn
                             );
-                            grid.getStore().load(); //Reload from server since the sync was not good
+                            grid.getStore().reload(); //Reload from server since the sync was not good
                         }
                     });    
                 }
@@ -816,7 +786,7 @@ Ext.define('Rd.controller.cAccessPoints', {
             url         : me.getUrlCsvImport(),
             success     : function(form, action) {              
                 if(action.result.success){
-                    store.load();
+                    store.reload();
                     window.close();                   
                 } 
                 Ext.ux.Toaster.msg(
@@ -1004,7 +974,7 @@ Ext.define('Rd.controller.cAccessPoints', {
             url: me.getUrlAdd(),
             success: function(form, action) {
                 win.close();
-                me.getStore('sApProfiles').load();
+                me.getGrid().getStore().load();
                 Ext.ux.Toaster.msg(
                     i18n('sNew_item_created'),
                     i18n('sItem_created_fine'),

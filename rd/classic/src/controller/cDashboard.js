@@ -335,27 +335,28 @@ Ext.define('Rd.controller.cDashboard', {
     },
     btnExpandClick: function(btn){
     	var me = this;
-   		var pnlDashboard = btn.up('pnlDashboard');
-   		var pnlWest = pnlDashboard.down('#pnlWest');
+   		var pnlDashboard    = btn.up('pnlDashboard');
+   		var pnlWest         = pnlDashboard.down('#pnlWest');
+   		var pnlCenter       = me.getViewP().down('#pnlCenter');
    		var treelist = pnlWest.down('treelist');
    		treelist.setMicro(!treelist.getMicro());
    		if(treelist.getMicro()){
-   			//pnlWest.setWidth(55).getEl().slideIn('r');
-   			pnlWest.getEl().animate({
-   				duration: 700,
-				to: {
-				    width: 55
-				},
-				listeners: {
-					afteranimate: function() {
-					    // Execute my custom method after the animation
-					    pnlWest.setWidth(55)
-					},
-					scope: this
-				}
-			});
-   		}else{
-   			pnlWest.setWidth(150).getEl().slideIn('l');
+   		
+   		    pnlWest.setWidth(55);
+   		    // Animate both panels simultaneously
+            pnlWest.getEl().animate({
+                duration: 700,
+                to: { width: 55 }
+            });
+            
+            pnlCenter.getEl().slideIn('r', {
+                duration: 700,   // match timing
+                easing: 'easeIn', // optional easing for smoother effect
+            });
+
+   		}else{ 		
+   			pnlWest.setWidth(150).getEl().slideIn('l').setWidth(150);
+   			pnlCenter.getEl().slideIn('l');
    		}   
     },
     treeNodeSelect: function(tree,record,ndx,opts){
@@ -377,14 +378,29 @@ Ext.define('Rd.controller.cDashboard', {
     		if(!item){
     			var added = Ext.getApplication().runAction(c,'Index',pnl,id);
                 if(!added){
-                    pnl.setActiveItem(item);
-                    pnl.getEl().slideIn('t'); //Slide it in if **not** added
+                    pnl.setActiveItem(item);                    
+                    var el = pnl.getEl();
+                    if (el) {
+                    el.slideIn('t', { duration: 250, easing: 'easeOut' });
+                    } 
+                    
                 }else{
                     pnl.setActiveItem(id);
+                    
+                    // now animate the newly active card                    
+                    var i   = pnl.down('#'+id);
+                    var el  = i.getEl();
+                    if (el) {
+                        el.slideIn('t', { duration: 250, easing: 'easeOut' });
+                    }
+                    
                 }
 		   	}else{
 		   		pnl.setActiveItem(item);
-                pnl.getEl().slideIn('t'); //Slide it in if **not** added
+                var el = pnl.getEl();
+                if (el) {
+                el.slideIn('t', { duration: 250, easing: 'easeOut' });
+                } 
 		   	}     	
     	} 
     },
@@ -400,15 +416,13 @@ Ext.define('Rd.controller.cDashboard', {
         myStore.getRoot().appendChild(dd.tree_nav);
         //--Set the detault selected item--
         var rootNode = pnl.down('#tlNav').getStore().getRootNode();
-        
-        
+              
        /* rootNode.eachChild(function(n) {
             if(n.get('id') == me.getDefaultScreen()){
                 pnl.down('#tlNav').setSelection(n);
             }
         });*/
         
-
         if(dd.user.cloud_count == 0){
             console.log("No Clouds - Start Up the Wizard");
             Ext.getApplication().runAction('cSetupWizard','Index') 

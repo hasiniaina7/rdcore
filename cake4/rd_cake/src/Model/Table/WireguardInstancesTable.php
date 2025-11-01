@@ -25,6 +25,7 @@ class WireguardInstancesTable extends Table {
             'foreignKey'=> 'wireguard_server_id',
             'joinType'  => 'INNER',
          ]);
+         $this->hasMany('WireguardPeers',['dependent' => true]);
     }
 
     public function validationDefault(Validator $v): Validator {

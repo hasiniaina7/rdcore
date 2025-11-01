@@ -97,44 +97,54 @@ class ApHelper22Component extends Component {
 		        $this->MetaData['mac']      = $mac;
 		        $this->MetaData['ap_id']    = $this->ApId;
 		        $this->MetaData['node_id']  = $this->ApId; //Add this to keep the firmware simple and backward compatible
+		        $this->MetaData['admin_state']  = $ent_ap->admin_state;
 		        		        
 		        $this->_update_wbw_channel(); //Update the wbw channel if it is included
 		        
-                $query = $this->{$this->main_model}->find()->contain([
-                    'ApApProfileEntries' => [
-                        'ApProfileEntries' => [
-                            'ApProfileEntrySchedules'
+		        $states = ['active'];
+		        
+		        if($ent_ap->admin_state !== 'active'){
+		            $states[] = $ent_ap->admin_state;
+		        }
+		        
+                $query = $this->{$this->main_model}->find()
+                    ->contain([
+                        'ApApProfileEntries' => [
+                            'ApProfileEntries' => [
+                                'ApProfileEntrySchedules'
+                            ],
                         ],
-                    ],
-                    'ApStaticEntryOverrides',
-                    'ApProfiles' => [
-                        'ApProfileEntries' => [ 
-                        	'ApProfileEntrySchedules'
-                        ],
-                        'ApProfileSettings' => [
-                            'Schedules' => [
-                                'ScheduleEntries' => [
-                                    'PredefinedCommands'
+                        'ApStaticEntryOverrides',
+                        'ApProfiles' => [
+                            'ApProfileEntries' => [ 
+                            	'ApProfileEntrySchedules'
+                            ],
+                            'ApProfileSettings' => [
+                                'Schedules' => [
+                                    'ScheduleEntries' => [
+                                        'PredefinedCommands'
+                                    ]
                                 ]
-                            ]
+                            ],
+                            'ApProfileSpecifics',
+                            'ApProfileExits' => fn($q) => $q->find('byAdminStates', ['states' => $states])
+                                ->contain([
+                                    'ApProfileExitApProfileEntries',
+                                    'ApProfileExitCaptivePortals',
+                                    'ApProfileExitSettings',
+                                    'ApProfileExitPppoeServers',
+                                    'SqmProfiles',
+                                ])
                         ],
-                        'ApProfileSpecifics',
-                        'ApProfileExits' => [
-                            'ApProfileExitApProfileEntries',
-                            'ApProfileExitCaptivePortals',
-                            'ApProfileExitSettings',
-                            'ApProfileExitPppoeServers',
-                            'SqmProfiles'
+                        'Schedules' => [
+                            'ScheduleEntries' => [
+                                'PredefinedCommands'
+                            ]
                         ]
-                    ],
-                    'Schedules' => [
-                        'ScheduleEntries' => [
-                            'PredefinedCommands'
-                        ]
-                    ]
-                ]);
+                    ]);
+                                               
                 $ap_profile = $query->where(['ApProfiles.id' => $ap_profile_id,'Aps.mac' =>$mac])->first();
-
+                
                 $ap_profile['ApsDetail'] = $ent_ap;             
                 $this->_update_fetched_info($ent_ap);
                 
@@ -505,12 +515,26 @@ class ApHelper22Component extends Component {
        /// print_r($ap_profile['ApProfileExit']);
        
         $this->MetaData['exits']= [];
+        
+        
+        //*** We need to ignore / skip these items under the **active** exit points ***
+        //*** IF the AP is in suspended or inactive mode ***
+        
+        $adminStateActiveSkips = [];
+        foreach($ap_profile->ap_profile->ap_profile_exits as $ap_profile_e){
+            $as = $ap_profile_e->admin_state;
+            if(($as == 'suspended')||($as == 'inactive')){
+                foreach($ap_profile_e->ap_profile_exit_ap_profile_entries as $entry){
+                    $adminStateActiveSkips[] = $entry->ap_profile_entry_id;
+                }            
+            }      
+        }        
 
         //Add the auto-attach entry points
         foreach($ap_profile->ap_profile->ap_profile_exits as $ap_profile_e){
                     
-            $has_entries_attached   = false;
-            $notVlan                = true;
+            $entries_attached   = 0;
+            $notVlan            = true;
 
            // if (($ap_profile_e->vlan > 0) && ($ap_profile_e->type === 'nat')) {
             if (($ap_profile_e->vlan > 0) && (($ap_profile_e->type === 'nat')||($ap_profile_e->type === 'captive_portal'))) {
@@ -527,8 +551,21 @@ class ApHelper22Component extends Component {
                                               
             //This is used to fetch info eventually about the entry points
             if(count($ap_profile_e->ap_profile_exit_ap_profile_entries) > 0){
-                $has_entries_attached = true;
+                $entries_attached++;
                 foreach($ap_profile_e->ap_profile_exit_ap_profile_entries as $entry){
+                
+                    //------------------------------------------
+                    $as         = $ap_profile_e->admin_state;
+                    $entry_id   = $entry->ap_profile_entry_id;
+                    
+                    if($as == 'active'){
+                        if(in_array($entry_id,$adminStateActiveSkips)){
+                            $entries_attached--;
+                            continue;
+                        }
+                    }
+                    //----------------------------------------
+                
                     if($entry->ap_profile_entry_id == 0){
                         $eth_one_bridge = true;
                     }
@@ -569,15 +606,15 @@ class ApHelper22Component extends Component {
             ];
                                    
             if($type == 'tagged_bridge_l3'){
-                $has_entries_attached = true;
+                $entries_attached++;
             }
             
             //We might have just WBW and single WAN port WITHOUT SSID
             if($exit_id == $wan_bridge_id){
-                $has_entries_attached = true;   
+                $entries_attached++; 
             }
 
-            if(($has_entries_attached == true)||($ap_profile_e->vlan > 0)){
+            if(($entries_attached > 0)||($ap_profile_e->vlan > 0)){
 
             //print_r($ap_profile_e);
 

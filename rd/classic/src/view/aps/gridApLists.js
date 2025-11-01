@@ -6,6 +6,11 @@ Ext.define('Rd.view.aps.gridApLists' ,{
     stateId		: 'StateGridApLists',
     stateEvents	: ['groupclick','columnhide'],
     border		: false,
+    padding     : 0,
+    ui          : 'light',
+    columnLines : false,
+    rowLines    : false,
+    stripeRows  : true,
     requires	: [
         'Rd.view.components.ajaxToolbar',
         'Ext.toolbar.Paging',

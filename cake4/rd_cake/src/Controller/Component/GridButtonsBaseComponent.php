@@ -152,6 +152,15 @@ class GridButtonsBaseComponent extends Component {
             'tooltip'   => __('Enable / Disable'),
             'ui'        => $this->btnUiEnable
         ];
+        
+        $this->btnAdminState = [
+            'xtype'     => 'button',  
+            'glyph'     => Configure::read('icnGears'),
+            'scale'     => $this->scale, 
+            'itemId'    => 'admin_state',
+            'tooltip'   => __('Change Admin State'),
+            'ui'        => $this->btnUiEnable
+        ];
 
         $this->btnRadius = [
             'xtype'     => 'button', 

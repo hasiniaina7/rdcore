@@ -34,9 +34,11 @@ class WireguardInstancesController extends AppController{
             return;
         }
         
-    	$req_q    = $this->request->getQuery(); //q_data is the query data
-        $cloud_id = $req_q['cloud_id'];
-        $query 	  = $this->{$this->main_model}->find()->contain(['WireguardServers']);      
+    	$req_q      = $this->request->getQuery(); //q_data is the query data
+        $server_id  = $req_q['server_id'];
+        $query 	    = $this->{$this->main_model}->find()
+                        ->where(['WireguardInstances.wireguard_server_id' => $server_id])
+                        ->contain(['WireguardServers']);      
                    
         $limit  = 50;   //Defaults
         $page   = 1;
@@ -257,7 +259,7 @@ class WireguardInstancesController extends AppController{
         //-- Subnet and IP ---
         if($req_d['ipv4_enabled'] === 1){
             $freeV4 = $this->SubnetPlanner->nextFreeSubnet(
-                serverId: 1,
+                serverId: $server_id,
                 family: 'ipv4',
                 prefix: 24,
                 seedCidr: null,
@@ -272,7 +274,7 @@ class WireguardInstancesController extends AppController{
         if($req_d['ipv6_enabled'] === 1){
             // Example: start scanning from a seed, no pool
             $freeV6 = $this->SubnetPlanner->nextFreeSubnet(
-                1, 'ipv6', 64, $this->v6PoolsStart, null
+                $server_id, 'ipv6', 64, $this->v6PoolsStart, null
             );
             [$ipv6_net,$ipv6_prefix] = explode('/',$freeV6);
             $next_ipv6 = $this->SubnetPlanner->nextIp($ipv6_net);      
@@ -356,9 +358,8 @@ class WireguardInstancesController extends AppController{
         $user = $this->Aa->user_for_token($this);
         if(!$user){   //If not a valid user
             return;
-        }
-        
-        $menu = $this->GridButtonsFlat->returnButtons(false,'accel_profiles');
+        }     
+        $menu = $this->GridButtonsFlat->returnButtons(false,'wireguardInstances');
         $this->set([
             'items'         => $menu,
             'success'       => true

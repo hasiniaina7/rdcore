@@ -31,7 +31,7 @@ Ext.define('Rd.controller.cPermanentUsers', {
                                 scope   : me
                             }
 	                    }
-	                ]
+	                ],    
 	            });      
             pnl.add(tp);
             added = true;
@@ -49,6 +49,7 @@ Ext.define('Rd.controller.cPermanentUsers', {
         'permananetUsers.winUserEmailDetail',
         'permanentUsers.winPermanentUserImport',
         'permanentUsers.pnlPermanentUserRealtime',
+        'components.winChangeAdminState',
         'components.btnUsersBack'
     ],
     stores: ['sLanguages', 'sPermanentUsers', 'sRealms', 'sProfiles', 'sAttributes', 'sVendors'],
@@ -68,6 +69,7 @@ Ext.define('Rd.controller.cPermanentUsers', {
         
         urlEmailSend        : '/cake4/rd_cake/permanent-users/email-user-details.json',
         urlEnableDisable    : '/cake4/rd_cake/permanent-users/enable-disable.json',
+        urlChangeAdminState : '/cake4/rd_cake/permanent-users/change-admin-state.json',
         urlChangePassword   : '/cake4/rd_cake/permanent-users/change-password.json',
         urlDelete           : '/cake4/rd_cake/permanent-users/delete.json', 
         urlDevicesListedOnly: '/cake4/rd_cake/permanent-users/restrict-list-of-devices.json',
@@ -124,6 +126,9 @@ Ext.define('Rd.controller.cPermanentUsers', {
             },
             'gridPermanentUsers #enable_disable' : {
                 click:      me.enableDisable
+            },
+            'gridPermanentUsers #admin_state' : {
+                click:      me.adminState
             },
             'gridPermanentUsers #test_radius' : {
                 click:      me.testRadius
@@ -230,6 +235,9 @@ Ext.define('Rd.controller.cPermanentUsers', {
             },
             '#winEnableDisablePermanentUser #save': {
                 click: me.enableDisableSubmit
+            },
+            '#winChangeAdminState #save': {
+                click: me.changeAdminStateSubmit
             },
             'gridUserPrivate' : {
                 beforeedit:     me.onBeforeEditUserPrivate
@@ -768,6 +776,57 @@ Ext.define('Rd.controller.cPermanentUsers', {
             failure             : Ext.ux.formFail
         });
     },
+    
+    adminState: function(){
+        var me      = this;
+        var grid    = me.getGrid();
+        //Find out if there was something selected
+        if(grid.getSelectionModel().getCount() == 0){ 
+             Ext.ux.Toaster.msg(
+                        i18n('sSelect_an_item'),
+                        i18n('sFirst_select_an_item_to_edit'),
+                        Ext.ux.Constants.clsWarn,
+                        Ext.ux.Constants.msgWarn
+            );
+        }else{
+            if(!Ext.WindowManager.get('winChangeAdminState')){
+                var w = Ext.widget('winChangeAdminState',{id:'winChangeAdminState'});
+                w.show();       
+            }    
+        }
+    },
+    changeAdminStateSubmit :function(button){
+
+        var me      = this;
+        var win     = button.up('window');
+        var form    = win.down('form');
+
+        var extra_params    = {};
+        var s               = me.getGrid().getSelectionModel().getSelection();
+        Ext.Array.each(s,function(record){
+            var r_id = record.getId();
+            extra_params[r_id] = r_id;
+        });
+
+        //Checks passed fine...      
+        form.submit({
+            clientValidation    : true,
+            url                 : me.getUrlChangeAdminState(),
+            params              : extra_params,
+            success             : function(form, action) {
+                win.close();
+                me.reload();
+                Ext.ux.Toaster.msg(
+                    i18n('sItems_modified'),
+                    i18n('sItems_modified_fine'),
+                    Ext.ux.Constants.clsInfo,
+                    Ext.ux.Constants.msgInfo
+                );
+            },
+            failure             : Ext.ux.formFail
+        });
+    },
+       
     testRadius: function(){
         var me = this;
         var grid = me.getGrid();
@@ -1354,6 +1413,9 @@ Ext.define('Rd.controller.cPermanentUsers', {
         }
         if(action == 'disable'){
             me.enableDisable();
+        }
+        if(action == 'admin_state'){
+            me.adminState();
         }
         if(action == 'radius'){
             me.testRadius();

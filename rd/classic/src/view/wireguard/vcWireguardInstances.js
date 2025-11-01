@@ -26,12 +26,12 @@ Ext.define('Rd.view.wireguard.vcWireguardInstances', {
         },
         'gridWireguardInstances #edit': {
             click   : 'edit'
-        },  
+        }, 
+        'gridWireguardInstances #btnPeers': {
+            click   : 'peers'
+        },   
         'gridWireguardInstances #restart': {
             click   : 'restart'
-        },
-        'gridWireguardInstances #sessions': {
-            click   : 'sessions'
         },
         'gridWireguardInstances actioncolumn': { 
              itemClick  : 'onActionColumnItemClick'
@@ -199,7 +199,7 @@ Ext.define('Rd.view.wireguard.vcWireguardInstances', {
             }
         }
     }, 
-    instances : function(){
+    peers : function(){
         // console.log("Edit node");  
         var me = this;
         //See if there are anything selected... if not, inform the user
@@ -216,12 +216,12 @@ Ext.define('Rd.view.wireguard.vcWireguardInstances', {
             var selected    =  me.getView().getSelectionModel().getSelection();
             var count       = selected.length;         
             Ext.each(me.getView().getSelectionModel().getSelection(), function(sr,index){
-
+            
                 //Check if the node is not already open; else open the node:
-                var tp          = me.getView().up('tabpanel');
+                var tp         = me.getView().up('tabpanel');
                 var t_id       = sr.getId();
-                var t_tab_id   = 'wgTab_'+t_id;
-                var nt          = tp.down('#'+t_tab_id);
+                var t_tab_id   = 'wgPeerTab_'+t_id;
+                var nt         = tp.down('#'+t_tab_id);
                 if(nt){
                     tp.setActiveTab(t_tab_id); //Set focus on  Tab
                     return;
@@ -230,13 +230,13 @@ Ext.define('Rd.view.wireguard.vcWireguardInstances', {
                 var t_tab_name = sr.get('name');
                 //Tab not there - add one
                 tp.add({ 
-                    title   : 'Instances for '+t_tab_name,
+                    title   : 'Peers for '+t_tab_name,
                     itemId  : t_tab_id,
                     closable: true,
-                    glyph   : Rd.config.icnGear,
+                    glyph   : Rd.config.icnExchange,
                     layout  : 'fit',
-                    srv_id  : t_id,
-                    xtype   : 'gridWireguardInstances'
+                    instance_id  : t_id,
+                    xtype   : 'gridWireguardPeers'
                 });
                 tp.setActiveTab(t_tab_id); //Set focus on Add Tab
             });
@@ -294,49 +294,6 @@ Ext.define('Rd.view.wireguard.vcWireguardInstances', {
             });
         }   
     },
-    sessions : function(){
-         // console.log("Edit node");  
-        var me = this;
-        //See if there are anything selected... if not, inform the user
-        var sel_count = me.getView().getSelectionModel().getCount();
-        if(sel_count == 0){
-            Ext.ux.Toaster.msg(
-                        i18n('sSelect_an_item'),
-                        i18n('sFirst_select_an_item'),
-                        Ext.ux.Constants.clsWarn,
-                        Ext.ux.Constants.msgWarn
-            );
-        }else{
-
-            var selected    =  me.getView().getSelectionModel().getSelection();
-            var count       = selected.length;         
-            Ext.each(me.getView().getSelectionModel().getSelection(), function(sr,index){
-
-                //Check if the node is not already open; else open the node:
-                var tp          = me.getView().up('tabpanel');
-                var t_id       = sr.getId();
-                var t_tab_id   = 'puTab_'+t_id;
-                var nt          = tp.down('#'+t_tab_id);
-                if(nt){
-                    tp.setActiveTab(t_tab_id); //Set focus on  Tab
-                    return;
-                }
-
-                var t_tab_name = sr.get('name');
-                //Tab not there - add one
-                tp.add({ 
-                    title   : t_tab_name,
-                    itemId  : t_tab_id,
-                    closable: true,
-                    glyph   : Rd.config.icnChain,
-                    layout  : 'fit',
-                    srv_id  : t_id,
-                    xtype   : 'gridAccelSessions'
-                });
-                tp.setActiveTab(t_tab_id); //Set focus on Add Tab
-            });
-        }   
-    },
     onViewActivate: function(pnl){
         var me = this;
         me.reload();   
@@ -358,10 +315,6 @@ Ext.define('Rd.view.wireguard.vcWireguardInstances', {
         
         if(action == 'restart'){
             me.restart();
-        } 
-        
-        if(action == 'sessions'){
-            me.sessions();
         }     
     }
 });

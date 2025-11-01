@@ -1,0 +1,2 @@
+Message-Authenticator := 0x00
+FreeRADIUS-Statistics-Type := All

@@ -382,6 +382,13 @@
 /* optional subtle border for contrast on light backgrounds */
 .rd-badge { border: 1px solid rgba(0,0,0,0.05); }
 
+.rd-badge-online {
+  background: #e6fffa;      /* light mint tone */
+  color: #0f766e;           /* teal text */
+  border: 1px solid #99f6e4;
+  margin-left: 6px;
+}
+
 
 .rd-section-header{
     font-weight: 600;
@@ -445,8 +452,15 @@
   font-size:12px; color:#5b6b84; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 
-.rd-tile-stat{
-  font-weight:700; font-size:22px; color:#0f1f3d; margin-left:12px;
+.rd-tile-stat {
+  position: relative;
+  font-weight: 700;
+  font-size: 24px;
+  display: inline-flex;
+  color:#0f1f3d; 
+  margin-left:12px;
+  align-items: center;
+  gap: 8px; 
 }
 
 /* Accents: thin left bar + tinted icon */
@@ -474,3 +488,32 @@
 @media (max-width: 980px){
   .rd-tiles-grid{ grid-template-columns: 1fr; }
 }
+
+/*
+.ip-cell { line-height: 1.3em; padding: 2px 0; }
+.ip-main { font-weight: 600; color: #1a1a1a; }
+.ip-meta { color: #666; font-size: 11px; }
+.country-code { color: #aaa; font-style: italic; }
+.ip-cell i { color: #999; margin-right: 4px; }
+*/
+
+.ip-cell {
+  line-height: 1.3em;
+  padding: 3px 0 2px 0;
+}
+.ip-main {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.ip-meta {
+  color: #555;
+  font-size: 11px;
+  margin-left: 1px;
+}
+.ip-cell i {
+  color: #999;
+  margin-right: 4px;
+  width: 14px;
+  text-align: center;
+}
+

@@ -143,6 +143,15 @@ class GridButtonsFlatComponent extends Component {
             'tooltip'   => __('Enable / Disable'),
             'ui'        => $this->btnUiEnable
         ];
+        
+        $this->btnAdminState = [
+            'xtype'     => 'button',  
+            'glyph'     => Configure::read('icnGears'),
+            'scale'     => $this->scale, 
+            'itemId'    => 'admin_state',
+            'tooltip'   => __('Change Admin State'),
+            'ui'        => $this->btnUiEnable
+        ];
 
         $this->btnRadius = [
             'xtype'     => 'button', 
@@ -984,11 +993,57 @@ class GridButtonsFlatComponent extends Component {
                         'itemId'    => 'btnInstances',
                         'tooltip'   => __('Manage Wireguard Instances'),
                         'ui'        => $this->btnUiEdit
+                    ],
+                    [
+                        'xtype'     => 'button',
+                        'iconCls'   => 'x-fa fa-bolt',
+                       // 'glyph'     => Configure::read('icnGears'),
+                        'scale'     => $this->scale,
+                        'itemId'    => 'btnLiveEvents',
+                        'tooltip'   => __('Live WireGuard Events'),
+                        'ui'        => 'button-metal'
                     ]
 		        ]
         	];
             $menu = [$a];
-        }                                             
+        }
+        
+        if($type == 'wireguardInstances'){       
+            $a = [
+            'xtype' => 'buttongroup',
+            'title' => null, 
+            'items' => [
+		            $this->btnReload,
+		            $this->btnAdd,		            
+		            $this->btnDelete,
+		            $this->btnEdit,
+		            [
+                        'xtype'     => 'button',
+                        'glyph'     => Configure::read('icnExchange'),
+                        'scale'     => $this->scale,
+                        'itemId'    => 'btnPeers',
+                        'tooltip'   => __('Manage Wireguard Peers'),
+                        'ui'        => $this->btnUiEdit
+                    ]
+		        ]
+        	];
+            $menu = [$a];
+        } 
+        
+        if($type == 'wireguardPeers'){       
+            $a = [
+            'xtype' => 'buttongroup',
+            'title' => null, 
+            'items' => [
+		            $this->btnReload,
+		            $this->btnAdd,		            
+		            $this->btnDelete,
+		            $this->btnEdit
+		        ]
+        	];
+            $menu = [$a];
+        }        
+                                                   
         return $menu;
     }
     
@@ -1389,8 +1444,7 @@ class GridButtonsFlatComponent extends Component {
             ]] 
         ];
     }
-    
-    
+       
      private function _fetchPermanentUserExtras(){
         $menu = []; 
         if($this->title){
@@ -1412,7 +1466,8 @@ class GridButtonsFlatComponent extends Component {
                     'ui'        => $this->btnUiMail
                ],
                $this->btnPassword,
-               $this->btnEnable,
+               //$this->btnEnable,
+               $this->btnAdminState,
                $this->btnRadius,
                $this->btnGraph,
                $this->btnByod,

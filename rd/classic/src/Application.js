@@ -136,60 +136,65 @@ Ext.define('Rd.Application', {
 
         Ext.apply(Ext.form.field.VTypes, {
 
-            //__IP Address__
+            // Existing vtypes...
             IPAddress:  function(v) {
                 return (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/).test(v);
             },
             IPAddressText:  i18n('sExample') + ': 192.168.1.1',
             IPAddressMask: /[\d\.]/i,
-         
-            //__ MAC Address __
+
+            // ---- IPv6 Address ----
+            IPv6Address: function(v) {
+                // Accepts full, compressed, and mixed IPv6 (with :: and embedded IPv4)
+                return (/^(([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|([0-9A-Fa-f]{1,4}:){1,7}:|([0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|([0-9A-Fa-f]{1,4}:){1,5}(:[0-9A-Fa-f]{1,4}){1,2}|([0-9A-Fa-f]{1,4}:){1,4}(:[0-9A-Fa-f]{1,4}){1,3}|([0-9A-Fa-f]{1,4}:){1,3}(:[0-9A-Fa-f]{1,4}){1,4}|([0-9A-Fa-f]{1,4}:){1,2}(:[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:((:[0-9A-Fa-f]{1,4}){1,6})|:((:[0-9A-Fa-f]{1,4}){1,7}|:)|fe80:(:[0-9A-Fa-f]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9])?[0-9])\.){3,}(25[0-5]|(2[0-4]|1{0,1}[0-9])?[0-9])|([0-9A-Fa-f]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9])?[0-9])\.){3,}(25[0-5]|(2[0-4]|1{0,1}[0-9])?[0-9]))$/).test(v);
+            },
+            IPv6AddressText: i18n('sExample') + ': 2001:0db8::1 or fe80::1%eth0',
+            IPv6AddressMask: /[0-9A-Fa-f:\.]/,
+            
+            IPAny: function(v) {
+                return Ext.form.field.VTypes.IPAddress(v) || Ext.form.field.VTypes.IPv6Address(v);
+            },
+            IPAnyText: i18n('sExample') + ': 192.168.0.1 or 2001:db8::1',
+            IPAnyMask: /[0-9A-Fa-f:\.]/,
+
+            // ---- MAC Address ----
             MacAddress: function(v) {
                 return (/^([a-fA-F0-9]{2}-){5}[a-fA-F0-9]{2}$/).test(v);
             },
             MacAddressMask: /[a-fA-F0-9\-]/,
             MacAddressText: i18n('sExample') + ': 01-23-45-67-89-AB',
-            
+
             MacColon: function(v) {
                 return (/^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$/).test(v);
             },
             MacColonMask: /[a-fA-F0-9\:]/,
             MacColonText: i18n('sExample') + ': 01:23:45:67:89:AB',
-         
-            //__ Hostname __
+
+            // ---- Hostname ----
             DnsName: function(v) {
                 return (/^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$/).test(v);
             },
             DnsNameText: 'This is not a valid FQDN name',
-            
-            //__ Password match __
+
+            // ---- Password match ----
             PasswordMatch: function(a,b){
-                var me  = this;
-                var f   = b.up('form');
-                var pwd = f.down('#password');
-                if(pwd != null){
-                    if(a != pwd.getValue()){
-                        return false;
-                    }else{
-                        return true;
-                    }   
-                }
-                return true;
+                var f = b.up('form'),
+                    pwd = f ? f.down('#password') : null;
+                return (!pwd || a === pwd.getValue());
             },
             PasswordMatchText: i18n('sPasswords_does_not_match'),
 
-            //__ Numeric __
+            // ---- Numeric ----
             Numeric : function(){
-				  var objRegExp  =  /[0-9]/;
-				  return function(strValue){
-					  //check for numeric characters
-					  return objRegExp.test(strValue);
-				  }
-		    }(),
-		    NumericText: 'Only numbers are allowed',
+                var objRegExp  =  /[0-9]/;
+                return function(strValue){
+                    return objRegExp.test(strValue);
+                }
+            }(),
+            NumericText: 'Only numbers are allowed',
             NumericMask: /[0-9]/
-
         });
+
     },
     
     addUx: function(){

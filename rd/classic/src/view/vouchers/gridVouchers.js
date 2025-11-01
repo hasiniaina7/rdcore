@@ -1,12 +1,17 @@
 Ext.define('Rd.view.vouchers.gridVouchers' ,{
-    extend:'Ext.grid.Panel',
-    alias : 'widget.gridVouchers',
-    multiSelect: true,
-    store : 'sVouchers',
-    stateful: true,
-    stateId: 'StateGridVouchers',
-    stateEvents:['groupclick','columnhide'],
-    border: false,
+    extend      :'Ext.grid.Panel',
+    alias       : 'widget.gridVouchers',
+    multiSelect : true,
+    store       : 'sVouchers',
+    stateful    : true,
+    stateId     : 'StateGridVouchers',
+    stateEvents :['groupclick','columnhide'],
+    border      : false,
+    padding     : 0,
+    ui          : 'light',
+    columnLines : false,
+    rowLines    : false,
+    stripeRows  : true,
     requires: [
         'Rd.view.components.ajaxToolbar',
         'Ext.toolbar.Paging',
@@ -65,8 +70,8 @@ Ext.define('Rd.view.vouchers.gridVouchers' ,{
                 tdCls       : 'gridTree', 
                 xtype       : 'templatecolumn', 
                 tpl:        new Ext.XTemplate(
-                                '<tpl if="Ext.isEmpty(batch)"><div class=\"fieldBlue\">'+i18n('s_br_Single_voucher_br')+'</div>',
-                                '<tpl else><div class=\"fieldGrey\">','{batch}','</div></tpl>' 
+                                '<tpl if="Ext.isEmpty(batch)"><div class=\"rd-chip rd-chip--blue\">'+i18n('s_br_Single_voucher_br')+'</div>',
+                                '<tpl else><div class=\"rd-chip rd-chip--grey\">','{batch}','</div></tpl>' 
                             ),
                 dataIndex   : 'batch',
                 filter: { type: 'string'},stateId: 'StateGridVouchers5'
@@ -158,7 +163,7 @@ Ext.define('Rd.view.vouchers.gridVouchers' ,{
                 tdCls       : 'gridTree',
                 xtype       : 'templatecolumn',
                 tpl         : new Ext.XTemplate(
-                                "<tpl if='status == \"new\"'><div class=\"fieldGreen\">"+i18n('sNew')+"</div></tpl>",
+                                "<tpl if='status == \"new\"'><div class=\"rd-chip rd-chip--green\">"+i18n('sNew')+"</div></tpl>",
                                 "<tpl if='status == \"used\"'><div class=\"fieldYellow\">"+i18n('sUsed')+"</div></tpl>",
                                 "<tpl if='status == \"depleted\"'><div class=\"fieldOrange\">"+i18n('sDepleted')+"</div></tpl>",
                                 "<tpl if='status == \"expired\"'><div class=\"fieldRed\">"+i18n('sExpired')+"</div></tpl>"

@@ -453,26 +453,32 @@ Ext.define('Rd.controller.cAccessPointEdits', {
     },
     btnExitTypeNext: function(button){
         var me      = this;
-        var win     = button.up('winAccessPointAddExit');
-        var type    = win.down('#rgrpExitType').getValue().exit_type;
+        var win     = button.up('winAccessPointAddExit');       
         var vlan    = win.down('#vlan');
         var tab_capt= win.down('#tabCaptivePortal');
-        var tab_nat = win.down('#tabNatDhcp');
-        var sel_type= win.down('#type');
+        var tab_nat = win.down('#tabNatDhcp');      
         var vpn     = win.down('#cmbOpenVpnServers');
         var pppoe   = win.down('#cmbAccelProfiles'); 
         var a_nas   = win.down('#chkNasClient');
         var cmb_realm = win.down('#cmbRealm');
         var a_page  = win.down('#chkLoginPage');
         var cmb_page= win.down('cmbDynamicDetail');
-        
+             
         var rgrpProtocol= win.down('#rgrpProtocol');
-        var l3Detail    = win.down('#pnlLayer3Detail');
-        
-        var tagConWith  = win.down('tagAccessPointEntryPoints');
+        var l3Detail    = win.down('#pnlLayer3Detail');      
+        var tagConWith  = win.down('tagAccessPointEntryPoints'); 
+        var type        = win.down('#rgrpExitType').getValue().exit_type;
+        var sel_type    = win.down('#type');
         
         sel_type.setValue(type);
         
+        var admin_state     = win.down('#rgrpAdminState').getValue().admin_state;
+        var sel_admin_state = win.down('#txtAdminState');
+        tagConWith.getStore().getProxy().setExtraParam('admin_state',admin_state);
+        tagConWith.getStore().load();
+                
+        sel_admin_state.setValue(admin_state);
+            
         if(type == 'openvpn_bridge'){
             vpn.setVisible(true);
             vpn.setDisabled(false);

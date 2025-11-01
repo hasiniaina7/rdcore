@@ -168,16 +168,43 @@ Ext.define('Rd.controller.cMainNetworks', {
         }
         return added;      
     },
-    actionBackButton: function(){
-        var me              = this;                           
-        var pnlDashboard    = me.getViewP().down('pnlDashboard');
-        var new_data        = Ext.Object.merge(pnlDashboard.down('#tbtHeader').getData(),{fa_value:'&#xf1ce;', value : 'RADIUS'});
-        pnlDashboard.down('#tbtHeader').update(new_data);
-        var pnl             = me.getViewP().down('#pnlCenter');
-        var item            = pnl.down('#tabMainNetworks');
-        pnl.setActiveItem(item);
-        pnl.getEl().slideIn('r');     
-    },   
+    
+    actionBackButton: function () {
+        var me = this,
+            vp = me.getViewP(),
+            pnlDashboard = vp.down('pnlDashboard'),
+            header = pnlDashboard.down('#tbtHeader'),
+            pnl = vp.down('#pnlCenter'),
+            tab = pnl.down('#tabMainNetworks'),
+            dv = tab.down('dataview'),
+            store = dv.getStore();
+
+        header.update(Ext.apply({}, { fa_value: '&#xf0e8;', value: 'NETWORKS' }, header.getData()));
+
+        // avoid empty flash during load
+        store.clearOnLoad = false;
+        dv.setLoading('Loading…');
+
+        // ensure the incoming card is hidden before activation
+        tab.on('afterrender', function () { tab.getEl().hide(); }, { single: true });
+
+        store.load({
+            callback: function () {
+                dv.setLoading(false);
+
+                // switch card (no animation here)
+                pnl.setActiveItem(tab);
+
+                // now animate the newly active card
+                var el = tab.getEl();
+                if (el) {
+                el.slideIn('r', { duration: 250, easing: 'easeOut' });
+                }
+            },
+            scope: me
+        });
+    }, 
+          
     itemClicked: function(view, record, item, index, e){
         var me = this;
 
@@ -198,66 +225,23 @@ Ext.define('Rd.controller.cMainNetworks', {
                 var added = Ext.getApplication().runAction(column.controller,'Index',pnl,id);
                 if(!added){
                     pnl.setActiveItem(item);
-                }else{
+                }else{                
                     pnl.setActiveItem(id);
+                    // now animate the newly active card                    
+                    var i   = pnl.down('#'+id);
+                    var el  = i.getEl();
+                    if (el) {
+                        el.slideIn('l', { duration: 250, easing: 'easeOut' });
+                    }
                 }
             }else{
-                pnl.setActiveItem(item);
+                pnl.setActiveItem(item);               
+                // now animate the newly active card
+                var el = item.getEl();
+                if (el) {
+                el.slideIn('l', { duration: 250, easing: 'easeOut' });
+                }                
             }
         }
     }
-    
-    /*       
-    actionIndex: function(pnl,itemId){
-        var me      = this;
-        var item    = pnl.down('#'+itemId);
-        console.log(itemId);
-        var added   = false;
-                   
-        if(!item){
-            var tp = Ext.create('Ext.tab.Panel',
-            	{          
-	            	border  : false,
-	                itemId  : itemId,
-	                plain	: true,
-	                cls     : 'subSubTab', //Make darker
-	            });      
-            pnl.add(tp);
-            Ext.Ajax.request({
-                url     : me.getUrlGetContent(),
-                method  : 'GET',
-                params  : { item_id : itemId },
-                success : function (response) {
-                    var jsonData = Ext.JSON.decode(response.responseText);
-                    if (jsonData.success) {
-                        var items = jsonData.items;
-                        if(items.meshes){
-                            Ext.getApplication().runAction('cMeshes','Index',tp); 
-                            added = true;                      
-                        }
-                        if(items.ap_profiles){
-                            Ext.getApplication().runAction('cAccessPoints','Index',tp);
-                            added = true;
-                        }
-                        if(items.unknown_nodes){
-                            Ext.getApplication().runAction('cUnknownNodes','Index',tp);
-                            added = true;
-                        }
-                        // Set the first tab active, if there are any tabs - or set it to the link in the routes (|network_active/aps)
-                        if (tp.items.getCount() > 0) {
-                            if(this.getActiveTab()){
-                                tp.setActiveTab(this.getActiveTab());
-                            }else{
-                                tp.setActiveTab(0);
-                            }
-                        }
-                    }
-                },
-                scope: me
-            });
-            added = true;
-        }
-        return added;      
-    }
-    */
 });

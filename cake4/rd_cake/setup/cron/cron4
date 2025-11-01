@@ -25,3 +25,7 @@
 #OTP Cleanup  
 */5 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake otp_cleanup >> /dev/null 2>&1
 
+#* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats --server 127.0.0.1 --port 18121 --secret adminsecret --attrs /etc/freeradius/status-all.txt --tag main >> /var/log/freeradius-stats.log 2>&1
+* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats >> /dev/null 2>&1
+
+

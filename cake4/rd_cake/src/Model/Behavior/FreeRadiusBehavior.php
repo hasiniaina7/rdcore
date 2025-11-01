@@ -22,6 +22,7 @@ class FreeRadiusBehavior extends Behavior {
         'time_cap_type'     => 'Rd-Cap-Type-Time',
         'data_cap_type'     => 'Rd-Cap-Type-Data',
         'active'            => 'Rd-Account-Disabled',
+        'admin_state'       => 'Rd-Admin-State',
         'from_date'         => 'Rd-Account-Activation-Time',
         'to_date'           => 'Expiration',
         'auto_add'          => 'Rd-Auto-Mac',

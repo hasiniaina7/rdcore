@@ -2,6 +2,13 @@ Rd = {};
 
 Rd.config = {
 
+    // --2025-- Grid common items
+    dash    : '<span class="rd-dash">—</span>',
+    chip    : function(cls, iconCls, text){
+        var icon = iconCls ? '<i class="' + iconCls + '"></i>' : '';
+        return '<span class="rd-chip ' + (cls||'') + '">' + icon + Ext.htmlEncode(text) + '</span>';
+    },
+
     //Graph Related
     rdGraphLabel    : {
         fontSize    : '14px',

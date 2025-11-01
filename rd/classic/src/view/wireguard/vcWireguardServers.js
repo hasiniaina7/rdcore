@@ -32,6 +32,9 @@ Ext.define('Rd.view.wireguard.vcWireguardServers', {
         'gridWireguardServers #btnInstances': {
             click   : 'instances'
         },  
+        'gridWireguardServers #btnLiveEvents': {
+            click   : 'liveEvents'
+        },  
         'gridWireguardServers #restart': {
             click   : 'restart'
         },
@@ -242,7 +245,7 @@ Ext.define('Rd.view.wireguard.vcWireguardServers', {
                 //Check if the node is not already open; else open the node:
                 var tp          = me.getView().up('tabpanel');
                 var t_id       = sr.getId();
-                var t_tab_id   = 'wgTab_'+t_id;
+                var t_tab_id   = 'wgInstanceTab_'+t_id;
                 var nt          = tp.down('#'+t_tab_id);
                 if(nt){
                     tp.setActiveTab(t_tab_id); //Set focus on  Tab
@@ -263,6 +266,27 @@ Ext.define('Rd.view.wireguard.vcWireguardServers', {
                 tp.setActiveTab(t_tab_id); //Set focus on Add Tab
             });
         }   
+    },
+    liveEvents : function(){
+    
+        var me      = this;
+        var tp      = me.getView().up('tabpanel');
+        var tab_id  = 'wgLiveTab'
+        var nt      = tp.down('#'+tab_id);
+        if(nt){
+            tp.setActiveTab(tab_id); //Set focus on  Tab
+            return;
+        }        
+        tp.add({ 
+            title   : 'Live Events',
+            itemId  : tab_id,
+            closable: true,
+            glyph   : Rd.config.icnActivity,
+            layout  : 'fit',
+            xtype   : 'gridWireguardLiveEvents'
+        });
+        tp.setActiveTab(tab_id); //Set focus on Add Tab
+    
     },
     restart : function(){
          // console.log("Edit node");  
