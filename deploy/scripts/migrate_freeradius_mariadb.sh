@@ -36,34 +36,62 @@ dump_mariadb() {
     pass_flag=("--password=${DB_PASS}")
   fi
 
+  mkdir -p "${WORK_DIR}"
+  chmod 750 "${WORK_DIR}"
+
   log INFO "Export de la base ${DB_NAME} (hôte ${DB_HOST}:${DB_PORT})"
+  # 1) Tentative avec l'utilisateur applicatif via TCP
   if mysqldump \
       --single-transaction --routines --events \
       -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" "${pass_flag[@]}" \
       "${DB_NAME}" > "${dump_path}"; then
     gzip -f "${dump_path}"
     log INFO "Dump MariaDB compressé : ${gzip_path}"
-  else
-    log WARN "Dump avec l'utilisateur ${DB_USER} échoué, tentative avec root."
-    if mysqldump \
-        --single-transaction --routines --events \
-        -h "${DB_HOST}" -P "${DB_PORT}" -u root \
-        "${DB_NAME}" > "${dump_path}"; then
-      gzip -f "${dump_path}"
-      log INFO "Dump MariaDB (root) compressé : ${gzip_path}"
-    else
-      log ERROR "Impossible de générer le dump MariaDB."
-      rm -f "${dump_path}"
-    fi
+    return 0
   fi
+
+  # 2) Fallback root via socket (évite les échecs root TCP avec unix_socket)
+  log WARN "Dump avec l'utilisateur ${DB_USER} échoué, tentative avec root via socket."
+  if mysqldump \
+      --single-transaction --routines --events \
+      -u root \
+      "${DB_NAME}" > "${dump_path}"; then
+    gzip -f "${dump_path}"
+    log INFO "Dump MariaDB (root socket) compressé : ${gzip_path}"
+    return 0
+  fi
+
+  # 3) Dernière tentative root TCP (si unix_socket non actif)
+  log WARN "Tentative finale root via TCP ${DB_HOST}:${DB_PORT}."
+  if mysqldump \
+      --single-transaction --routines --events \
+      -h "${DB_HOST}" -P "${DB_PORT}" -u root \
+      "${DB_NAME}" > "${dump_path}"; then
+    gzip -f "${dump_path}"
+    log INFO "Dump MariaDB (root TCP) compressé : ${gzip_path}"
+    return 0
+  fi
+
+  log ERROR "Impossible de générer le dump MariaDB. Vérifiez les privilèges ou l'authentification root (unix_socket)."
+  rm -f "${dump_path}"
+  return 1
 }
 
 export_radacct_csv() {
   local csv_path="${WORK_DIR}/radacct_snapshot.csv"
   log INFO "Export de radacct (CSV simplifié) dans ${csv_path}"
-  mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" ${DB_PASS:+--password=${DB_PASS}} "${DB_NAME}" \
-    -e "SELECT radacctid, username, nasipaddress, acctstarttime, acctstoptime, acctsessiontime, acctinputoctets, acctoutputoctets FROM radacct" \
-    | sed 's/\t/,/g' > "${csv_path}" || log WARN "Export radacct CSV échoué (table volumineuse?)."
+  if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" ${DB_PASS:+--password=${DB_PASS}} "${DB_NAME}" \
+      -e "SELECT radacctid, username, nasipaddress, acctstarttime, acctstoptime, acctsessiontime, acctinputoctets, acctoutputoctets FROM radacct" \
+      | sed 's/\t/,/g' > "${csv_path}"; then
+    return 0
+  fi
+  log WARN "Export radacct avec ${DB_USER} échoué, tentative root via socket."
+  if mysql -u root "${DB_NAME}" \
+      -e "SELECT radacctid, username, nasipaddress, acctstarttime, acctstoptime, acctsessiontime, acctinputoctets, acctoutputoctets FROM radacct" \
+      | sed 's/\t/,/g' > "${csv_path}"; then
+    return 0
+  fi
+  log WARN "Export radacct CSV échoué (droits insuffisants?). Étape ignorée."
 }
 
 archive_freeradius() {
@@ -135,4 +163,5 @@ TARBALL_PATH="$(create_tarball)"
 transfer_tarball "$TARBALL_PATH"
 
 log INFO "Migration générée : ${TARBALL_PATH}"
+log INFO "Dossier de travail contenant les fichiers : ${WORK_DIR}"
 log INFO "=== Fin migration FreeRADIUS + MariaDB (${TIMESTAMP}) ==="

@@ -17,6 +17,7 @@ Le script `deploy/scripts/migrate_radiusdesk.sh` réalise une migration « app
 ### Exécution
 
 ```bash
+sudo chmod +x ./deploy/scripts/migrate_radiusdesk.sh
 sudo ./deploy/scripts/migrate_radiusdesk.sh
 ```
 
@@ -42,7 +43,27 @@ Le script `deploy/scripts/migrate_freeradius_mariadb.sh` génère un bundle d’
 ### Exécution
 
 ```bash
+sudo chmod +x ./deploy/scripts/migrate_freeradius_mariadb.sh
 sudo ./deploy/scripts/migrate_freeradius_mariadb.sh
+```
+
+Exemple de fin d’exécution :
+
+```
+[INFO] Migration générée : /var/backups/radiusdesk-migration/radiusdesk_freeradius_mariadb_20251104-080419.tar.gz
+[INFO] Dossier de travail contenant les fichiers : /var/backups/radiusdesk-migration/20251104-080419
+```
+
+À la fin, le script affiche deux chemins utiles :
+
+- le tarball d’export : `/var/backups/radiusdesk-migration/radiusdesk_freeradius_mariadb_<horodatage>.tar.gz`
+- le dossier de travail (fichiers décompressés) : `/var/backups/radiusdesk-migration/<horodatage>`
+
+Pour consulter immédiatement les fichiers :
+
+```bash
+cd /var/backups/radiusdesk-migration/<horodatage>
+ls -la
 ```
 
 Variables optionnelles :
@@ -55,6 +76,8 @@ Variables optionnelles :
 | `MIGRATION_TARGET_PATH` | Destination distante (rsync) | `/root` |
 
 Le script produit `radiusdesk_freeradius_mariadb_<horodatage>.tar.gz` dans `MIGRATION_STAGING_DIR` et, si `MIGRATION_TARGET_HOST` est défini, l’envoie via `rsync`.
+
+Note permissions MariaDB : si l’utilisateur applicatif (`rd`) n’a pas les privilèges nécessaires pour lire toutes les tables, le script tente automatiquement un dump via `root` en socket Unix (scénario courant avec `unix_socket`). Aucune interaction n’est requise sur le serveur source.
 
 ## 3. Restauration sur un nouveau serveur
 
@@ -90,4 +113,3 @@ Le script produit `radiusdesk_freeradius_mariadb_<horodatage>.tar.gz` dans `MIGR
 ---
 
 > Tous les chemins et exemples sont donnés à titre indicatif ; adaptez-les à votre environnement. Pensez à chiffrer ou à transférer de façon sécurisée les archives générées (contiennent bases et secrets).
-
