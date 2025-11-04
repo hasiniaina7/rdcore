@@ -1,0 +1,8 @@
+# Ignore Sencha SDK clone
+sencha_workspace/extjs-gpl/
+
+# Build outputs
+sencha_workspace/ConsumptionPortal/build/
+sencha_workspace/ConsumptionPortal/ext/
+sencha_workspace/ConsumptionPortal/bootstrap.js
+sencha_workspace/ConsumptionPortal/bootstrap.css

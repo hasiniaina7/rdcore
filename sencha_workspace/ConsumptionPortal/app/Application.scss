@@ -1,0 +1,30 @@
+/*
+ *  This file can be used to set variables and supply global styling.  View specific 
+ *  styling should be located the view's corresponding scss file.
+ */
+$enable-font-awesome: dynamic(true);
+
+.consumption-viewport {
+  background: #0f172a;
+
+  .x-panel-body-default {
+    background: linear-gradient(145deg, #0f172a 0%, #1e293b 60%, #111827 100%);
+  }
+
+  .result-grid .x-grid-item-selected .x-grid-cell-inner {
+    background-color: rgba(255, 23, 68, 0.25);
+  }
+
+  .traffic-card .x-panel-body,
+  .qos-card .x-panel-body {
+    color: #fff;
+    font-size: 15px;
+    line-height: 1.6em;
+  }
+
+  .status-bar {
+    color: #f87171;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+}
