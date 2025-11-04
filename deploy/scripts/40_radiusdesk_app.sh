@@ -36,9 +36,15 @@ log INFO "Synchronisation du code RADIUSdesk."
 mkdir -p /var/www
 git config --global --add safe.directory /var/www/rdcore || true
 if [[ ! -d /var/www/rdcore ]]; then
-  git clone https://github.com/RADIUSdesk/rdcore.git /var/www/rdcore
+  git clone --branch cake4 --single-branch https://github.com/hasiniaina7/rdcore.git /var/www/rdcore
 else
-  git -C /var/www/rdcore pull --ff-only || log WARN "git pull rdcore a échoué."
+  git -C /var/www/rdcore fetch origin cake4 || log WARN "git fetch rdcore a échoué."
+  if git -C /var/www/rdcore rev-parse --verify cake4 >/dev/null 2>&1; then
+    git -C /var/www/rdcore checkout cake4
+  else
+    git -C /var/www/rdcore checkout -b cake4 origin/cake4 || log WARN "checkout cake4 échoué."
+  fi
+  git -C /var/www/rdcore reset --hard origin/cake4 || log WARN "reset cake4 échoué."
 fi
 
 git config --global --add safe.directory /var/www/rd_mobile || true

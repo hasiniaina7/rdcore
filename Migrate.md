@@ -25,10 +25,12 @@ Variables optionnelles (à exporter avant l’exécution) :
 
 | Variable | Rôle | Valeur par défaut |
 |----------|------|-------------------|
-| `MIGRATION_BACKUP_DIR` | Dossier des dumps SQL | `/var/backups/radiusdesk` |
+| `MIGRATION_BACKUP_DIR` | Dossier des dumps SQL | `/var/backups/radiusdesk-migration` |
 | `SENCHA_BIN` | Chemin vers l’exécutable `sencha` | `which sencha` |
 
 Le journal détaillé est écrit dans `/var/log/radiusdesk-install/migration_radiusdesk.log`.
+
+Par défaut, les dumps SQL sont déposés dans `/var/backups/radiusdesk-migration/` (modifiable via `MIGRATION_BACKUP_DIR`).
 
 ## 2. Migration FreeRADIUS + MariaDB uniquement
 
@@ -83,21 +85,22 @@ Note permissions MariaDB : si l’utilisateur applicatif (`rd`) n’a pas les 
 
 1. Copier l’archive de migration sur le nouveau serveur.
 2. Installer les dépendances système nécessaires (MariaDB, FreeRADIUS, etc.).
-3. Extraire l’archive :
+3. Extraire l’archive (les fichiers appartiennent à root) :
    ```bash
-   tar -xzf radiusdesk_freeradius_mariadb_<horodatage>.tar.gz
-   cd <horodatage>
+   sudo tar -xzf radiusdesk_freeradius_mariadb_<horodatage>.tar.gz -C /var/backups/radiusdesk-migration/
+   sudo -s            # passer en root pour la suite
+   cd /var/backups/radiusdesk-migration/<horodatage>
    ```
 4. Importer la base de données :
    ```bash
-   gunzip mariadb_dump.sql.gz
-   mysql -u <user> -p <base> < mariadb_dump.sql
+   gunzip -f mariadb_dump.sql.gz  # selon le contenu de l’archive
+   mysql -uroot rd < mariadb_dump.sql
    ```
 5. Restaurer la configuration FreeRADIUS (adapter les chemins si nécessaire) :
    ```bash
    rsync -a freeradius/etc_freeradius/ /etc/freeradius/
-   rsync -a freeradius/var_lib_freeradius/ /var/lib/freeradius/
-   rsync -a freeradius/var_log_freeradius/ /var/log/freeradius/
+   [ -d freeradius/var_lib_freeradius ] && rsync -a freeradius/var_lib_freeradius/ /var/lib/freeradius/
+   [ -d freeradius/var_log_freeradius ] && rsync -a freeradius/var_log_freeradius/ /var/log/freeradius/
    chown -R freerad:freerad /etc/freeradius /var/lib/freeradius /var/log/freeradius
    ```
 6. Reconfigurer `deploy/config/env.sh` si des paramètres changent (hôtes, mots de passe, secrets).

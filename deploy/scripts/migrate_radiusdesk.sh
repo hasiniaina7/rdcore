@@ -18,7 +18,7 @@ CURRENT_LOG="${LOG_DIR}/migration_radiusdesk.log"
 require_root
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP_DIR="${MIGRATION_BACKUP_DIR:-/var/backups/radiusdesk}"
+BACKUP_DIR="${MIGRATION_BACKUP_DIR:-/var/backups/radiusdesk-migration}"
 SENCHA_BIN="${SENCHA_BIN:-$(command -v sencha || true)}"
 
 log INFO "=== Démarrage de la migration RADIUSdesk (${TIMESTAMP}) ==="
@@ -34,15 +34,23 @@ dump_database() {
     pass_flag=("--password=${DB_PASS}")
   fi
 
-  if mysqldump --single-transaction --routines --events -u "${DB_USER}" "${pass_flag[@]}" "${DB_NAME}" | gzip > "${dump_file}"; then
+  if mysqldump --single-transaction --routines --events \
+      -h "${DB_HOST}" -P "${DB_PORT}" \
+      -u "${DB_USER}" "${pass_flag[@]}" "${DB_NAME}" | gzip > "${dump_file}"; then
     log INFO "Dump MySQL complété."
   else
     log WARN "Échec du dump avec l'utilisateur ${DB_USER}, tentative avec root."
     if mysqldump --single-transaction --routines --events -u root "${DB_NAME}" | gzip > "${dump_file}"; then
-      log INFO "Dump MySQL réalisé via root."
+      log INFO "Dump MySQL réalisé via root (socket)."
     else
-      log WARN "Impossible de sauvegarder la base. Poursuite de la migration sans dump."
-      rm -f "${dump_file}"
+      log WARN "Tentative root via socket échouée, essai via TCP ${DB_HOST}:${DB_PORT}."
+      if mysqldump --single-transaction --routines --events \
+          -h "${DB_HOST}" -P "${DB_PORT}" -u root "${DB_NAME}" | gzip > "${dump_file}"; then
+        log INFO "Dump MySQL réalisé via root (TCP)."
+      else
+        log WARN "Impossible de sauvegarder la base. Poursuite de la migration sans dump."
+        rm -f "${dump_file}"
+      fi
     fi
   fi
 }
@@ -50,20 +58,20 @@ dump_database() {
 update_git_repo() {
   local path="$1"
   local url="$2"
+  local branch="${3:-}"
 
   git config --global --add safe.directory "$path" || true
 
+  if [[ -d "$path/.git" ]]; then
+    git -C "$path" remote set-url origin "$url" 2>/dev/null || git -C "$path" remote add origin "$url"
+  fi
+
   if [[ ! -d "$path/.git" ]]; then
-    log INFO "Clonage de ${url} dans ${path}"
-    git clone "$url" "$path"
+    log WARN "Répertoire ${path} introuvable ou non initialisé. Exécutez d'abord deploy/scripts/40_radiusdesk_app.sh."
+    return
   else
-    log INFO "Mise à jour git dans ${path}"
-    if ! git -C "$path" fetch --all --prune; then
-      log WARN "git fetch échoué dans ${path}"
-    else
-      git -C "$path" reset --hard origin/$(git -C "$path" rev-parse --abbrev-ref HEAD || echo master) || true
-      git -C "$path" pull --ff-only || log WARN "git pull échoué dans ${path}"
-    fi
+    log INFO "Répertoire ${path} déjà en place, aucune mise à jour git effectuée."
+    return
   fi
 }
 
@@ -71,6 +79,7 @@ run_composer() {
   local workdir="/var/www/rdcore/cake4/rd_cake"
   if [[ -f "${workdir}/composer.json" ]]; then
     log INFO "composer install (production)"
+    chown -R www-data:www-data "$workdir" || true
     sudo -H -u www-data composer install --no-dev --prefer-dist --no-interaction --working-dir="$workdir"
   else
     log WARN "composer.json introuvable dans ${workdir}, saut."
@@ -153,7 +162,7 @@ reload_services() {
 }
 
 dump_database
-update_git_repo /var/www/rdcore https://github.com/RADIUSdesk/rdcore.git
+update_git_repo /var/www/rdcore https://github.com/hasiniaina7/rdcore.git cake4
 if [[ -d /var/www/rd_mobile || "${INSTALL_RD_MOBILE:-1}" -eq 1 ]]; then
   update_git_repo /var/www/rd_mobile https://github.com/RADIUSdesk/rd_mobile.git || true
 fi
