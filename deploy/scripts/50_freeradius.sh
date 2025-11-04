@@ -9,12 +9,42 @@ source "${BASE_DIR}/lib/common.sh"
 
 CURRENT_LOG="${LOG_DIR}/50_freeradius.log"
 STEP_NAME="50_freeradius"
+FORCE=0
+
+usage() {
+  cat <<'EOT'
+Usage: 50_freeradius.sh [--force]
+
+Options:
+  --force   Réexécute la configuration même si l'étape est marquée comme terminée.
+EOT
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force)
+      FORCE=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Option inconnue: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
 
 require_root
 
-if already_done "$STEP_NAME"; then
+if already_done "$STEP_NAME" && [[ "${FORCE}" -eq 0 ]]; then
   log INFO "Étape ${STEP_NAME} déjà marquée comme faite, on saute."
   exit 0
+elif already_done "$STEP_NAME"; then
+  log INFO "Étape ${STEP_NAME} déjà marquée comme faite, réexécution forcée."
 fi
 
 export DEBIAN_FRONTEND=noninteractive

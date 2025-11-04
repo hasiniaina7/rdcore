@@ -27,9 +27,59 @@ mkdir -p "$WORK_DIR"
 log INFO "=== Migration FreeRADIUS + MariaDB (${TIMESTAMP}) ==="
 log INFO "Répertoire de travail : ${WORK_DIR}"
 
+mysql_query_any() {
+  local query="$1"
+  local opts=(-N -B)
+  local pass_flag=()
+  local output
+
+  if [[ -n "${DB_PASS}" ]]; then
+    pass_flag=("--password=${DB_PASS}")
+  fi
+
+  if output=$(mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" "${pass_flag[@]}" -D "${DB_NAME}" "${opts[@]}" -e "${query}" 2>/dev/null); then
+    printf '%s\n' "${output}"
+    return 0
+  fi
+
+  if output=$(mysql -u root -D "${DB_NAME}" "${opts[@]}" -e "${query}" 2>/dev/null); then
+    printf '%s\n' "${output}"
+    return 0
+  fi
+
+  if output=$(mysql -h "${DB_HOST}" -P "${DB_PORT}" -u root -D "${DB_NAME}" "${opts[@]}" -e "${query}" 2>/dev/null); then
+    printf '%s\n' "${output}"
+    return 0
+  fi
+
+  return 1
+}
+
+test_db_user_access() {
+  local pass_flag=()
+  local err_file
+  err_file="$(mktemp)"
+
+  if [[ -n "${DB_PASS}" ]]; then
+    pass_flag=("--password=${DB_PASS}")
+  fi
+
+  if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" "${pass_flag[@]}" -D "${DB_NAME}" -e "SELECT 1" >/dev/null 2>"${err_file}"; then
+    log INFO "Connexion MariaDB avec ${DB_USER}@${DB_HOST}:${DB_PORT} validée."
+  else
+    local err_msg=""
+    if [[ -s "${err_file}" ]]; then
+      err_msg="$(head -n 1 "${err_file}")"
+    fi
+    log WARN "Connexion MariaDB avec ${DB_USER}@${DB_HOST}:${DB_PORT} impossible. Vérifiez les privilèges. Détails: ${err_msg:-\"aucune sortie\"}"
+  fi
+  rm -f "${err_file}"
+}
+
 dump_mariadb() {
   local dump_path="${WORK_DIR}/mariadb_dump.sql"
   local gzip_path="${dump_path}.gz"
+  local dump_err="${dump_path}.stderr"
   local pass_flag=()
 
   if [[ -n "${DB_PASS}" ]]; then
@@ -40,53 +90,66 @@ dump_mariadb() {
   chmod 750 "${WORK_DIR}"
 
   log INFO "Export de la base ${DB_NAME} (hôte ${DB_HOST}:${DB_PORT})"
+  test_db_user_access
+
+  perform_dump() {
+    local label="$1"; shift
+    if mysqldump \
+        --single-transaction --routines --events \
+        "$@" > "${dump_path}" 2> "${dump_err}"; then
+      gzip -f "${dump_path}"
+      rm -f "${dump_err}"
+      log INFO "Dump MariaDB ${label} compressé : ${gzip_path}"
+      return 0
+    fi
+    local exit_code=$?
+    local err_msg=""
+    if [[ -s "${dump_err}" ]]; then
+      err_msg="$(head -n 2 "${dump_err}" | tr $'\n' ' ')"
+    fi
+    log WARN "mysqldump ${label} échoué (code ${exit_code}). ${err_msg:-\"sans sortie stderr\"}"
+    rm -f "${dump_path}" "${gzip_path}"
+    return 1
+  }
+
   # 1) Tentative avec l'utilisateur applicatif via TCP
-  if mysqldump \
-      --single-transaction --routines --events \
+  if perform_dump "${DB_USER}@${DB_HOST}:${DB_PORT}" \
       -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" "${pass_flag[@]}" \
-      "${DB_NAME}" > "${dump_path}"; then
-    gzip -f "${dump_path}"
-    log INFO "Dump MariaDB compressé : ${gzip_path}"
+      "${DB_NAME}"; then
     return 0
   fi
 
   # 2) Fallback root via socket (évite les échecs root TCP avec unix_socket)
   log WARN "Dump avec l'utilisateur ${DB_USER} échoué, tentative avec root via socket."
-  if mysqldump \
-      --single-transaction --routines --events \
-      -u root \
-      "${DB_NAME}" > "${dump_path}"; then
-    gzip -f "${dump_path}"
-    log INFO "Dump MariaDB (root socket) compressé : ${gzip_path}"
+  if perform_dump "root@localhost (socket)" \
+      -u root "${DB_NAME}"; then
     return 0
   fi
 
   # 3) Dernière tentative root TCP (si unix_socket non actif)
   log WARN "Tentative finale root via TCP ${DB_HOST}:${DB_PORT}."
-  if mysqldump \
-      --single-transaction --routines --events \
+  if perform_dump "root@${DB_HOST}:${DB_PORT}" \
       -h "${DB_HOST}" -P "${DB_PORT}" -u root \
-      "${DB_NAME}" > "${dump_path}"; then
-    gzip -f "${dump_path}"
-    log INFO "Dump MariaDB (root TCP) compressé : ${gzip_path}"
+      "${DB_NAME}"; then
     return 0
   fi
 
   log ERROR "Impossible de générer le dump MariaDB. Vérifiez les privilèges ou l'authentification root (unix_socket)."
   rm -f "${dump_path}"
+  rm -f "${dump_err}"
   return 1
 }
 
 export_radacct_csv() {
   local csv_path="${WORK_DIR}/radacct_snapshot.csv"
   log INFO "Export de radacct (CSV simplifié) dans ${csv_path}"
-  if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" ${DB_PASS:+--password=${DB_PASS}} "${DB_NAME}" \
+  if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" ${DB_PASS:+--password=${DB_PASS}} -D "${DB_NAME}" \
       -e "SELECT radacctid, username, nasipaddress, acctstarttime, acctstoptime, acctsessiontime, acctinputoctets, acctoutputoctets FROM radacct" \
       | sed 's/\t/,/g' > "${csv_path}"; then
     return 0
   fi
   log WARN "Export radacct avec ${DB_USER} échoué, tentative root via socket."
-  if mysql -u root "${DB_NAME}" \
+  if mysql -u root -D "${DB_NAME}" \
       -e "SELECT radacctid, username, nasipaddress, acctstarttime, acctstoptime, acctsessiontime, acctinputoctets, acctoutputoctets FROM radacct" \
       | sed 's/\t/,/g' > "${csv_path}"; then
     return 0
@@ -115,6 +178,55 @@ archive_freeradius() {
   printf 'RADIUS_SECRET_DEFAULT="%s"\n' "${RADIUS_SECRET_DEFAULT}" > "${fr_root}/radiusdesk_secrets.env"
 }
 
+check_schema() {
+  local report="${WORK_DIR}/schema_checks.txt"
+  local tmp_file
+  local failures=0
+
+  tmp_file="$(mktemp)"
+  : > "${report}"
+
+  log INFO "Vérification du schéma MariaDB attendu (rapport : ${report})."
+
+  if ! mysql_query_any "SELECT 1" > /dev/null; then
+    log WARN "Impossible de contacter MariaDB pour les vérifications de schéma."
+    {
+      echo "[WARN] Impossible de contacter MariaDB avec les identifiants fournis (SELECT 1)."
+      echo "       Vérifiez la connectivité et les privilèges de ${DB_USER}@${DB_HOST}:${DB_PORT}."
+    } >> "${report}"
+    rm -f "${tmp_file}"
+    return
+  fi
+
+  if mysql_query_any "SHOW COLUMNS FROM permanent_users LIKE 'admin_state';" > "${tmp_file}"; then
+    if [[ ! -s "${tmp_file}" ]]; then
+      failures=1
+      cat >> "${report}" <<'EOT'
+[WARN] Colonne `permanent_users.admin_state` absente.
+       Action recommandée : appliquer le patch SQL
+         cake4/rd_cake/setup/db/8.105_add_suspend_option.sql
+       Exemple :
+         mysql -u rd -prd rd < /var/www/rdcore/cake4/rd_cake/setup/db/8.105_add_suspend_option.sql
+EOT
+    fi
+  else
+    failures=1
+    {
+      echo "[WARN] Vérification de la colonne permanent_users.admin_state impossible."
+      echo "       Consultez les permissions SQL et relancez la migration."
+    } >> "${report}"
+  fi
+
+  if (( failures == 0 )); then
+    echo "[OK] Schéma MariaDB conforme pour les vérifications effectuées." >> "${report}"
+    log INFO "Schéma MariaDB conforme."
+  else
+    log WARN "Des points de schéma MariaDB nécessitent une action (voir ${report})."
+  fi
+
+  rm -f "${tmp_file}"
+}
+
 copy_metadata() {
   log INFO "Ajout d'un fichier README de restauration"
   cat > "${WORK_DIR}/README.txt" <<'EOT'
@@ -123,6 +235,7 @@ Contenu principal :
   - mariadb_dump.sql.gz : dump complet de la base RadiusDesk
   - radacct_snapshot.csv : export CSV (optionnel) des sessions
   - freeradius/ : configuration FreeRADIUS (/etc, /var/lib, logs)
+  - schema_checks.txt : diagnostics de cohérence pour le schéma MariaDB
 
 Import sur un nouveau serveur :
   1) Installer MariaDB et créer la base cible.
@@ -131,7 +244,8 @@ Import sur un nouveau serveur :
        rsync -a freeradius/etc_freeradius/ /etc/freeradius/
        rsync -a freeradius/var_lib_freeradius/ /var/lib/freeradius/
   4) Vérifier les droits (chown -R freerad:freerad ...)
-  5) Redémarrer mariadb et freeradius.
+  5) Consulter schema_checks.txt et appliquer les correctifs éventuels.
+  6) Redémarrer mariadb et freeradius.
 EOT
 
   log INFO "Copie de la configuration RadiusDesk env.sh"
@@ -157,6 +271,7 @@ transfer_tarball() {
 
 dump_mariadb
 export_radacct_csv || true
+check_schema
 archive_freeradius
 copy_metadata
 TARBALL_PATH="$(create_tarball)"
