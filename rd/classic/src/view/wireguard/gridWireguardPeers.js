@@ -16,21 +16,15 @@ Ext.define('Rd.view.wireguard.gridWireguardPeers' ,{
         activate  : 'onViewActivate'
     },
     plugins     : [
-        'gridfilters',
-        {
-            ptype       : 'rowexpander',
-            rowBodyTpl  : new Ext.XTemplate(
-                '<div class="plain-wrap">',
-            	'</div>'
-            )
-        }
+        'gridfilters'
     ],
     requires    : [
         'Rd.view.components.ajaxToolbar',
         'Ext.toolbar.Paging',
         'Ext.ux.ProgressBarPager',
         'Rd.view.wireguard.vcWireguardPeers',
-        'Rd.view.wireguard.pnlWireguardPeerAddEdit'
+        'Rd.view.wireguard.pnlWireguardPeerAddEdit',
+        'Rd.view.wireguard.pnlWireguardPeerQrcode'
     ],
     controller  : 'vcWireguardPeers',
     urlMenu     : '/cake4/rd_cake/wireguard-peers/menu-for-grid.json',  
@@ -113,6 +107,42 @@ Ext.define('Rd.view.wireguard.gridWireguardPeers' ,{
                     var ip_v6 = rec.get('ipv6_address')+'/'+rec.get('ipv6_prefix');         
                     return chip('rd-chip--warning', 'fa fa-network-wired', ip_v6);
                 }
+            },
+            { 
+                text        : 'Last handshake',               
+                dataIndex   : 'last_handshake_ts',
+                sortable    : true,
+                tdCls       : 'gridTree', 
+                renderer: function (enabled, m, rec) {
+                    var last_seen = rec.get('last_seen');
+                    if(rec.get('state') == 'never'){
+                        return chip('rd-chip--blue','','Never');
+                    }
+                    if(rec.get('state') == 'up'){
+                        return chip('rd-chip--green','',last_seen);
+                    }
+                    if(rec.get('state') == 'down'){
+                        return chip('rd-chip--grey','',last_seen);
+                    }
+                },
+                filter      : {type: 'string'},
+                flex        : 1
+            },
+            { 
+                text        : 'RX bytes',               
+                dataIndex   : 'rx_human',
+                sortable    : true,
+                tdCls       : 'gridTree',  
+                filter      : {type: 'string'},
+                flex        : 1
+            },
+            { 
+                text        : 'TX bytes',               
+                dataIndex   : 'tx_human',
+                sortable    : true,
+                tdCls       : 'gridTree',  
+                filter      : {type: 'string'},
+                flex        : 1
             },
             { 
                 text        : 'Created',

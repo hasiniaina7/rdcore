@@ -192,7 +192,6 @@ Ext.define('Rd.view.wireguard.vcWireguardServers', {
             success: function(form, action) {
                 win.close();
                 me.reload();
-                me.reloadComboBox();
                 Ext.ux.Toaster.msg(
                     i18n('sNew_item_created'),
                     i18n('sItem_created_fine'),
@@ -213,7 +212,6 @@ Ext.define('Rd.view.wireguard.vcWireguardServers', {
             success: function(form, action) {
                 win.close();
                 me.reload();
-                me.reloadComboBox();
                 Ext.ux.Toaster.msg(
                     'Item Updated',
                     'Item Updated Fine',

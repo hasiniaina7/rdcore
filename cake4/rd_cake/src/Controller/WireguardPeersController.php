@@ -26,6 +26,7 @@ class WireguardPeersController extends AppController{
         $this->loadComponent('JsonErrors'); 
         $this->loadComponent('TimeCalculations');
         $this->loadComponent('SubnetPlanner');
+        $this->loadComponent('Formatter');
         $this->Authentication->allowUnauthenticated(['gooiHom']);              
     }
          
@@ -61,11 +62,23 @@ class WireguardPeersController extends AppController{
 
         foreach($q_r as $i){               
 			$i->update		= true;
-			$i->delete		= true;		
-			$i->state		= 'up';
+			$i->delete		= true;
+			$cut_off        = FrozenTime::now()->subMinutes(15);		
+			if($i->last_handshake_ts < $cut_off){		
+			   $i->state		= 'down';
+			}
+			if($i->last_handshake_ts > $cut_off){		
+			   $i->state		= 'up';
+			}
+			if($i->last_handshake_ts == null){
+			    $i->state		= 'never';
+			}
 			
-			$i->modified_in_words = $this->TimeCalculations->time_elapsed_string($i->modified);
-			$i->created_in_words = $this->TimeCalculations->time_elapsed_string($i->created);				
+			$i->modified_in_words= $this->TimeCalculations->time_elapsed_string($i->modified);
+			$i->created_in_words = $this->TimeCalculations->time_elapsed_string($i->created);
+			$i->last_seen        = $this->TimeCalculations->time_elapsed_string($i->last_handshake_ts);
+			$i->tx_human         = $this->Formatter->formatted_bytes($i->tx_bytes);
+			$i->rx_human         = $this->Formatter->formatted_bytes($i->rx_bytes); 			
             array_push($items,$i);
         }
         
@@ -79,90 +92,7 @@ class WireguardPeersController extends AppController{
         ]);
         $this->viewBuilder()->setOption('serialize', true);
     }
-    
-    public function gooiHom(){
-    
-        $freeV4 = $this->SubnetPlanner->nextFreeSubnet(
-            serverId: 1,
-            family: 'ipv4',
-            prefix: 24,
-            seedCidr: null,
-            poolCidr: $this->v4PoolsStart
-        );
-        [$ipv4_net,$ipv4_mask] = explode('/',$freeV4);
-        $next_ipv4 = $this->SubnetPlanner->nextIp($ipv4_net);
-        // e.g. returns "10.12.3.0/24"
-
-        // Example: start scanning from a seed, no pool
-        $freeV6 = $this->SubnetPlanner->nextFreeSubnet(
-            1, 'ipv6', 64, $this->v6PoolsStart, null
-        );
-        [$ipv6_net,$ipv6_mask] = explode('/',$freeV6);
-        $next_ipv6 = $this->SubnetPlanner->nextIp($ipv6_net);           
-        
-        $this->set([
-            'success' 	=> true,
-            'data'		=> ['4' => $freeV4, 'ip_v4' => $next_ipv4, '6' => $freeV6,'ip_v6' => $next_ipv6]
-        ]);
-        $this->viewBuilder()->setOption('serialize', true);
-        
-    /*
-        // Minimal create: IPv4-only, auto-generate private/public + PSK
-        $instance = $this->WireguardInstances->newEntity([
-            'wireguard_server_id' => 1,
-            'name'                => 'wg4',
-            'listen_port'         => 51821,
-
-            // trigger key generation:
-            'private_key'         => '',       // -> generates private_key + public_key
-            'preshared_key'       => '',       // -> generates preshared_key (optional)
-
-            'ipv4_enabled'        => true,
-            'ipv4_address'        => '10.12.0.1',
-            'ipv4_mask'           => 24,
-
-            'ipv6_enabled'        => true,
-            'ipv6_address'        => 'fd00:12::1',
-            'ipv6_prefix'         => 64,
-
-            'nat_enabled'         => true,
-            'sqm_enabled'         => true,
-
-            'upload_mb'           => 120,
-            'download_mb'         => 340,
-        ]);
-       
-        if ($this->WireguardInstances->save($instance)) {
-
-            $this->set([
-                'success' 	=> true,
-                'data'		=> $instance
-            ]);
-            $this->viewBuilder()->setOption('serialize', true);
-        } else {
-            $message = 'Error';           
-            $errors  = $instance->getErrors();
-            $a       = [];
-            foreach(array_keys($errors) as $field){
-                $detail_string = '';
-                $error_detail =  $errors[$field];
-                foreach(array_keys($error_detail) as $error){
-                    $detail_string = $detail_string."".$error_detail[$error];   
-                }
-                $a[$field] = $detail_string;
-            }
-            
-            $this->set([
-                'errors'    => $a,
-                'success'   => false,
-                'message'   => __('Could not create item'),
-            ]);
-            $this->viewBuilder()->setOption('serialize', true);
-        }
-        */
-    	 
-    }
-    
+   
     public function view(){
         $user = $this->_ap_right_check();
         if (!$user) {
@@ -322,6 +252,126 @@ class WireguardPeersController extends AppController{
         ]);
         $this->viewBuilder()->setOption('serialize', true);
 	}
+	
+	
+	public function peerConfig(){
+
+        $this->request->allowMethod(['get']);
+
+        $token     = $this->request->getQuery('token');
+        $peerId    = $this->request->getQuery('peer_id');
+        $cloudId   = $this->request->getQuery('cloud_id');
+
+        $peer     = $this->WireguardPeers
+            ->find()
+            ->where([
+                'WireguardPeers.id' => $peerId
+            ])
+            ->contain(['WireguardInstances' => ['WireguardServers']])
+            ->first();
+
+        if (!$peer) {
+            throw new \Cake\Http\Exception\NotFoundException(__('Invalid peer/token'));
+        }
+        
+        $ip_address = '';
+        
+        if($peer->ipv4_enabled){
+            $ip_address = $peer->ipv4_address.'/32';//.$peer->ipv4_mask;
+        }
+        
+        if(strlen($ip_address)>0){
+            $ip_address = $ip_address.',';
+        }
+                
+        if($peer->ipv6_enabled){
+            $ip_address = $ip_address.$peer->ipv6_address.'/'.$peer->ipv6_prefix;
+        }     
+
+        // Example build of config body
+        $cfg = "[Interface]
+PrivateKey = {$peer->private_key}
+Address    = {$ip_address}
+
+[Peer]
+PublicKey  = {$peer->wireguard_instance->public_key}
+Endpoint   = {$peer->wireguard_instance->wireguard_server->ip_address}:{$peer->wireguard_instance->listen_port}
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = {$peer->persistent_keepalive}
+";
+
+        // === 2) Create Text Response ===
+        $peer_name  = str_replace(' ', '_', strtolower( $peer->name ) );
+        $filename   = "wg_peer_{$peer_name}.conf";
+       
+        $response = $this->response
+            ->withType('text/plain') // correct MIME for wireguard config
+            ->withStringBody($cfg);
+            //->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
+        return $response;
+   }
+
+	public function qrcodeConfig(){
+	
+	    $this->request->allowMethod(['get']);
+
+        $peerId    = $this->request->getQuery('peer_id');
+        $cloudId   = $this->request->getQuery('cloud_id');
+
+        $peer     = $this->WireguardPeers
+            ->find()
+            ->where([
+                'WireguardPeers.id' => $peerId
+            ])
+            ->contain(['WireguardInstances' => ['WireguardServers']])
+            ->first();
+
+        if (!$peer) {
+            throw new \Cake\Http\Exception\NotFoundException(__('Invalid peer/token'));
+        }
+        
+        $ip_address = '';
+        
+        if($peer->ipv4_enabled){
+            $ip_address = $peer->ipv4_address.'/32';//.$peer->ipv4_mask;
+        }
+        
+        if(strlen($ip_address)>0){
+            $ip_address = $ip_address.',';
+        }
+                
+        if($peer->ipv6_enabled){
+            $ip_address = $ip_address.$peer->ipv6_address.'/'.$peer->ipv6_prefix;
+        }
+        
+        $cfg = "[Interface]
+PrivateKey = {$peer->private_key}
+Address    = {$ip_address}
+
+[Peer]
+PublicKey  = {$peer->wireguard_instance->public_key}
+Endpoint   = {$peer->wireguard_instance->wireguard_server->ip_address}:{$peer->wireguard_instance->listen_port}
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = {$peer->persistent_keepalive}
+";     
+        
+        $data = [
+            'config'    => $cfg,
+            'metaData'  => [
+                'name'  => $peer->name,
+                'description' => $peer->description,
+            ]
+        ];
+
+         $this->set([
+            'data'         => $data,
+            'success'       => true
+        ]);
+        $this->viewBuilder()->setOption('serialize', true);	
+		
+	}
+	
    
     public function menuForGrid(){
     

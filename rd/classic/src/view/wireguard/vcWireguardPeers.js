@@ -5,7 +5,9 @@ Ext.define('Rd.view.wireguard.vcWireguardPeers', {
     
     },
     config: {
-        urlDelete   : '/cake4/rd_cake/wireguard-peers/delete.json'
+        urlDelete       : '/cake4/rd_cake/wireguard-peers/delete.json',
+        UrlPeerConfig   : '/cake4/rd_cake/wireguard-peers/peer-config.json',
+        UrlPeerQrCode   : '/cake4/rd_cake/wireguard-peers/qrcode-config.json'
     },
     control: {
         'gridWireguardPeers #reload': {
@@ -26,6 +28,12 @@ Ext.define('Rd.view.wireguard.vcWireguardPeers', {
         'gridWireguardPeers #edit': {
             click   : 'edit'
         },   
+        'gridWireguardPeers #btnConfig': {
+            click   : 'peerConfig'
+        }, 
+        'gridWireguardPeers #btnQrCode': {
+            click   : 'qrcode'
+        },     
         'gridWireguardPeers actioncolumn': { 
              itemClick  : 'onActionColumnItemClick'
         }
@@ -191,6 +199,91 @@ Ext.define('Rd.view.wireguard.vcWireguardPeers', {
             }
         }
     }, 
+    
+    peerConfig: function(){
+        var me      = this;   
+        //Find out if there was something selected
+        var selCount = me.getView().getSelectionModel().getCount();
+        if(selCount == 0){
+             Ext.ux.Toaster.msg(
+                        i18n('sSelect_an_item'),
+                        i18n('sFirst_select_an_item'),
+                        Ext.ux.Constants.clsWarn,
+                        Ext.ux.Constants.msgWarn
+            );
+        }else{
+            if(selCount > 1){
+                Ext.ux.Toaster.msg(
+                        i18n('sLimit_the_selection'),
+                        i18n('sSelection_limited_to_one'),
+                        Ext.ux.Constants.clsWarn,
+                        Ext.ux.Constants.msgWarn
+                );
+            }else{
+                var sr          = me.getView().getSelectionModel().getLastSelected();
+                var inst_id     = me.getView().instance_id;
+                var tp          = me.getView().up('tabpanel');               
+                var t_id        = sr.get('id');                                         
+                var extra_params= Ext.Object.toQueryString(Ext.Ajax.getExtraParams());               
+                window.open(me.getUrlPeerConfig()+'?'+extra_params+"&peer_id="+t_id);
+                
+            }
+        }
+    },
+    
+    qrcode: function(){
+        var me      = this;   
+        //Find out if there was something selected
+        var selCount = me.getView().getSelectionModel().getCount();
+        if(selCount == 0){
+             Ext.ux.Toaster.msg(
+                        i18n('sSelect_an_item'),
+                        i18n('sFirst_select_an_item'),
+                        Ext.ux.Constants.clsWarn,
+                        Ext.ux.Constants.msgWarn
+            );
+        }else{
+            if(selCount > 1){
+                Ext.ux.Toaster.msg(
+                        i18n('sLimit_the_selection'),
+                        i18n('sSelection_limited_to_one'),
+                        Ext.ux.Constants.clsWarn,
+                        Ext.ux.Constants.msgWarn
+                );
+            }else{
+            
+                var sr          = me.getView().getSelectionModel().getLastSelected();
+                var inst_id     = me.getView().instance_id;
+                var tp          = me.getView().up('tabpanel');               
+                var t_tab_name  = 'Peer config QR code';
+                var t_id        = sr.get('id');
+                var t_tab_id    = 'qrTab_'+t_id;
+                
+                //If already there focus and return
+                var nt         = tp.down('#'+t_tab_id);
+                if(nt){
+                    tp.setActiveTab(t_tab_id); //Set focus on  Tab
+                    return;
+                }
+                                
+                //Tab not there - add one
+                tp.add({ 
+                    title   : t_tab_name,
+                    itemId  : t_tab_id,
+                    peer_id : t_id,
+                    instance_id : inst_id,
+                    closable: true,
+                    glyph   : Rd.config.icnEdit,
+                    xtype   : 'pnlWireguardPeerQrcode'
+                });
+                tp.setActiveTab(t_tab_id); //Set focus on Add Tab
+                
+                //var extra_params= Ext.Object.toQueryString(Ext.Ajax.getExtraParams());               
+                //window.open(me.getUrlPeerQrCode()+'?'+extra_params+"&peer_id="+t_id);               
+                
+            }
+        }
+    },   
     onViewActivate: function(pnl){
         var me = this;
         me.reload();   

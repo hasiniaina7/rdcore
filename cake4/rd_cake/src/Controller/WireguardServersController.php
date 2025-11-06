@@ -20,7 +20,9 @@ class WireguardServersController extends AppController{
     public function initialize():void{  
         parent::initialize();
 
-        $this->loadModel('WireguardServers'); 
+        $this->loadModel('WireguardServers');
+        $this->loadModel('WireguardInstances');
+        $this->loadModel('WireguardPeers');  
        // $this->loadModel('AccelStats');
        // $this->loadModel('AccelSessions');
         $this->loadModel('WireguardArrivals');
@@ -64,126 +66,47 @@ class WireguardServersController extends AppController{
     
     public function submitReport(){ 
     
-        $req_d		= $this->request->getData();
+        $req_d = $this->request->getData();
+        
         $reply_data = [];
-        
-        //--We store the data as JSON strings since ther are arrays.
-        foreach (array_keys($req_d['stat']) as $key){
-                 
-            if($key == 'sessions'){
-                $s_list = $req_d['stat'][$key];
-                foreach($s_list as $s){
-                    if($s['name'] == 'active'){
-                        $req_d['stat']['sessions_active'] = $s['value'];
-                    }
-                }              
-            }
-            
-            if(($key == 'core')||($key == 'sessions')||($key == 'pppoe')){
-                $req_d['stat'][$key] = json_encode($req_d['stat'][$key]);
-            }
-            
-            if(preg_match('/^radius/', $key)){ //,"radius(1, 164.160.89.129)"
-                $radius_nr = preg_replace('/^radius\(/','',$key);
-                $radius_nr = preg_replace('/,.*/','',$radius_nr);
-                $radius_ip = preg_replace('/.*,\s+/','',$key);
-                $radius_ip = preg_replace('/\)$/','',$radius_ip);
-                array_push($req_d['stat'][$key], ['name' => 'ip', 'value' => $radius_ip]);            
-                $req_d['stat']['radius'.$radius_nr] = json_encode($req_d['stat'][$key]);     
-            }
-            
-            if(preg_match('/^mem/', $key)){    // "mem(rss\/virt)":"5632\/244536 kB"
-                $req_d['stat']['mem'] = $req_d['stat'][$key];
-            }             
-        }
-        
+              
         if(isset($req_d['mac'])){
-            $mac = $req_d['mac'];
-            
-            //MESHdesk and APdesk will include 'mode'
-            $e_s = false;
-            if(isset($req_d['mode'])){
-                if($req_d['mode'] == 'mesh'){
-                    $val = $mac.'_mpppoe_%';
-                    $e_s = $this->{'WireguardServers'}->find()->where(['WireguardServers.mac LIKE' => $val])->first();   
-                }  
-            
-                if($req_d['mode'] == 'ap'){
-                    $val = $mac.'_apppoe_%';
-                    $e_s = $this->{'WireguardServers'}->find()->where(['WireguardServers.mac LIKE' => $val])->first();   
-                }          
-                
-            }else{
-                $e_s = $this->{'WireguardServers'}->find()->where(['WireguardServers.mac' => $mac])->first();
-            }         
-            if($e_s){ 
-            
-                $server_id = $e_s->id;
-                $req_d['stat']['wireguard_server_id'] = $e_s->id;
-                                        
-                $e_s->last_contact = FrozenTime::now();
-                $e_s->last_contact_from_ip = $this->request->clientIp();
-                $this->{'WireguardServers'}->save($e_s);
-                
-                //--Do the stats entry-- 
-                $e_stats = $this->{'WireguardStats'}->find()->where(['WireguardStats.wireguard_server_id' => $e_s->id])->first();
-                if($e_stats){
-                    $this->{'WireguardStats'}->patchEntity($e_stats, $req_d['stat']);    
-                }else{                  
-                    $e_stats = $this->{'WireguardStats'}->newEntity($req_d['stat']);
-                }
-                $this->{'WireguardStats'}->save($e_stats);
-                
-                //--Do the sessions entry--
-                foreach($req_d['sessions'] as $session){ 
-                
-                    foreach(array_keys($session) as $key){              
-                         if(str_contains($key , '-')){                        
-                            $new_key = str_replace('-','_',$key);
-                            $session[$new_key] = $session[$key];
-                         }
-                    }
-                    if(array_key_exists('rate_limit',$session)){
-                       //Do nothing 
-                    }else{
-                       $session['rate_limit'] = 'No Limit';  
-                    }
-                                               
-                    $mac        = $session['calling_sid'];                                
-                    $e_session  =  $this->{'WireguardSessions'}->find()->where(['WireguardSessions.wireguard_server_id' => $server_id,'WireguardSessions.calling_sid' => $mac])->first();
-                    if($e_session){
-                        $this->{'WireguardSessions'}->patchEntity($e_session,$session);    
-                    }else{ 
-                        $session['wireguard_server_id'] = $server_id;                 
-                        $e_session                  = $this->{'WireguardSessions'}->newEntity($session);
-                    }
-                    $this->{'WireguardSessions'}->save($e_session);             
-                }
-                
-                //See if there are any sessions to terminate
-                $terminate_list = $this->{'WireguardSessions'}->find()->where(['WireguardSessions.disconnect_flag' => true,'WireguardSessions.wireguard_server_id' => $server_id])->all();
-                if(count($terminate_list)>0){
-                    $reply_data['terminate'] = [];
-                    foreach($terminate_list as $t){
-                        array_push($reply_data['terminate'],$t->sid);
-                        //Clear the flag 
-                        $t->disconnect_flag = false;
-                        $t->setDirty('modified', true); //Dont update the modified field
-                        //Save it
-                        $this->{'WireguardSessions'}->save($t);
-                    }              
-                }
+            $mac = $req_d['mac'];            
+            $w_s = $this->WireguardServers->find()->where(['WireguardServers.mac' => $mac])->first();       
+            if($w_s){                                        
+                $w_s->last_contact = FrozenTime::now();
+                $w_s->last_contact_from_ip = $this->request->clientIp();
                 
                 //See if the restart_service_flag is set and clear it
-                if($e_s->restart_service_flag){
+                if($w_s->restart_flag){
                     $reply_data['restart_service'] = true;
-                    $e_s->restart_service_flag = false;
-                    //$e_s->setDirty('modified', true);
-                    $this->{'WireguardServers'}->save($e_s);             
-                }                                        
-            }     
+                    $w_s->restart_flag = false;         
+                }                
+                $this->WireguardServers->save($w_s);                  
+            }                       
         }
-                
+                    
+        if(isset($req_d['info'])){
+            foreach(array_keys($req_d['info']) as $instance){
+                $i_public = $req_d['info'][$instance]['public_key'];
+                $wg_i = $this->WireguardInstances->find()->where(['WireguardInstances.public_key' => $i_public])->first();
+                if($wg_i){
+                    foreach($req_d['info'][$instance]['peers'] as $peer){
+                        $wg_p = $this->WireguardPeers->find()->where(['WireguardPeers.public_key' => $peer['public_key']])->first();
+                        if($wg_p){
+                            if($peer['latest_handshake']>0){
+                                $frozenTime = FrozenTime::createFromTimestamp($peer['latest_handshake']);
+                                $wg_p->last_handshake_ts = $frozenTime;
+                            }
+                            $wg_p->tx_bytes = $peer['tx_bytes'];
+                            $wg_p->rx_bytes = $peer['rx_bytes'];
+                            $this->WireguardPeers->save($wg_p);
+                        }                   
+                    }                   
+                }            
+            }               
+        }
+                              
         $this->set([
             'success'   => true,
             'data'      => $reply_data
@@ -367,20 +290,20 @@ class WireguardServersController extends AppController{
 			
 	    if(isset($req_d['id'])){   //Single item delete       
             $entity     = $this->{$this->main_model}->get($req_d['id']);
-            if($entity->restart_service_flag == 0){
-                $entity->restart_service_flag = 1;
+            if($entity->restart_flag == 0){
+                $entity->restart_flag = 1;
             }else{
-                $entity->restart_service_flag = 0;
+                $entity->restart_flag = 0;
             }
             $entity->setDirty('modified', true);
             $this->{$this->main_model}->save($entity);
         }else{
             foreach($req_d as $d){
                 $entity     = $this->{$this->main_model}->get($d['id']);  
-                if($entity->restart_service_flag == 0){
-                    $entity->restart_service_flag = 1;
+                if($entity->restart_flag == 0){
+                    $entity->restart_flag = 1;
                 }else{
-                    $entity->restart_service_flag = 0;
+                    $entity->restart_flag = 0;
                 }
                 $entity->setDirty('modified', true);
                 $this->{$this->main_model}->save($entity);

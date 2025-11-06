@@ -195,7 +195,6 @@ $config['icnBus']   	= 'xf207@'.$config['webFont'];
 $config['icnChainBroken'] = 'xf127@'.$config['webFont'];
 $config['icnCompress']    = 'xf066@'.$config['webFont'];
 $config['icnCalculator']  = 'xf1ec@'.$config['webFont'];
-$config['icnQrcode']    = 'xf029@'.$config['webFont'];
 $config['icnUserPlus']  = 'xf234@'.$config['webFont'];
 $config['icnUpoad']     = 'xf093@'.$config['webFont'];
 $config['icnInfoCircle']= 'xf05a@'.$config['webFont'];

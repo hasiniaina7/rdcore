@@ -988,20 +988,19 @@ class GridButtonsFlatComponent extends Component {
 		            $this->btnEdit,
 		            [
                         'xtype'     => 'button',
-                        'glyph'     => Configure::read('icnGears'),
+                        'glyph'     => Configure::read('icnCog'),
                         'scale'     => $this->scale,
                         'itemId'    => 'btnInstances',
                         'tooltip'   => __('Manage Wireguard Instances'),
                         'ui'        => $this->btnUiEdit
                     ],
                     [
-                        'xtype'     => 'button',
-                        'iconCls'   => 'x-fa fa-bolt',
-                       // 'glyph'     => Configure::read('icnGears'),
+                        'xtype'     => 'button', 
+                        'glyph'     => Configure::read('icnGears'), 
                         'scale'     => $this->scale,
-                        'itemId'    => 'btnLiveEvents',
-                        'tooltip'   => __('Live WireGuard Events'),
-                        'ui'        => 'button-metal'
+                        'itemId'    => 'restart',
+                        'tooltip'   =>  __('Restart Service'),
+                        'ui'        => $this->btnUiRestart
                     ]
 		        ]
         	];
@@ -1041,7 +1040,27 @@ class GridButtonsFlatComponent extends Component {
 		            $this->btnEdit
 		        ]
         	];
-            $menu = [$a];
+        	$b = [
+                'xtype' => 'buttongroup',
+                'title' => null, 
+                'items' => [
+                    [
+                        'xtype'     => 'button',
+                        'iconCls'   => 'x-fa fa-file-text',
+                        'scale'     => $this->scale,
+                        'itemId'    => 'btnConfig',
+                        'tooltip'   => __('Peer config as text')
+                    ],
+                    [
+                        'xtype'     => 'button',
+                        'glyph'     => Configure::read('icnQrcode'),
+                        'scale'     => $this->scale,
+                        'itemId'    => 'btnQrCode',
+                        'tooltip'   => __('Peer config as QR code')
+                    ]
+                ]
+        	];
+            $menu = [$a,$b];
         }        
                                                    
         return $menu;
