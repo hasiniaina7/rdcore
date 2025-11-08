@@ -23,6 +23,39 @@ PATCH_STATE_DIR="${STATE_DIR}/sql_patches"
 WWW_USER="${WWW_USER:-www-data}"
 WWW_GROUP="${WWW_GROUP:-www-data}"
 
+SKIP_RADACCT_CLEANUP=0
+
+usage() {
+  cat <<'EOF'
+Usage: update_radiusdesk_app.sh [--skip-radacct-cleanup]
+
+Options:
+  --skip-radacct-cleanup   N'exécute pas cleanup_stale_radacct.sh à la fin.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-radacct-cleanup)
+      SKIP_RADACCT_CLEANUP=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Option inconnue: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "${SKIP_RADACCT_CLEANUP}" -eq 1 ]]; then
+  AUTO_CLOSE_STALE_SESSIONS=0
+fi
+
 log INFO "=== Mise à jour RadiusDesk (code + patches SQL) ==="
 
 MANAGED_BUILD_DIR="${RDCORE_PATH}/rd/build/production/Rd"
@@ -56,6 +89,35 @@ purge_old_build() {
     log INFO "Suppression de l'ancien build ${MANAGED_BUILD_DIR}."
     rm -rf "${MANAGED_BUILD_DIR}"
   fi
+}
+
+restore_build_from_git() {
+  if [[ -d "${RDCORE_PATH}/.git" ]]; then
+    if git -C "${RDCORE_PATH}" ls-tree HEAD rd/build/production/Rd >/dev/null 2>&1; then
+      log INFO "Restauration du build depuis git."
+      if ! git -C "${RDCORE_PATH}" checkout -- rd/build/production/Rd >/dev/null 2>&1; then
+        log WARN "Impossible de restaurer rd/build/production/Rd depuis git."
+      fi
+    else
+      log WARN "rd/build/production/Rd n'est pas versionné (aucune restauration git possible)."
+    fi
+  fi
+}
+
+ensure_build_present() {
+  if [[ -d "${MANAGED_BUILD_DIR}" ]]; then
+    return
+  fi
+  if compgen -G "${BACKUP_ROOT}/Rd_backup_*" >/dev/null 2>&1; then
+    local latest
+    latest="$(ls -1dt ${BACKUP_ROOT}/Rd_backup_* 2>/dev/null | head -n 1)"
+    if [[ -n "${latest}" && -d "${latest}" ]]; then
+      log WARN "Build absent après mise à jour; restauration depuis ${latest}."
+      cp -a "${latest}" "${MANAGED_BUILD_DIR}"
+      return
+    fi
+  fi
+  log ERROR "Le build ${MANAGED_BUILD_DIR} est introuvable après mise à jour (git et backups indisponibles)."
 }
 
 apply_local_patches() {
@@ -96,6 +158,7 @@ if [[ -d "${RDCORE_PATH}" ]]; then
   rotate_build_backups
   purge_old_build
   update_repo "${RDCORE_PATH}" "${RD_BRANCH}"
+  restore_build_from_git
 else
   log ERROR "RDCORE_PATH=${RDCORE_PATH} introuvable."
   exit 1
@@ -104,9 +167,6 @@ fi
 if [[ -d "${RDMOBILE_PATH}" ]]; then
   update_repo "${RDMOBILE_PATH}" "${RDMOBILE_BRANCH}" || true
 fi
-
-rotate_build_backups
-purge_old_build
 
 log INFO "Installation/maj des dépendances Composer."
 if [[ -f "${RDCORE_PATH}/cake4/rd_cake/composer.json" ]]; then
@@ -154,5 +214,8 @@ if [[ "${AUTO_CLOSE_STALE_SESSIONS}" -eq 1 ]]; then
     STALE_SESSION_GRACE_SECONDS="${STALE_SESSION_GRACE_SECONDS}" "${BASE_DIR}/scripts/cleanup_stale_radacct.sh" || log WARN "Nettoyage radacct a signalé une erreur."
   fi
 fi
+
+restore_build_from_git
+ensure_build_present
 
 log INFO "=== Mise à jour RadiusDesk terminée ==="

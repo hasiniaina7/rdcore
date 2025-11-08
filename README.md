@@ -114,7 +114,7 @@ Sinon exemples manuels (HTTP‑01 / DNS‑01) loggés dans `70_tls_certbot.sh`.
 ## Conseils d’exploitation
 - Sauvegarde: DB `rd` + `/var/www/rdcore` + `/etc/freeradius`.
 - Journaux utiles: `journalctl -u nginx`, `journalctl -u freeradius`, `cake4/rd_cake/logs/*`.
-- Mise à jour applicative (code + patches SQL): `sudo ./deploy/scripts/update_radiusdesk_app.sh` (git pull, composer install, patches locaux, application des `8.*.sql`, purge des caches, fermeture automatique des sessions orphelines, rotation des builds `/rd/build/production/Rd` avec conservation des 2 dernières sauvegardes dans `deploy/backups/rd_build`).
+- Mise à jour applicative (code + patches SQL): `sudo ./deploy/scripts/update_radiusdesk_app.sh [--skip-radacct-cleanup]` (git pull, restauration du build `rd/build/production/Rd` depuis git ou backups, composer install, patches locaux, application des `8.*.sql`, purge des caches, fermeture automatique des sessions orphelines sauf si l’option est spécifiée).
 - Nettoyage manuel des sessions RADIUS importées: `sudo ./deploy/scripts/cleanup_stale_radacct.sh` (appelé automatiquement par les scripts 40 / update, configurable via `STALE_SESSION_GRACE_SECONDS`).
 
 ## Sécurité

@@ -113,7 +113,7 @@ Note permissions MariaDB : si l’utilisateur applicatif (`rd`) n’a pas les 
    ```
 8. Effectuer les vérifications fonctionnelles (authentification RADIUS, interface web `https://<host>/rd/`).
 
-> **Note** – `deploy/scripts/cleanup_stale_radacct.sh` est exécuté automatiquement par `update_radiusdesk_app.sh` pour clôturer les sessions importées. Pour sauter cette étape lors d’une mise à jour, exportez `AUTO_CLOSE_STALE_SESSIONS=0` avant de lancer le script.
+> **Note** – `deploy/scripts/cleanup_stale_radacct.sh` est exécuté automatiquement par `update_radiusdesk_app.sh` pour clôturer les sessions importées. Pour sauter cette étape lors d’une mise à jour, lancez `sudo ./deploy/scripts/update_radiusdesk_app.sh --skip-radacct-cleanup`.
 
 ---
 
