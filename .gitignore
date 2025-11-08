@@ -6,3 +6,6 @@ sencha_workspace/ConsumptionPortal/build/
 sencha_workspace/ConsumptionPortal/ext/
 sencha_workspace/ConsumptionPortal/bootstrap.js
 sencha_workspace/ConsumptionPortal/bootstrap.css
+
+# Ignore any files whose name starts with "important"
+important*
