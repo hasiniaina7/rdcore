@@ -24,6 +24,39 @@ WWW_GROUP="${WWW_GROUP:-www-data}"
 
 log INFO "=== Mise à jour RadiusDesk (code + patches SQL) ==="
 
+MANAGED_BUILD_DIR="${RDCORE_PATH}/rd/build/production/Rd"
+BACKUP_ROOT="${BASE_DIR}/backups/rd_build"
+MAX_BUILD_BACKUPS=2
+
+rotate_build_backups() {
+  mkdir -p "${BACKUP_ROOT}"
+  if [[ -d "${MANAGED_BUILD_DIR}" ]]; then
+    local ts
+    ts="$(date +%Y%m%d-%H%M%S)"
+    local dest="${BACKUP_ROOT}/Rd_backup_${ts}"
+    log INFO "Sauvegarde du build courant dans ${dest}."
+    cp -a "${MANAGED_BUILD_DIR}" "${dest}"
+  else
+    log INFO "Pas de build actuel à sauvegarder (${MANAGED_BUILD_DIR} introuvable)."
+  fi
+
+  mapfile -t backups < <(ls -1dt ${BACKUP_ROOT}/Rd_backup_* 2>/dev/null || true)
+  local count="${#backups[@]}"
+  if (( count > MAX_BUILD_BACKUPS )); then
+    for ((i=MAX_BUILD_BACKUPS; i<count; i++)); do
+      log INFO "Suppression de l'ancienne sauvegarde ${backups[i]}"
+      rm -rf "${backups[i]}"
+    done
+  fi
+}
+
+purge_old_build() {
+  if [[ -d "${MANAGED_BUILD_DIR}" ]]; then
+    log INFO "Suppression de l'ancien build ${MANAGED_BUILD_DIR}."
+    rm -rf "${MANAGED_BUILD_DIR}"
+  fi
+}
+
 apply_local_patches() {
   if compgen -G "${PATCHES_DIR}/*.patch" >/dev/null 2>&1; then
     for patch_file in "${PATCHES_DIR}"/*.patch; do
@@ -68,6 +101,9 @@ fi
 if [[ -d "${RDMOBILE_PATH}" ]]; then
   update_repo "${RDMOBILE_PATH}" master || true
 fi
+
+rotate_build_backups
+purge_old_build
 
 log INFO "Installation/maj des dépendances Composer."
 if [[ -f "${RDCORE_PATH}/cake4/rd_cake/composer.json" ]]; then
