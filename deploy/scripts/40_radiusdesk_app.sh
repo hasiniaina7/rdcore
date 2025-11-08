@@ -11,8 +11,115 @@ CURRENT_LOG="${LOG_DIR}/40_radiusdesk_app.log"
 STEP_NAME="40_radiusdesk_app"
 PATCHES_DIR="${BASE_DIR}/templates/patches"
 RDCORE_PATH="/var/www/rdcore"
+CAKE_DB_DIR="${RDCORE_PATH}/cake4/rd_cake/setup/db"
+RD_SQL_DUMP="${CAKE_DB_DIR}/rd.sql"
 
 require_root
+
+MYSQL_ADMIN_USER="${DB_ADMIN_USER:-${DB_USER}}"
+MYSQL_ADMIN_PASS="${DB_ADMIN_PASS:-${DB_PASS:-}}"
+MYSQL_ARGS=(--batch --skip-column-names -u "${MYSQL_ADMIN_USER}")
+[[ -n "${DB_HOST:-}" ]] && MYSQL_ARGS+=(-h "${DB_HOST}")
+[[ -n "${DB_PORT:-}" ]] && MYSQL_ARGS+=(-P "${DB_PORT}")
+
+# mysql_exec <database> <sql>
+mysql_exec() {
+  local database="$1"
+  local query="$2"
+  local cmd=(mysql "${MYSQL_ARGS[@]}")
+  if [[ -n "${database}" ]]; then
+    cmd+=("${database}")
+  fi
+  if [[ -n "${MYSQL_ADMIN_PASS}" ]]; then
+    MYSQL_PWD="${MYSQL_ADMIN_PASS}" "${cmd[@]}" -e "${query}"
+  else
+    "${cmd[@]}" -e "${query}"
+  fi
+}
+
+# mysql_exec_file <database> <file>
+mysql_exec_file() {
+  local database="$1"
+  local file="$2"
+  if [[ ! -f "${file}" ]]; then
+    log ERROR "Fichier SQL introuvable : ${file}"
+    return 1
+  fi
+  local cmd=(mysql "${MYSQL_ARGS[@]}")
+  if [[ -n "${database}" ]]; then
+    cmd+=("${database}")
+  fi
+  if [[ -n "${MYSQL_ADMIN_PASS}" ]]; then
+    MYSQL_PWD="${MYSQL_ADMIN_PASS}" "${cmd[@]}" < "${file}"
+  else
+    "${cmd[@]}" < "${file}"
+  fi
+}
+
+# table_exists <database> <table>
+table_exists() {
+  local schema="$1"
+  local table="$2"
+  local sql="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${schema}' AND table_name='${table}';"
+  local count
+  if ! count="$(mysql_exec "" "${sql}" 2>/dev/null)"; then
+    return 1
+  fi
+  [[ "${count}" -gt 0 ]]
+}
+
+ensure_rd_database_schema() {
+  log INFO "Vérification du schéma SQL (${DB_NAME})"
+  if ! mysql_exec "" "SELECT 1;" >/dev/null 2>&1; then
+    log ERROR "Impossible de se connecter à MySQL (utilisateur ${MYSQL_ADMIN_USER})."
+    exit 1
+  fi
+
+  mysql_exec "" "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+  local anchors=(access_providers permanent_users realms)
+  local schema_ready=1
+  for tbl in "${anchors[@]}"; do
+    if table_exists "${DB_NAME}" "${tbl}"; then
+      schema_ready=0
+      break
+    fi
+  done
+
+  if [[ "${schema_ready}" -ne 0 ]]; then
+    if [[ -f "${RD_SQL_DUMP}" ]]; then
+      log INFO "Import initial de rd.sql (base ${DB_NAME})."
+      mysql_exec_file "${DB_NAME}" "${RD_SQL_DUMP}"
+    else
+      log ERROR "Dump initial ${RD_SQL_DUMP} introuvable."
+      exit 1
+    fi
+  else
+    log INFO "Schéma ${DB_NAME} déjà initialisé, pas d'import complet."
+  fi
+
+  local patches_applied=0
+  if compgen -G "${CAKE_DB_DIR}/8.*.sql" >/dev/null; then
+    while IFS= read -r patch; do
+      log INFO "Application du patch SQL $(basename "${patch}")."
+      if mysql_exec_file "${DB_NAME}" "${patch}"; then
+        patches_applied=$((patches_applied + 1))
+      else
+        log WARN "Patch $(basename "${patch}") a échoué (peut déjà être appliqué)."
+      fi
+    done < <(find "${CAKE_DB_DIR}" -maxdepth 1 -type f -name '8.*.sql' | sort)
+  else
+    log WARN "Aucun patch SQL 8.*.sql trouvé dans ${CAKE_DB_DIR}."
+  fi
+  log INFO "Patches SQL appliqués : ${patches_applied}"
+
+  if table_exists "${DB_NAME}" "passpoint_uplinks"; then
+    log INFO "Validation OK : la table passpoint_uplinks est présente."
+  else
+    log ERROR "La table passpoint_uplinks est absente après import/patch. Vérifiez vos fichiers SQL."
+    exit 1
+  fi
+}
 
 apply_local_patches() {
   if compgen -G "${PATCHES_DIR}/*.patch" >/dev/null 2>&1; then
@@ -158,41 +265,7 @@ mkdir -p /var/www/rdcore/cake4/rd_cake/webroot/img/{realms,dynamic_details,dynam
 chown -R www-data:www-data /var/www/rdcore
 chown -R www-data:www-data /var/www/html
 
-log INFO "Initialisation de la base RADIUSdesk si nécessaire."
-SCHEMA_COUNT=$(mysql -u root -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${DB_NAME}'" || echo "0")
-if [[ "${SCHEMA_COUNT}" -eq 0 ]]; then
-  if [[ -f /var/www/rdcore/cake4/rd_cake/setup/db/rd.sql ]]; then
-    log INFO "Import du schéma rd.sql dans ${DB_NAME}."
-    mysql -u root "${DB_NAME}" < /var/www/rdcore/cake4/rd_cake/setup/db/rd.sql
-  else
-    log WARN "Fichier rd.sql introuvable, import DB non effectué."
-  fi
-else
-  log INFO "La base ${DB_NAME} contient déjà ${SCHEMA_COUNT} tables, aucune importation."
-fi
-
-PATCH_DIR="/var/www/rdcore/cake4/rd_cake/setup/db"
-PATCH_STATE_DIR="${STATE_DIR}/sql_patches"
-mkdir -p "${PATCH_STATE_DIR}"
-if compgen -G "${PATCH_DIR}/8.*.sql" >/dev/null; then
-  while IFS= read -r patch; do
-    patch_name="$(basename "${patch}")"
-    marker="${PATCH_STATE_DIR}/${patch_name}.done"
-    if [[ -f "${marker}" ]]; then
-      log INFO "Patch SQL ${patch_name} déjà appliqué."
-      continue
-    fi
-    log INFO "Application du patch SQL ${patch_name}."
-    if mysql --force -u root "${DB_NAME}" < "${patch}"; then
-      log INFO "Patch ${patch_name} appliqué."
-    else
-      log WARN "Patch ${patch_name} a retourné des avertissements (peut déjà être appliqué)."
-    fi
-    touch "${marker}"
-  done < <(find "${PATCH_DIR}" -maxdepth 1 -type f -name '8.*.sql' -print | sort)
-else
-  log WARN "Aucun patch SQL complémentaire trouvé dans ${PATCH_DIR}."
-fi
+ensure_rd_database_schema
 
 if [[ -x "${BASE_DIR}/scripts/cleanup_stale_radacct.sh" ]]; then
   log INFO "Nettoyage automatique des sessions radacct orphelines."
