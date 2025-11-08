@@ -114,7 +114,8 @@ Sinon exemples manuels (HTTP‑01 / DNS‑01) loggés dans `70_tls_certbot.sh`.
 ## Conseils d’exploitation
 - Sauvegarde: DB `rd` + `/var/www/rdcore` + `/etc/freeradius`.
 - Journaux utiles: `journalctl -u nginx`, `journalctl -u freeradius`, `cake4/rd_cake/logs/*`.
-- En cas de mise à jour rdcore: rejouer phase 40 et vider le cache Cake (`bin/cake cache clear_all`).
+- Mise à jour applicative (code + patches SQL): `sudo ./deploy/scripts/update_radiusdesk_app.sh` (git pull, composer install, patches locaux, application des `8.*.sql`, purge des caches, fermeture automatique des sessions orphelines).
+- Nettoyage manuel des sessions RADIUS importées: `sudo ./deploy/scripts/cleanup_stale_radacct.sh` (appelé automatiquement par les scripts 40 / update, configurable via `STALE_SESSION_GRACE_SECONDS`).
 
 ## Sécurité
 - Changer `RADIUS_SECRET_DEFAULT` rapidement.
@@ -125,4 +126,3 @@ Sinon exemples manuels (HTTP‑01 / DNS‑01) loggés dans `70_tls_certbot.sh`.
 Ce guide s’adresse à des déploiements reproductibles et sûrs. Les scripts
 s’arrêtent en cas de configuration manquante critique et écrivent des logs
 exhaustifs pour accélérer le diagnostic.
-

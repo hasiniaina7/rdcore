@@ -1,0 +1,32 @@
+diff --git a/cake4/rd_cake/src/Controller/RadacctsController.php b/cake4/rd_cake/src/Controller/RadacctsController.php
+--- a/cake4/rd_cake/src/Controller/RadacctsController.php
++++ b/cake4/rd_cake/src/Controller/RadacctsController.php
+@@
+         $req_q    = $this->request->getQuery();
+         foreach(array_keys($req_q) as $key){
+             if(preg_match('/^\d+/',$key)){
+                 $qr = $this->{$this->workingModel}->find()->where(['radacctid' => $key])->first();
+                 if($qr){
+                     if($qr->acctstoptime == null){
+-                        $now = date('Y-m-d h:i:s');
+-                        $d['acctstoptime'] = $now;
+-						$this->{$this->workingModel}->patchEntity($qr,$d);
+-                        $this->{$this->workingModel}->save($qr);
++                        $now = FrozenTime::now('UTC');
++                        $duration = null;
++                        if($qr->acctstarttime instanceof FrozenTime){
++                            $duration = max(0, $now->getTimestamp() - $qr->acctstarttime->getTimestamp());
++                        }
++                        $d = [
++                            'acctstoptime'       => $now,
++                            'acctupdatetime'     => $now,
++                            'acctterminatecause' => $qr->acctterminatecause ?: 'Clear-Stale-Session',
++                        ];
++                        if($duration !== null){
++                            $d['acctsessiontime'] = $duration;
++                        }
++						$this->{$this->workingModel}->patchEntity($qr,$d);
++                        $this->{$this->workingModel}->save($qr);
+                     }
+                 }  
+             }

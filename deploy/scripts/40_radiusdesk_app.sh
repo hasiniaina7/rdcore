@@ -9,8 +9,23 @@ source "${BASE_DIR}/lib/common.sh"
 
 CURRENT_LOG="${LOG_DIR}/40_radiusdesk_app.log"
 STEP_NAME="40_radiusdesk_app"
+PATCHES_DIR="${BASE_DIR}/templates/patches"
+RDCORE_PATH="/var/www/rdcore"
 
 require_root
+
+apply_local_patches() {
+  if compgen -G "${PATCHES_DIR}/*.patch" >/dev/null 2>&1; then
+    for patch_file in "${PATCHES_DIR}"/*.patch; do
+      log INFO "Application du patch local $(basename "${patch_file}")."
+      if patch -d "${RDCORE_PATH}" -p1 -N --dry-run < "${patch_file}" >/dev/null 2>&1; then
+        patch -d "${RDCORE_PATH}" -p1 -N < "${patch_file}" || log WARN "Échec application patch $(basename "${patch_file}")."
+      else
+        log INFO "Patch $(basename "${patch_file}") déjà appliqué ou non applicable (dry-run)."
+      fi
+    done
+  fi
+}
 
 if already_done "$STEP_NAME"; then
   log INFO "Étape ${STEP_NAME} déjà marquée comme faite, on saute."
@@ -34,17 +49,17 @@ systemctl enable --now redis-server
 
 log INFO "Synchronisation du code RADIUSdesk."
 mkdir -p /var/www
-git config --global --add safe.directory /var/www/rdcore || true
-if [[ ! -d /var/www/rdcore ]]; then
-  git clone --branch cake4 --single-branch https://github.com/hasiniaina7/rdcore.git /var/www/rdcore
+git config --global --add safe.directory "${RDCORE_PATH}" || true
+if [[ ! -d "${RDCORE_PATH}" ]]; then
+  git clone --branch cake4 --single-branch https://github.com/hasiniaina7/rdcore.git "${RDCORE_PATH}"
 else
-  git -C /var/www/rdcore fetch origin cake4 || log WARN "git fetch rdcore a échoué."
-  if git -C /var/www/rdcore rev-parse --verify cake4 >/dev/null 2>&1; then
-    git -C /var/www/rdcore checkout cake4
+  git -C "${RDCORE_PATH}" fetch origin cake4 || log WARN "git fetch rdcore a échoué."
+  if git -C "${RDCORE_PATH}" rev-parse --verify cake4 >/dev/null 2>&1; then
+    git -C "${RDCORE_PATH}" checkout cake4
   else
-    git -C /var/www/rdcore checkout -b cake4 origin/cake4 || log WARN "checkout cake4 échoué."
+    git -C "${RDCORE_PATH}" checkout -b cake4 origin/cake4 || log WARN "checkout cake4 échoué."
   fi
-  git -C /var/www/rdcore reset --hard origin/cake4 || log WARN "reset cake4 échoué."
+  git -C "${RDCORE_PATH}" reset --hard origin/cake4 || log WARN "reset cake4 échoué."
 fi
 
 git config --global --add safe.directory /var/www/rd_mobile || true
@@ -55,17 +70,19 @@ else
 fi
 
 log INFO "Ajustement des permissions avant Composer."
-chown -R www-data:www-data /var/www/rdcore || true
+chown -R www-data:www-data "${RDCORE_PATH}" || true
 if [[ -d /var/www/rd_mobile ]]; then
   chown -R www-data:www-data /var/www/rd_mobile || true
 fi
 
 log INFO "Installation des dépendances Composer de RADIUSdesk."
-if [[ -f /var/www/rdcore/cake4/rd_cake/composer.json ]]; then
-  sudo -H -u www-data composer install --no-dev --prefer-dist --no-interaction --working-dir=/var/www/rdcore/cake4/rd_cake
+if [[ -f ${RDCORE_PATH}/cake4/rd_cake/composer.json ]]; then
+  sudo -H -u www-data composer install --no-dev --prefer-dist --no-interaction --working-dir="${RDCORE_PATH}/cake4/rd_cake"
 else
   log WARN "composer.json introuvable, saut de composer install."
 fi
+
+apply_local_patches
 
 log INFO "Création des liens symboliques dans /var/www/html."
 mkdir -p /var/www/html
@@ -175,6 +192,11 @@ if compgen -G "${PATCH_DIR}/8.*.sql" >/dev/null; then
   done < <(find "${PATCH_DIR}" -maxdepth 1 -type f -name '8.*.sql' -print | sort)
 else
   log WARN "Aucun patch SQL complémentaire trouvé dans ${PATCH_DIR}."
+fi
+
+if [[ -x "${BASE_DIR}/scripts/cleanup_stale_radacct.sh" ]]; then
+  log INFO "Nettoyage automatique des sessions radacct orphelines."
+  "${BASE_DIR}/scripts/cleanup_stale_radacct.sh" || log WARN "Nettoyage radacct a signalé une erreur."
 fi
 
 log INFO "Activation du cron RADIUSdesk."
