@@ -20,6 +20,7 @@ require_root
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="${MIGRATION_BACKUP_DIR:-/var/backups/radiusdesk-migration}"
 SENCHA_BIN="${SENCHA_BIN:-$(command -v sencha || true)}"
+UI_TARBALL="${MIGRATION_UI_TARBALL:-}"
 
 log INFO "=== Démarrage de la migration RADIUSdesk (${TIMESTAMP}) ==="
 
@@ -138,6 +139,56 @@ build_sencha() {
   fi
 }
 
+deploy_ui_artifact() {
+  local target_dir="/var/www/rdcore/rd/build/production/Rd"
+  local tmp_dir=""
+
+  if [[ -z "$UI_TARBALL" ]]; then
+    return 1
+  fi
+
+  if [[ ! -f "$UI_TARBALL" ]]; then
+    log WARN "Artefact UI ${UI_TARBALL} introuvable ; build Sencha requis."
+    return 1
+  fi
+
+  tmp_dir="$(mktemp -d /tmp/rd_ui.XXXXXX)"
+  log INFO "Déploiement de l'artefact UI ${UI_TARBALL}"
+
+  if [[ "$UI_TARBALL" == *.tar.gz || "$UI_TARBALL" == *.tgz ]]; then
+    if ! tar -xzf "$UI_TARBALL" -C "$tmp_dir"; then
+      log WARN "Extraction de ${UI_TARBALL} échouée."
+      rm -rf "$tmp_dir"
+      return 1
+    fi
+  else
+    log WARN "Format d'artefact inconnu (${UI_TARBALL}). Utilisez un .tar.gz."
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  local src=""
+  if [[ -d "${tmp_dir}/Rd" ]]; then
+    src="${tmp_dir}/Rd"
+  elif [[ -d "${tmp_dir}/build/production/Rd" ]]; then
+    src="${tmp_dir}/build/production/Rd"
+  else
+    src="${tmp_dir}"
+  fi
+
+  mkdir -p "$target_dir"
+  if rsync -a --delete "${src}/" "${target_dir}/"; then
+    log INFO "Artefact UI déployé dans ${target_dir}"
+  else
+    log WARN "Échec du déploiement UI via rsync."
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  rm -rf "$tmp_dir"
+  return 0
+}
+
 refresh_permissions() {
   log INFO "Remise en place des permissions www-data"
   chown -R www-data:www-data /var/www/rdcore || true
@@ -170,7 +221,9 @@ fi
 run_composer
 apply_sql_patches
 clear_cake_cache
-build_sencha
+if ! deploy_ui_artifact; then
+  build_sencha
+fi
 refresh_permissions
 reload_services
 

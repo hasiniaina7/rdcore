@@ -23,6 +23,9 @@ DB_PASS="${DB_PASS:-rd}"
 RADIUS_SECRET_DEFAULT="${RADIUS_SECRET_DEFAULT:-testing123}"
 RADIUS_CLIENT_NET="${RADIUS_CLIENT_NET:-0.0.0.0/0}"
 
+# Stockage persistant pour les uploads (logos, photos, etc.)
+RD_UPLOADS_PERSIST_DIR="${RD_UPLOADS_PERSIST_DIR:-/var/local/radiusdesk-data/uploads}"
+
 # TLS / Let's Encrypt
 LE_EMAIL="${LE_EMAIL:-contact@techzone.lat}"
 AUTO_LE="${AUTO_LE:-1}"                     # 1 pour lancer certbot automatiquement
