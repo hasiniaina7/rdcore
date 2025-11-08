@@ -16,6 +16,7 @@ require_root
 
 RDCORE_PATH="${RDCORE_PATH:-/var/www/rdcore}"
 RDMOBILE_PATH="${RDMOBILE_PATH:-/var/www/rd_mobile}"
+RDMOBILE_BRANCH="${RDMOBILE_BRANCH:-main}"
 RD_BRANCH="${RD_BRANCH:-cake4}"
 PATCH_DIR="${RDCORE_PATH}/cake4/rd_cake/setup/db"
 PATCH_STATE_DIR="${STATE_DIR}/sql_patches"
@@ -92,6 +93,8 @@ update_repo() {
 }
 
 if [[ -d "${RDCORE_PATH}" ]]; then
+  rotate_build_backups
+  purge_old_build
   update_repo "${RDCORE_PATH}" "${RD_BRANCH}"
 else
   log ERROR "RDCORE_PATH=${RDCORE_PATH} introuvable."
@@ -99,7 +102,7 @@ else
 fi
 
 if [[ -d "${RDMOBILE_PATH}" ]]; then
-  update_repo "${RDMOBILE_PATH}" master || true
+  update_repo "${RDMOBILE_PATH}" "${RDMOBILE_BRANCH}" || true
 fi
 
 rotate_build_backups
