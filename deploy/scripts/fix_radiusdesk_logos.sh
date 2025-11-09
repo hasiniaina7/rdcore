@@ -5,6 +5,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "${BASE_DIR}/.." && pwd)"
 source "${BASE_DIR}/config/env.sh"
 source "${BASE_DIR}/lib/common.sh"
 
@@ -52,5 +53,17 @@ for rel in "${UPLOAD_RELATIVE_PATHS[@]}"; do
   chown -R www-data:www-data "${dest}" || true
   chmod 775 "${dest}" || true
 done
+
+DEFAULT_LOGO_SRC="${DEFAULT_LOGO_FILE:-${REPO_ROOT}/logo.png}"
+DEFAULT_LOGO_DEST="${UPLOADS_PERSIST_ROOT}/cake4/rd_cake/webroot/img/access_providers/logo.png"
+if [[ -f "${DEFAULT_LOGO_SRC}" ]]; then
+  if [[ ! -f "${DEFAULT_LOGO_DEST}" ]] || ! cmp -s "${DEFAULT_LOGO_SRC}" "${DEFAULT_LOGO_DEST}"; then
+    log INFO "Copie du logo par défaut vers ${DEFAULT_LOGO_DEST}"
+    install -m 0644 "${DEFAULT_LOGO_SRC}" "${DEFAULT_LOGO_DEST}"
+    chown www-data:www-data "${DEFAULT_LOGO_DEST}" || true
+  fi
+else
+  log WARN "Logo par défaut introuvable (${DEFAULT_LOGO_SRC}), copie ignorée."
+fi
 
 log INFO "Symlinks et permissions des logos/uploads rétablis."
