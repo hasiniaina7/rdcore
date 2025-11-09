@@ -147,6 +147,16 @@ configure_firewall() {
   ufw --force reload >/dev/null
 }
 
+allow_wg_internal_routes() {
+  log INFO "Autorisation du trafic wgX -> wgX (iptables/ufw)"
+  if ! iptables -C FORWARD -i wg+ -o wg+ -j ACCEPT >/dev/null 2>&1; then
+    iptables -I FORWARD -i wg+ -o wg+ -j ACCEPT
+  fi
+  if ! ip6tables -C FORWARD -i wg+ -o wg+ -j ACCEPT >/dev/null 2>&1; then
+    ip6tables -I FORWARD -i wg+ -o wg+ -j ACCEPT
+  fi
+}
+
 drop_metadata() {
   mkdir -p "${STATE_DIR}"
   cat > "${WG_STATE_MARK}" <<EOF
@@ -169,6 +179,7 @@ create_env_file
 install_units
 install_cake_stub
 configure_firewall
+allow_wg_internal_routes
 drop_metadata
 summary
 
