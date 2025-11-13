@@ -186,11 +186,11 @@ class CountsComponent extends Component {
           	    $realm_list = $apRealmList;
           	}        	
      	}
-     	if($found_realm){ 	
+    	if($found_realm){ 	
      		array_push($where, ["Radaccts.realm IN" => $realm_list]);
      	}else{
      		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
-        	return false;
+        	return 0;
      	}      
         //====== END Realm FILTER =====  
         array_push($where,"Radaccts.acctstoptime IS NULL");
