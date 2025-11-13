@@ -18,9 +18,19 @@ require_root
 
 MYSQL_ADMIN_USER="${DB_ADMIN_USER:-${DB_USER}}"
 MYSQL_ADMIN_PASS="${DB_ADMIN_PASS:-${DB_PASS:-}}"
+MYSQL_ADMIN_HOST="${DB_ADMIN_HOST:-${DB_HOST:-127.0.0.1}}"
+MYSQL_ADMIN_PORT="${DB_ADMIN_PORT:-${DB_PORT:-3306}}"
+
+if [[ "${MYSQL_ADMIN_USER}" == "root" && -z "${MYSQL_ADMIN_PASS}" && "${MYSQL_ADMIN_HOST}" == "127.0.0.1" ]]; then
+  log WARN "Connexion MySQL root sans mot de passe avec DB_ADMIN_HOST=127.0.0.1 → bascule sur localhost pour utiliser le socket."
+  MYSQL_ADMIN_HOST="localhost"
+fi
+
 MYSQL_ARGS=(--batch --skip-column-names -u "${MYSQL_ADMIN_USER}")
-[[ -n "${DB_HOST:-}" ]] && MYSQL_ARGS+=(-h "${DB_HOST}")
-[[ -n "${DB_PORT:-}" ]] && MYSQL_ARGS+=(-P "${DB_PORT}")
+[[ -n "${MYSQL_ADMIN_HOST:-}" ]] && MYSQL_ARGS+=(-h "${MYSQL_ADMIN_HOST}")
+[[ -n "${MYSQL_ADMIN_PORT:-}" ]] && MYSQL_ARGS+=(-P "${MYSQL_ADMIN_PORT}")
+
+log INFO "MySQL admin cible: ${MYSQL_ADMIN_USER}@${MYSQL_ADMIN_HOST}:${MYSQL_ADMIN_PORT}"
 
 # mysql_exec <database> <sql>
 mysql_exec() {
@@ -35,6 +45,11 @@ mysql_exec() {
   else
     "${cmd[@]}" -e "${query}"
   fi
+  local rc=$?
+  if [[ "${rc}" -ne 0 ]]; then
+    log ERROR "mysql_exec a échoué (requête: ${query})"
+  fi
+  return "${rc}"
 }
 
 # mysql_exec_file <database> <file>
@@ -54,6 +69,11 @@ mysql_exec_file() {
   else
     "${cmd[@]}" < "${file}"
   fi
+  local rc=$?
+  if [[ "${rc}" -ne 0 ]]; then
+    log ERROR "Import MySQL échoué (fichier ${file}, utilisateur ${MYSQL_ADMIN_USER})."
+  fi
+  return "${rc}"
 }
 
 # table_exists <database> <table>
@@ -71,7 +91,10 @@ table_exists() {
 ensure_rd_database_schema() {
   log INFO "Vérification du schéma SQL (${DB_NAME})"
   if ! mysql_exec "" "SELECT 1;" >/dev/null 2>&1; then
-    log ERROR "Impossible de se connecter à MySQL (utilisateur ${MYSQL_ADMIN_USER})."
+    log ERROR "Impossible de se connecter à MySQL (utilisateur ${MYSQL_ADMIN_USER} @ ${MYSQL_ADMIN_HOST}:${MYSQL_ADMIN_PORT})."
+    if [[ "${DB_ADMIN_HINTS:-1}" == "1" ]]; then
+      log ERROR "Astuce: définissez DB_ADMIN_USER/DB_ADMIN_PASS/DB_ADMIN_HOST/DB_ADMIN_PORT ou créez un compte administrateur dédié avec 'GRANT ALL ON *.* TO \"rdadmin\"@\"localhost\" IDENTIFIED BY \"***\" WITH GRANT OPTION;'."
+    fi
     exit 1
   fi
 
