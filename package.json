@@ -21,6 +21,9 @@
     "backend",
     "frontend"
   ],
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/techzone-lat/captive-portail.git"

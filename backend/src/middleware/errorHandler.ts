@@ -3,18 +3,20 @@ import createError from 'http-errors';
 import logger from '../utils/logger';
 
 const errorHandler: ErrorRequestHandler = (err, req, res) => {
-  const httpErr = createError(err.status || 500, err.message, err);
-  const status = httpErr.status || 500;
+  const status = err.status || err.statusCode || 500;
+  const message = typeof err.message === 'string' && err.message.length > 0 ? err.message : 'Internal Server Error';
+  const httpErr = createError(status, message);
+
   logger.error({
     err,
     requestId: req.requestId,
     path: req.path,
   });
 
-  res.status(status).json({
+  res.status(httpErr.status || 500).json({
     success: false,
     message: httpErr.message,
-    status,
+    status: httpErr.status || 500,
     requestId: req.requestId,
   });
 };

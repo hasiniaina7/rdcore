@@ -25,11 +25,12 @@ components:
       type: apiKey
       in: query
       name: token
-      description: RadiusDesk Access Provider token (paired with cloud_id).
+      description: RadiusDesk Access Provider token (paired with cloud_id query parameter).
     OmadaSession:
       type: apiKey
       in: cookie
       name: JSESSIONID
+      description: Omada controller session cookie used after `/hotspot/login`.
   schemas:
     DynamicGalleryItem:
       type: object
@@ -170,7 +171,10 @@ paths:
     get:
       tags: [dynamic, radiusdesk-proxy]
       summary: Proxy to RadiusDesk dynamic details
-      description: Pass-through to `/dynamic-details/info-for.json` plus caching (15s TTL).
+      description: >
+        Pass-through to `/dynamic-details/info-for.json` including every Omada query parameter.
+        Responses are cached for 15 seconds and expose the cache decision via `x-cache-status`.
+      operationId: listDynamicDetails
       parameters:
         - in: query
           name: clientMac
@@ -178,9 +182,18 @@ paths:
         - in: query
           name: key
           schema: { type: string }
+        - in: query
+          name: lang
+          schema: { type: string }
+          description: Optional language override forwarded to RadiusDesk.
       responses:
         '200':
           description: Dynamic detail
+          headers:
+            x-cache-status:
+              description: HIT when served from cache, MISS when fetched from RadiusDesk.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -201,10 +214,36 @@ paths:
                         show_logo: true
                         available_languages:
                           - { id: fr, value: Français }
+        '400':
+          description: Invalid key or query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                missingKey:
+                  value:
+                    success: false
+                    message: Dynamic key is missing
+                    status: 400
+        '401':
+          description: RadiusDesk token rejected (RBA, realm mismatch, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: RadiusDesk unreachable or internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /connect/{mode}:
     post:
       tags: [auth, omada]
       summary: Authenticate a client session and push authorization to Omada
+      description: Validate the user/voucher/click context against RadiusDesk and request Omada authorization.
+      operationId: connectClient
       parameters:
         - in: path
           name: mode
@@ -246,8 +285,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConnectResult'
+              examples:
+                voucher:
+                  value:
+                    status: accepted
+                    message: Access granted
+                    nextRedirect: https://portal/success
+                    omadaSite: 22ccb98d-44
+                    username: VCHR-1001
+                    mac: AA-BB-CC-00-11-22
+                    requestId: req_123
         '400':
           description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                missingUser:
+                  value:
+                    success: false
+                    message: username required
+                    status: 400
+        '401':
+          description: RadiusDesk token/ACL denied or Omada session invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Omada authorization failed
           content:
             application/json:
               schema:
@@ -256,6 +323,8 @@ paths:
     get:
       tags: [usage, radiusdesk-proxy]
       summary: Aggregate usage for a user and MAC address
+      description: Combine RadiusDesk quota information with the most recent session list for the client.
+      operationId: getUsageStats
       parameters:
         - in: query
           name: username
@@ -268,17 +337,66 @@ paths:
         - in: query
           name: limit
           schema: { type: integer, default: 10 }
+        - in: query
+          name: withSessions
+          schema:
+            type: boolean
+            default: true
+          description: When false, skip fetching session history and only return aggregate usage.
       responses:
         '200':
           description: Usage summary
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UsageStats'
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UsageStats'
+              examples:
+                usage:
+                  value:
+                    success: true
+                    data:
+                      username: user@example.com
+                      mac: AA-BB-CC-00-11-22
+                      dataUsed: 2048
+                      dataCap: 4096
+                      timeUsed: 1800
+                      timeCap: 7200
+                      depleted: false
+                      sessions:
+                        - radacctid: 123
+                          username: user@example.com
+                          acctstarttime: 2024-11-01T10:00:00Z
+                          acctstoptime: null
+                          framedipaddress: 10.0.0.12
+        '400':
+          description: Missing username or mac
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: RadiusDesk authentication failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: RadiusDesk timeout or aggregation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /usage/disconnect:
     post:
       tags: [usage]
       summary: Disconnect active sessions using RadiusDesk kick
+      description: Calls RadiusDesk `kick-active` to close the selected session IDs.
+      operationId: disconnectSessions
       requestBody:
         required: true
         content:
@@ -292,10 +410,34 @@ paths:
       responses:
         '200':
           description: Disconnect request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: RadiusDesk access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: RadiusDesk kick endpoint failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /social/{provider}/start:
     get:
       tags: [social]
       summary: Begin the OAuth/OIDC handshake for dynamic social providers
+      description: Returns the provider-specific authorization URL and state token.
+      operationId: startSocialAuth
       parameters:
         - in: path
           name: provider
@@ -304,10 +446,41 @@ paths:
       responses:
         '200':
           description: Authorization URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+              examples:
+                facebook:
+                  value:
+                    success: true
+                    data:
+                      provider: facebook
+                      authorizationUrl: https://auth/facebook?state=req_123
+        '400':
+          description: Unsupported provider or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Social login disabled for the dynamic profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Social provider bootstrap failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /social/{provider}/callback:
     get:
       tags: [social]
       summary: Callback endpoint storing state before connect/social
+      description: Validates the OAuth callback and relays state back to the frontend flow.
+      operationId: handleSocialCallback
       parameters:
         - in: path
           name: provider
@@ -316,32 +489,193 @@ paths:
       responses:
         '200':
           description: Callback acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '400':
+          description: Missing OAuth state or provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Social login disabled for the dynamic profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal callback processing error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /healthz:
     get:
       tags: [omada]
       summary: Liveness probe
+      description: Simple liveness check reporting whether the backend process is running.
+      operationId: getHealth
       responses:
         '200':
           description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '500':
+          description: Backend initialization failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /readyz:
     get:
       tags: [omada, radiusdesk-proxy]
       summary: Checks Omada session and RadiusDesk cache
+      description: Ensures RadiusDesk+Omada dependencies are reachable and cached credentials are valid.
+      operationId: getReadiness
       responses:
         '200':
           description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '503':
+          description: Dependencies unavailable (Omada or RadiusDesk down)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /metrics:
     get:
       tags: [omada]
       summary: Prometheus metrics endpoint
+      description: Exposes prom-client metrics for scraping by observability platforms.
+      operationId: getMetrics
       responses:
         '200':
           description: Prom metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+        '503':
+          description: Metrics registry unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
 x-externalDocs:
   radiusdesk:
-    description: RadiusDesk endpoints used by the proxy
-    url: https://hotspot.techzone.lat/rd/build/production/Rd/
+    description: Reference payloads for the upstream RadiusDesk APIs.
+    resources:
+      - endpoint: GET /permanent-users/index.json
+        query:
+          token: Access Provider UUID
+          cloud_id: integer
+          limit: number
+        success:
+          success: true
+          totalCount: 1
+          items:
+            - id: 44
+              username: demo@example.com
+              profile: Fibre-2M
+              framedipaddress: 10.0.0.12
+        error:
+          success: false
+          message: Access denied
+          status: 403
+      - endpoint: GET /vouchers/index.json
+        query:
+          token: Access Provider UUID
+          cloud_id: integer
+          name: GUEST-1234
+        success:
+          success: true
+          items:
+            - name: GUEST-1234
+              password: secret
+              time_valid: 00-04-00
+              single_field: false
+        error:
+          success: false
+          message: Rate limited
+          status: 429
+      - endpoint: GET /dynamic-details/info-for.json
+        description: Dynamic login metadata (Details/Settings/Pages/Gallery).
+        query:
+          key: lobby-portal
+          language: fr_FR
+        success:
+          success: true
+          detail:
+            name: Hotel Lobby
+          settings:
+            show_logo: true
+            show_screen_delay: 5
+        error:
+          success: false
+          message: Dynamic key not found
+          status: 404
+      - endpoint: GET /radaccts/kick-active.json
+        description: Disconnect active sessions by radacctid query keys.
+        query:
+          token: Access Provider UUID
+          cloud_id: integer
+          "1234": 1
+        success:
+          success: true
+          data:
+            title: Disconnect Sent
+        error:
+          success: false
+          message: Access denied
+          status: 403
   omada:
-    description: Omada FAQ 2907 and API flows
-    url: https://community.tp-link.com/en/business/forum/topic/2907
+    description: Omada controller External Portal operations.
+    resources:
+      - endpoint: POST /api/v2/hotspot/login
+        body:
+          name: Operator
+          password: Operator@123
+        success:
+          errorCode: 0
+          result:
+            token: 751c0a2d-...
+        cookies:
+          - JSESSIONID
+          - csrfToken
+        error:
+          errorCode: -2011
+          msg: Invalid operator credentials
+      - endpoint: POST /api/v2/hotspot/extPortal/auth?token={CSRF}
+        payload_eap:
+          clientMac: AA-BB-CC-DD-EE-FF
+          apMac: 11-22-33-44-55-66
+          ssidName: Guest-WiFi
+          site: e8f65d62-...
+          radioId: 1
+          authType: 4
+          time: 1730488745123123
+          accessToken: user@example.com
+          redirectUrl: https://portal/success
+        payload_gateway:
+          clientMac: AA-BB-CC-DD-EE-FF
+          gatewayMac: 66-55-44-33-22-11
+          vid: 20
+          authType: 4
+          time: 1730488745123123
+          accessToken: VCHR-2001
+          redirectUrl: https://portal/success
+        errors:
+          - errorCode: -2010
+            msg: Session expired (requires new `/hotspot/login`)
+          - errorCode: 4700
+            msg: Timestamp timeout
+          - httpStatus: 500
+            msg: Controller internal error

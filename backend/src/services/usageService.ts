@@ -2,14 +2,20 @@ import createError from 'http-errors';
 import { getUsage, getSessions, kickSessions } from './radiusdeskIntegration';
 import { UsageStats } from '../types';
 
-export async function fetchUsage(username: string, mac: string, limit = 10): Promise<UsageStats> {
+export async function fetchUsage(
+  username: string,
+  mac: string,
+  limit = 10,
+  withSessions = true
+): Promise<UsageStats> {
   if (!username || !mac) {
     throw createError(400, 'username and mac are required');
   }
-  const [usage, sessions] = await Promise.all([
-    getUsage(username, mac),
-    getSessions(username, limit),
-  ]);
+
+  const usagePromise = getUsage(username, mac);
+  const sessionsPromise = withSessions ? getSessions(username, limit) : Promise.resolve(undefined);
+
+  const [usage, sessions] = await Promise.all([usagePromise, sessionsPromise]);
 
   return {
     username,
@@ -19,7 +25,7 @@ export async function fetchUsage(username: string, mac: string, limit = 10): Pro
     timeUsed: usage?.data?.time_used ?? undefined,
     timeCap: usage?.data?.time_cap ?? null,
     depleted: Boolean(usage?.data?.depleted),
-    sessions: sessions?.items ?? [],
+    sessions: withSessions ? sessions?.items ?? [] : [],
   };
 }
 

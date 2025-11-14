@@ -10,9 +10,10 @@ router.get('/usage', async (req, res, next) => {
       username: z.string(),
       mac: z.string(),
       limit: z.coerce.number().min(1).max(50).default(10),
+      withSessions: z.coerce.boolean().optional().default(true),
     });
     const params = schema.parse(req.query);
-    const data = await fetchUsage(params.username, params.mac, params.limit);
+    const data = await fetchUsage(params.username, params.mac, params.limit, params.withSessions);
     res.json({ success: true, data });
   } catch (error) {
     next(error);

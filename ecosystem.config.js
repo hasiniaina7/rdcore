@@ -12,9 +12,9 @@ module.exports = {
     },
     {
       name: 'portal-frontend',
-      cwd: './frontend',
-      script: 'npx',
-      args: 'serve -s dist -l 3000',
+      cwd: '.',
+      script: './node_modules/.bin/serve',
+      args: '-s public -l 3000',
       env: {
         NODE_ENV: 'production'
       }

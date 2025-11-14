@@ -8,15 +8,117 @@
 | Social buttons | `GET /api/social/{provider}/start`, `/callback` | TBD (OAuth providers) | Stubs return state/redirect and feed `POST /connect/social`. |
 | Health & Ops | `/healthz`, `/readyz`, `/metrics` | `GET /api/v2/hotspot/login`, `GET /dynamic-details/...` | `/readyz` ensures Omada CSRF + RadiusDesk cache; `/metrics` exposes prom-client counters. |
 
-## External Docs Links
+## RadiusDesk references
 
-- **RadiusDesk**
-  - `GET /permanent-users/index.json` — token + cloud_id query, returns `{items,totalCount}` with `last_seen` & `framedipaddress`.
-  - `GET /vouchers/index.json` — exposes `time_valid`, `activate_on_login`, single field detection.
-  - `GET /radaccts/get-usage.json` — public usage aggregator with fields `data_used`, `time_used`, `depleted`.
-  - `GET /dynamic-details/info-for.json` — dynamic settings, languages, gallery, click-to-connect forms.
-- **Omada Controller**
-  - `POST /api/v2/hotspot/login` — body `{name,password}`, returns `{result.token}` + cookies `JSESSIONID`, `csrfToken`.
-  - `POST /api/v2/hotspot/extPortal/auth?token=CSRF` — payload `clientMac`, `apMac|gatewayMac`, `ssidName|vid`, `site`, `radioId`, `time`, `authType=4`, `accessToken`. Errors: `-2010` (session expired), `4700` (timestamp drift), `4800` (unknown client).
+### Permanent users (GET `/permanent-users/index.json`)
 
-These mappings ensure every UI component maps to a backend handler and authoritative Omada/RadiusDesk APIs referenced inside `docs/openapi/openapi.yaml`.
+Required query string: `token`, `cloud_id`, paging params (`limit`, `start`). Returns items with `last_seen`, `framedipaddress`, etc.
+
+```json
+{
+  "success": true,
+  "totalCount": 1,
+  "items": [
+    {
+      "id": 44,
+      "username": "demo@example.com",
+      "profile": "Fibre-2M",
+      "last_seen": { "status": "online", "span": "15m" },
+      "framedipaddress": "10.0.0.12"
+    }
+  ]
+}
+```
+
+Typical error (RBA/ACL mismatch):
+
+```json
+{ "success": false, "message": "Access denied", "status": 403 }
+```
+
+### Vouchers (GET `/vouchers/index.json`)
+
+Used during voucher connect flows to ensure voucher is still valid.
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "name": "GUEST-1234",
+      "password": "secret",
+      "time_valid": "00-04-00",
+      "single_field": false
+    }
+  ]
+}
+```
+
+Rate limiting error (`status: 429`) must propagate to frontend as a temporary failure.
+
+### Dynamic details (GET `/dynamic-details/info-for.json`)
+
+Used by `/api/dynamic/details` to render the React shell (Details/Settings/Pages). Request includes `key`, `clientMac`, `lang`.
+
+### Sessions / Kick (GET `/radaccts/get-usage.json`, `/radaccts/index.json`, `/radaccts/kick-active.json`)
+
+- `/radaccts/get-usage.json` is public (no token) and returns quotas:
+
+```json
+{
+  "success": true,
+  "data": { "data_used": 2048, "data_cap": 4096, "time_used": 1800, "time_cap": 7200, "depleted": false }
+}
+```
+
+- `/radaccts/kick-active.json` requires `token`, `cloud_id`, plus `radacctid` keys. Success includes `{"data":{"title":"Disconnect Sent"}}`. Unauthorized returns `403`.
+
+## Omada controller references
+
+### Operator login (POST `/api/v2/hotspot/login`)
+
+```json
+{ "name": "Operator", "password": "Operator@123" }
+```
+
+Response:
+
+```json
+{ "errorCode": 0, "msg": "Success", "result": { "token": "751c0a2d-..." } }
+```
+
+Cookies stored: `JSESSIONID`, `Omada_Application_Id`, `csrfToken`.
+
+### Client auth (POST `/api/v2/hotspot/extPortal/auth?token={CSRF}`)`
+
+EAP payload example:
+
+```json
+{
+  "clientMac": "AA-BB-CC-DD-EE-FF",
+  "apMac": "11-22-33-44-55-66",
+  "ssidName": "Guest-WiFi",
+  "site": "e8f65d62-...",
+  "radioId": 1,
+  "authType": 4,
+  "time": 1730488745123123,
+  "accessToken": "user@example.com",
+  "redirectUrl": "https://portal/success"
+}
+```
+
+Gateway payload uses `gatewayMac` + `vid` instead of `apMac`/`ssidName`.
+
+Error patterns expected by our backend:
+
+- `errorCode: -2010` → session expired, re-login.
+- `errorCode: 4700` → timestamp drift (client must resend).
+- HTTP `500` → controller internal failure; we surface as `502` to frontend.
+
+## Error handling alignment
+
+- RadiusDesk RBA failure → backend returns `401` with `ApiError`.
+- RadiusDesk throttling or DB failure → backend returns `500`.
+- Omada controller errors bubble up through `/connect/{mode}` as `502` or `401`.
+
+These references complement `docs/openapi/openapi.yaml` and guarantee the frontend/backends align with genuine upstream behaviour (permanent user lookup, voucher validation, radacct kick, Omada login/auth flows).

@@ -1,5 +1,5 @@
 import createError from 'http-errors';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 import config from '../config';
 import { ConnectRequestContext, ConnectResult } from '../types';
 import { authorizeClient } from './omadaIntegration';
@@ -14,7 +14,7 @@ function ensure(value: unknown, message: string) {
 }
 
 export async function connect(ctx: ConnectRequestContext, requestId?: string): Promise<ConnectResult> {
-  const rid = requestId || nanoid();
+  const rid = requestId || randomUUID();
   const basePayload = { ...ctx.omada };
   basePayload.accessToken = ctx.omada.accessToken || ctx.username || ctx.voucherCode || ctx.mac || rid;
   ensure(basePayload.clientMac, 'clientMac is required');
@@ -59,6 +59,7 @@ export async function connect(ctx: ConnectRequestContext, requestId?: string): P
       username: ctx.username,
       mac: ctx.mac,
       site: ctx.omada.site,
+      dynamicKey: ctx.dynamicKey,
     });
     return result;
   } catch (error: unknown) {

@@ -14,6 +14,36 @@ const withDefaults = (params: Record<string, unknown>) => ({
   ...params,
 });
 
+const toNumber = (value: unknown): number | undefined => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+};
+
+type UsagePayload = {
+  success?: boolean;
+  data?: {
+    data_used?: number;
+    data_cap?: number | null;
+    time_used?: number;
+    time_cap?: number | null;
+    depleted?: boolean;
+  };
+};
+
+const normalizeUsagePayload = (payload: UsagePayload | undefined) => {
+  if (!payload?.data) {
+    return payload;
+  }
+  const normalized = {
+    ...payload.data,
+    data_used: toNumber(payload.data.data_used),
+    data_cap: payload.data.data_cap === null ? null : toNumber(payload.data.data_cap),
+    time_used: toNumber(payload.data.time_used),
+    time_cap: payload.data.time_cap === null ? null : toNumber(payload.data.time_cap),
+  };
+  return { ...payload, data: normalized };
+};
+
 async function timedRequest<T>(fn: () => Promise<T>, label: string): Promise<T> {
   const end = radiusdeskLatency.startTimer({ endpoint: label });
   try {
@@ -37,14 +67,20 @@ export async function getUsage(username: string, mac: string) {
     const { data } = await radiusClient.get('/radaccts/get-usage.json', {
       params: withDefaults({ username, mac }),
     });
-    return data;
+    return normalizeUsagePayload(data);
   }, 'get-usage');
 }
 
 export async function getSessions(username: string, limit = 10) {
   return timedRequest(async () => {
     const { data } = await radiusClient.get('/radaccts/index.json', {
-      params: withDefaults({ username, limit, only_connected: 'false' }),
+      params: withDefaults({
+        username,
+        limit,
+        only_connected: 'false',
+        page: 1,
+        start: 0,
+      }),
     });
     return data;
   }, 'sessions');
