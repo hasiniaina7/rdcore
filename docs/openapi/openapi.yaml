@@ -167,13 +167,15 @@ components:
         message: { type: string }
         status: { type: integer }
 paths:
-  /dynamic/details:
+  /api/dynamic/details:
     get:
       tags: [dynamic, radiusdesk-proxy]
       summary: Proxy to RadiusDesk dynamic details
       description: >
         Pass-through to `/dynamic-details/info-for.json` including every Omada query parameter.
         Responses are cached for 15 seconds and expose the cache decision via `x-cache-status`.
+        When RadiusDesk reports `success=false`, the same status is surfaced so that the client can
+        block the connection attempt and show the available keys.
       operationId: listDynamicDetails
       parameters:
         - in: query
@@ -214,6 +216,12 @@ paths:
                         show_logo: true
                         available_languages:
                           - { id: fr, value: Français }
+                invalidKey:
+                  value:
+                    success: false
+                    data:
+                      key: invalid
+                    message: 'Dynamic key not found'
         '400':
           description: Invalid key or query parameters
           content:
@@ -238,7 +246,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /connect/{mode}:
+  /api/connect/{mode}:
     post:
       tags: [auth, omada]
       summary: Authenticate a client session and push authorization to Omada
@@ -319,11 +327,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /usage:
+  /api/usage:
     get:
       tags: [usage, radiusdesk-proxy]
       summary: Aggregate usage for a user and MAC address
       description: Combine RadiusDesk quota information with the most recent session list for the client.
+        When the upstream usage API returns no stats (typical for fresh accounts), the service responds
+        with zeroed counters and an empty sessions array.
       operationId: getUsageStats
       parameters:
         - in: query
@@ -373,6 +383,18 @@ paths:
                           acctstarttime: 2024-11-01T10:00:00Z
                           acctstoptime: null
                           framedipaddress: 10.0.0.12
+                freshAccount:
+                  value:
+                    success: true
+                    data:
+                      username: admin@dev
+                      mac: AA-BB-CC-00-11-22
+                      dataUsed: 0
+                      dataCap: null
+                      timeUsed: 0
+                      timeCap: null
+                      depleted: false
+                      sessions: []
         '400':
           description: Missing username or mac
           content:
@@ -391,7 +413,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /usage/disconnect:
+  /api/usage/disconnect:
     post:
       tags: [usage]
       summary: Disconnect active sessions using RadiusDesk kick
@@ -432,7 +454,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /social/{provider}/start:
+  /api/social/{provider}/start:
     get:
       tags: [social]
       summary: Begin the OAuth/OIDC handshake for dynamic social providers
@@ -475,7 +497,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /social/{provider}/callback:
+  /api/social/{provider}/callback:
     get:
       tags: [social]
       summary: Callback endpoint storing state before connect/social

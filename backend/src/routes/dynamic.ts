@@ -7,7 +7,11 @@ router.get('/dynamic/details', async (req, res, next) => {
   try {
     const { data, hit } = await getDynamicDetail(req.query);
     res.setHeader('x-cache-status', hit ? 'HIT' : 'MISS');
-    res.json({ success: true, data });
+    res.json({
+      success: data.success !== false,
+      data: data.data ?? null,
+      message: data.message,
+    });
   } catch (error) {
     next(error);
   }

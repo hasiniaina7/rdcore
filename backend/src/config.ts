@@ -15,6 +15,7 @@ const envSchema = z.object({
   PORTAL_PUBLIC_URL: z.string().url(),
   PORTAL_SUCCESS_URL: z.string().url(),
   LOG_LEVEL: z.string().default('info'),
+  DEFAULT_LANGUAGE: z.string().default('fr_FR'),
   ENABLE_SSE_USAGE: z
     .string()
     .optional()

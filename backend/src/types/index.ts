@@ -18,13 +18,18 @@ export interface DynamicSettings {
   click_to_connect?: Record<string, unknown>;
 }
 
-export interface DynamicDetailResponse {
+export interface DynamicDetailData {
   detail?: Record<string, unknown>;
   settings?: DynamicSettings;
   photos?: Array<Record<string, unknown>>;
   pages?: Array<Record<string, unknown>>;
   client_info?: Record<string, unknown>;
+}
+
+export interface DynamicDetailResponse {
   success?: boolean;
+  data?: DynamicDetailData | Record<string, unknown> | null;
+  message?: string;
 }
 
 export interface OmadaPortalPayload {

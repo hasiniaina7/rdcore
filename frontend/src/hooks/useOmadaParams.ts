@@ -1,6 +1,18 @@
 import { useMemo } from 'react';
 
-const keys = ['clientMac', 'apMac', 'gatewayMac', 'site', 'radioId', 'ssidName', 'vid', 'redirectUrl', 't'] as const;
+const keys = [
+  'clientMac',
+  'apMac',
+  'gatewayMac',
+  'site',
+  'radioId',
+  'ssidName',
+  'vid',
+  'redirectUrl',
+  't',
+  'key',
+  'lang',
+] as const;
 
 type OmadaParams = Partial<Record<(typeof keys)[number], string>>;
 

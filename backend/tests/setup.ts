@@ -8,6 +8,7 @@ const defaults: Record<string, string> = {
   PORTAL_PUBLIC_URL: 'https://portal.example.com',
   PORTAL_SUCCESS_URL: 'https://portal.example.com/success',
   LOG_LEVEL: 'silent',
+  DEFAULT_LANGUAGE: 'fr_FR',
   ENABLE_SSE_USAGE: 'false',
 };
 
