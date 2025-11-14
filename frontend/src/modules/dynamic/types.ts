@@ -33,7 +33,14 @@ export type DynamicSettings = {
     temp_password?: string;
     items?: { name: string }[];
   };
-  click_to_connect?: Record<string, unknown>;
+  click_to_connect?: ClickToConnectConfig;
+  user_login_check?: boolean;
+  voucher_login_check?: boolean;
+  auto_suffix_check?: boolean;
+  auto_suffix?: string;
+  usage_show_check?: boolean;
+  connect_check?: boolean;
+  connect_only?: boolean;
   [key: string]: unknown;
 };
 
@@ -56,4 +63,13 @@ export type DynamicDetailApiResponse = {
 export type AvailableKeyPair = {
   label: string;
   value: string;
+};
+
+export type ClickToConnectConfig = {
+  connect_check?: boolean;
+  connect_username?: string;
+  connect_suffix?: string;
+  connect_delay?: number;
+  button_title?: string;
+  [key: string]: unknown;
 };

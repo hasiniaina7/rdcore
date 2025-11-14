@@ -31,7 +31,16 @@ export default function Home() {
       <DynamicKeyHelp error={error} supportHref={supportHref} />
       {showShell && data ? (
         <>
-          <DynamicShell detail={data.detail ?? undefined} settings={data.settings} pages={data.pages} clientInfo={data.client_info} />
+          <DynamicShell
+            detail={data.detail ?? undefined}
+            settings={data.settings}
+            pages={data.pages}
+            clientInfo={data.client_info}
+            photos={data.photos}
+            gallery={data.gallery}
+            omadaParams={params}
+            dynamicKey={params.key}
+          />
           <section aria-label="Omada context">
             <h3>{t('dynamic.detail.clientInfo')}</h3>
             <dl>

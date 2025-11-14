@@ -70,7 +70,7 @@ export interface ConnectResult {
 
 export interface UsageStats {
   username: string;
-  mac: string;
+  mac?: string;
   dataUsed?: number;
   dataCap?: number | null;
   timeUsed?: number;

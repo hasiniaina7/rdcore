@@ -66,11 +66,39 @@ const resources = {
         connect: {
           title: 'Click to Connect',
           placeholder: 'The connect panel will render here (G4.4).',
-          countdown: 'Connect panel available in {{seconds}} seconds'
+          countdown: 'Connect panel available in {{seconds}} seconds',
+          waitMessage: 'Please wait for the connect panel to appear.',
+          missingOmada: 'Missing Omada parameters in the URL.',
+          missingKey: 'Dynamic key required for click-to-connect.',
+          loading: 'Connecting…',
+          success: 'Access granted. Redirecting…',
+          error: 'Unable to complete the connection.',
+          clickTitle: 'Click-to-Connect',
+          clickBody: 'Quickly grant access using the captive portal defaults.',
+          clickCta: 'Connect now',
+          userTitle: 'Permanent user',
+          username: 'Username',
+          password: 'Password',
+          submit: 'Connect',
+          voucherTitle: 'Voucher',
+          voucherCode: 'Voucher code'
         },
         social: {
           title: 'Social login',
-          placeholder: 'No social login providers were configured.'
+          placeholder: 'No social login providers were configured.',
+          description: 'Connect with the configured social providers handled by the operator.',
+          error: 'Unable to start the social login flow.',
+          noTempUser: 'Social login is not fully configured.',
+          noProviders: 'No social login providers available.'
+        },
+        gallery: {
+          title: 'Photo gallery',
+          empty: 'No promotional photos are available.',
+          slide: 'Gallery slide',
+          prev: 'Previous',
+          next: 'Next',
+          thumbnail: 'Thumbnail {{index}}',
+          close: 'Close viewer'
         },
         menu: {
           title: 'Quick menu',
@@ -80,6 +108,35 @@ const resources = {
           termsLink: 'Terms & Privacy',
           languages: 'Languages'
         }
+      },
+      success: {
+        subtitle: 'Monitor your connection status and usage.',
+        username: 'Username',
+        password: 'Password',
+        mac: 'MAC address',
+        refresh: 'Refresh',
+        loading: 'Loading…',
+        missingParams: 'Specify the username and MAC to load usage.',
+        fetchError: 'Unable to fetch usage.',
+        disconnectError: 'Unable to disconnect the session.',
+        statusTitle: 'Status',
+        statusOnline: 'Online',
+        statusOffline: 'Offline',
+        deviceInfo: 'Site: {{site}} — SSID: {{ssid}}',
+        quotaTitle: 'Usage',
+        dataUsed: '{{used}} used / {{cap}} cap',
+        timeUsed: '{{used}} used / {{cap}} cap',
+        depleted: 'Quota depleted',
+        supportTitle: 'Support',
+        supportFallback: 'Contact the operator for help.',
+        sessionsTitle: 'Recent sessions',
+        noSessions: 'No sessions recorded yet.',
+        sessionStart: 'Start',
+        sessionStop: 'Stop',
+        sessionDuration: 'Duration',
+        sessionIp: 'IP address',
+        sessionOngoing: 'Ongoing',
+        disconnect: 'Disconnect'
       }
     }
   },
@@ -147,11 +204,39 @@ const resources = {
         connect: {
           title: 'Connexion rapide',
           placeholder: 'Le panneau de connexion sera rendu ici (G4.4).',
-          countdown: 'Panneau disponible dans {{seconds}} secondes'
+          countdown: 'Panneau disponible dans {{seconds}} secondes',
+          waitMessage: 'Merci de patienter pendant l’affichage du panneau.',
+          missingOmada: 'Paramètres Omada manquants dans l’URL.',
+          missingKey: 'La clé dynamique est requise pour la connexion rapide.',
+          loading: 'Connexion en cours…',
+          success: 'Accès accordé. Redirection…',
+          error: 'Impossible de terminer la connexion.',
+          clickTitle: 'Click-to-Connect',
+          clickBody: 'Accordez un accès rapide en utilisant la configuration par défaut.',
+          clickCta: 'Se connecter',
+          userTitle: 'Utilisateur permanent',
+          username: 'Nom d’utilisateur',
+          password: 'Mot de passe',
+          submit: 'Se connecter',
+          voucherTitle: 'Bon',
+          voucherCode: 'Code bon'
         },
         social: {
           title: 'Connexion sociale',
-          placeholder: 'Aucun fournisseur social configuré.'
+          placeholder: 'Aucun fournisseur social configuré.',
+          description: 'Connectez-vous à l’aide des fournisseurs sociaux configurés.',
+          error: 'Impossible de lancer le flux social.',
+          noTempUser: 'Le social login n’est pas entièrement configuré.',
+          noProviders: 'Aucun fournisseur social disponible.'
+        },
+        gallery: {
+          title: 'Galerie photos',
+          empty: 'Aucune photo promotionnelle disponible.',
+          slide: 'Diapositive de galerie',
+          prev: 'Précédent',
+          next: 'Suivant',
+          thumbnail: 'Miniature {{index}}',
+          close: 'Fermer la visionneuse'
         },
         menu: {
           title: 'Menu rapide',
@@ -161,6 +246,35 @@ const resources = {
           termsLink: 'Conditions & Confidentialité',
           languages: 'Langues'
         }
+      },
+      success: {
+        subtitle: 'Surveillez le statut de votre connexion et vos consommations.',
+        username: "Nom d'utilisateur",
+        password: 'Mot de passe',
+        mac: 'Adresse MAC',
+        refresh: 'Actualiser',
+        loading: 'Chargement…',
+        missingParams: "Indiquez le nom d'utilisateur et la MAC pour charger les usages.",
+        fetchError: 'Impossible de récupérer les usages.',
+        disconnectError: 'Impossible de déconnecter la session.',
+        statusTitle: 'Statut',
+        statusOnline: 'En ligne',
+        statusOffline: 'Hors ligne',
+        deviceInfo: 'Site : {{site}} — SSID : {{ssid}}',
+        quotaTitle: 'Consommation',
+        dataUsed: '{{used}} utilisés / {{cap}} limite',
+        timeUsed: '{{used}} utilisés / {{cap}} limite',
+        depleted: 'Quota épuisé',
+        supportTitle: 'Support',
+        supportFallback: "Contactez l'exploitant pour obtenir de l’aide.",
+        sessionsTitle: 'Sessions récentes',
+        noSessions: 'Aucune session pour le moment.',
+        sessionStart: 'Début',
+        sessionStop: 'Fin',
+        sessionDuration: 'Durée',
+        sessionIp: 'Adresse IP',
+        sessionOngoing: 'En cours',
+        disconnect: 'Déconnecter'
       }
     }
   },
@@ -228,11 +342,39 @@ const resources = {
         connect: {
           title: 'Haga clic para conectar',
           placeholder: 'El panel de conexión se mostrará aquí (G4.4).',
-          countdown: 'Panel disponible en {{seconds}} segundos'
+          countdown: 'Panel disponible en {{seconds}} segundos',
+          waitMessage: 'Por favor espera a que aparezca el panel.',
+          missingOmada: 'Faltan parámetros de Omada en la URL.',
+          missingKey: 'Se requiere la clave dinámica para conectarse.',
+          loading: 'Conectando…',
+          success: 'Acceso concedido. Redirigiendo…',
+          error: 'No se pudo completar la conexión.',
+          clickTitle: 'Conectar con un clic',
+          clickBody: 'Otorga acceso rápidamente usando la configuración por defecto.',
+          clickCta: 'Conectar ahora',
+          userTitle: 'Usuario permanente',
+          username: 'Usuario',
+          password: 'Contraseña',
+          submit: 'Conectar',
+          voucherTitle: 'Voucher',
+          voucherCode: 'Código de voucher'
         },
         social: {
           title: 'Inicio de sesión social',
-          placeholder: 'No hay proveedores sociales configurados.'
+          placeholder: 'No hay proveedores sociales configurados.',
+          description: 'Conéctate usando los proveedores sociales configurados.',
+          error: 'No es posible iniciar el flujo social.',
+          noTempUser: 'El social login no está completamente configurado.',
+          noProviders: 'No hay proveedores sociales disponibles.'
+        },
+        gallery: {
+          title: 'Galería de fotos',
+          empty: 'No hay fotos promocionales disponibles.',
+          slide: 'Diapositiva de galería',
+          prev: 'Anterior',
+          next: 'Siguiente',
+          thumbnail: 'Miniatura {{index}}',
+          close: 'Cerrar visor'
         },
         menu: {
           title: 'Menú rápido',
@@ -242,6 +384,35 @@ const resources = {
           termsLink: 'Términos y privacidad',
           languages: 'Idiomas'
         }
+      },
+      success: {
+        subtitle: 'Revisa el estado y consumo de tu conexión.',
+        username: 'Usuario',
+        password: 'Contraseña',
+        mac: 'Dirección MAC',
+        refresh: 'Actualizar',
+        loading: 'Cargando…',
+        missingParams: 'Indica el usuario y la MAC para cargar el uso.',
+        fetchError: 'No se pudieron obtener los datos.',
+        disconnectError: 'No se pudo desconectar la sesión.',
+        statusTitle: 'Estado',
+        statusOnline: 'En línea',
+        statusOffline: 'Fuera de línea',
+        deviceInfo: 'Sitio: {{site}} — SSID: {{ssid}}',
+        quotaTitle: 'Consumo',
+        dataUsed: '{{used}} usados / {{cap}} límite',
+        timeUsed: '{{used}} usados / {{cap}} límite',
+        depleted: 'Cuota agotada',
+        supportTitle: 'Soporte',
+        supportFallback: 'Contacta al operador para recibir ayuda.',
+        sessionsTitle: 'Sesiones recientes',
+        noSessions: 'No hay sesiones registradas.',
+        sessionStart: 'Inicio',
+        sessionStop: 'Fin',
+        sessionDuration: 'Duración',
+        sessionIp: 'Dirección IP',
+        sessionOngoing: 'En curso',
+        disconnect: 'Desconectar'
       }
     }
   }

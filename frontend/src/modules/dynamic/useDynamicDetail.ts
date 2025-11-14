@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import type {
   DynamicDetail,
@@ -28,6 +28,7 @@ export interface DynamicLoaderState {
 }
 
 const SUPPORT_ROUTE = '/support';
+const DEFAULT_KEY = import.meta.env.VITE_DEFAULT_DYNAMIC_KEY || 'test_dynamic_keys';
 
 const toAvailablePairs = (payload: unknown): AvailableKeyPair[] => {
   if (!payload) {
@@ -64,12 +65,7 @@ const toAvailablePairs = (payload: unknown): AvailableKeyPair[] => {
 
 export default function useDynamicDetail(): DynamicLoaderState & { supportHref: string } {
   const [state, setState] = useState<DynamicLoaderState>({ isLoading: true, isBlocked: false });
-  const search = useMemo(() => window.location.search, [window.location.search]);
-  const supportHref = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    const key = params.get('key');
-    return key ? `${SUPPORT_ROUTE}?key=${encodeURIComponent(key)}` : SUPPORT_ROUTE;
-  }, [window.location.search]);
+  const [supportHref, setSupportHref] = useState(SUPPORT_ROUTE);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -77,9 +73,19 @@ export default function useDynamicDetail(): DynamicLoaderState & { supportHref: 
     async function fetchDetail() {
       setState((prev) => ({ ...prev, isLoading: true }));
       try {
-        const pathname = '/dynamic/details';
-        const url = search ? `${pathname}${search}` : pathname;
-        const response = await client.get<DynamicDetailApiResponse>(url, {
+        const currentUrl = new URL(window.location.href);
+        const params = new URLSearchParams(currentUrl.search);
+        if (!params.get('key') && DEFAULT_KEY) {
+          params.set('key', DEFAULT_KEY);
+        }
+        const keyParam = params.get('key');
+        if (keyParam && currentUrl.searchParams.get('key') !== keyParam) {
+          currentUrl.searchParams.set('key', keyParam);
+          window.history.replaceState({}, '', `${currentUrl.pathname}?${currentUrl.searchParams.toString()}${currentUrl.hash}`);
+        }
+        setSupportHref(keyParam ? `${SUPPORT_ROUTE}?key=${encodeURIComponent(keyParam)}` : SUPPORT_ROUTE);
+        const requestPath = params.toString() ? `/dynamic/details?${params.toString()}` : '/dynamic/details';
+        const response = await client.get<DynamicDetailApiResponse>(requestPath, {
           signal: controller.signal,
         });
         const payload = response.data;
@@ -117,7 +123,7 @@ export default function useDynamicDetail(): DynamicLoaderState & { supportHref: 
 
     fetchDetail();
     return () => controller.abort();
-  }, [search]);
+  }, []);
 
   return { ...state, supportHref };
 }

@@ -4,15 +4,16 @@ import { UsageStats } from '../types';
 
 export async function fetchUsage(
   username: string,
-  mac: string,
+  password: string,
+  mac: string | undefined,
   limit = 10,
   withSessions = true
 ): Promise<UsageStats> {
-  if (!username || !mac) {
-    throw createError(400, 'username and mac are required');
+  if (!username || !password) {
+    throw createError(400, 'username and password are required');
   }
 
-  const usagePromise = getUsage(username, mac);
+  const usagePromise = getUsage(username, { password, mac });
   const sessionsPromise = withSessions ? getSessions(username, limit) : Promise.resolve(undefined);
 
   const [usage, sessions] = await Promise.all([usagePromise, sessionsPromise]);

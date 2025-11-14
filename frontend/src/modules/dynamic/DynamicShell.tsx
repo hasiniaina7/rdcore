@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DynamicClientInfo, DynamicPage, DynamicSettings } from './types';
+import type { DynamicClientInfo, DynamicGalleryItem, DynamicPage, DynamicSettings } from './types';
 import DOMPurify from 'dompurify';
 import { useTranslation } from 'react-i18next';
+import BrandingBanner from './BrandingBanner';
+import GalleryCarousel from './GalleryCarousel';
 import type { TFunction } from 'i18next';
+import ConnectPanel from './ConnectPanel';
+import SocialLoginPanel from './SocialLoginPanel';
 
 const PANELS = ['details', 'settings', 'pages', 'connect', 'social'] as const;
 type Panel = (typeof PANELS)[number];
@@ -12,6 +16,10 @@ interface Props {
   settings?: DynamicSettings;
   pages?: DynamicPage[];
   clientInfo?: DynamicClientInfo;
+  photos?: DynamicGalleryItem[];
+  gallery?: DynamicGalleryItem[];
+  omadaParams: Record<string, string | undefined>;
+  dynamicKey?: string;
 }
 
 const clampDelay = (screenDelay?: number) => {
@@ -26,7 +34,16 @@ const sanitize = (html?: string) => ({
   dangerouslySetInnerHTML: { __html: DOMPurify.sanitize(html ?? '') },
 });
 
-export default function DynamicShell({ detail, settings, pages, clientInfo }: Props) {
+export default function DynamicShell({
+  detail,
+  settings,
+  pages,
+  clientInfo,
+  photos,
+  gallery,
+  omadaParams,
+  dynamicKey,
+}: Props) {
   const { t, i18n } = useTranslation();
   const [panel, setPanel] = useState<Panel>('details');
   const [isSideMenuOpen, setSideMenuOpen] = useState(false);
@@ -77,6 +94,8 @@ export default function DynamicShell({ detail, settings, pages, clientInfo }: Pr
 
   return (
     <div style={shellStyle}>
+      <BrandingBanner detail={detail} settings={settings} />
+      <GalleryCarousel gallery={gallery} photos={photos} />
       <header style={toolbarStyle}>
         <nav aria-label={t('dynamic.toolbar.title')} style={toolbarButtonsStyle}>
           <ToolbarButton label={t('dynamic.toolbar.details')} active={panel === 'details'} onClick={() => setPanel('details')} />
@@ -194,26 +213,20 @@ export default function DynamicShell({ detail, settings, pages, clientInfo }: Pr
         {panel === 'connect' && (
           <div>
             <h2>{t('dynamic.connect.title')}</h2>
-            {connectVisible ? (
-              <p>{t('dynamic.connect.placeholder')}</p>
-            ) : (
-              <p>{t('dynamic.connect.countdown', { seconds: delaySeconds })}</p>
-            )}
+            <ConnectPanel
+              settings={settings}
+              connectVisible={connectVisible}
+              dynamicKey={dynamicKey}
+              omadaParams={omadaParams}
+            />
           </div>
         )}
 
         {panel === 'social' && (
           <div>
             <h2>{t('dynamic.social.title')}</h2>
-            {settings?.social_login?.items?.length ? (
-              <ul>
-                {settings.social_login.items.map((item) => (
-                  <li key={item.name}>{item.name}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>{t('dynamic.social.placeholder')}</p>
-            )}
+            <p>{t('dynamic.social.description')}</p>
+            <SocialLoginPanel settings={settings} omadaParams={omadaParams} />
           </div>
         )}
       </section>

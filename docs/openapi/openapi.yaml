@@ -341,9 +341,16 @@ paths:
           required: true
           schema: { type: string }
         - in: query
-          name: mac
+          name: password
           required: true
+          schema:
+            type: string
+            format: password
+          description: User or voucher password; required to validate the usage lookup.
+        - in: query
+          name: mac
           schema: { type: string }
+          description: Optional client MAC if available from Omada.
         - in: query
           name: limit
           schema: { type: integer, default: 10 }

@@ -62,10 +62,20 @@ export async function fetchDynamicDetails(query: Record<string, unknown>): Promi
   }, 'dynamic-details');
 }
 
-export async function getUsage(username: string, mac: string) {
+export async function getUsage(
+  username: string,
+  options: { mac?: string; password: string }
+) {
   return timedRequest(async () => {
+    const params: Record<string, unknown> = {
+      username,
+      password: options.password,
+    };
+    if (options.mac) {
+      params.mac = options.mac;
+    }
     const { data } = await radiusClient.get('/radaccts/get-usage.json', {
-      params: withDefaults({ username, mac }),
+      params: withDefaults(params),
     });
     return normalizeUsagePayload(data);
   }, 'get-usage');
