@@ -1,0 +1,347 @@
+openapi: 3.0.3
+info:
+  title: Captive Portal Omada/Radiusdesk API
+  version: 0.1.0
+  description: >-
+    Backend API powering the Omada/Radiusdesk captive portal. All responses are JSON and
+    instrumented for PM2 deployments.
+servers:
+  - url: http://localhost:4000
+    description: Local dev
+  - url: https://lab.techzone.lat/portal-api
+    description: Lab environment
+tags:
+  - name: dynamic
+  - name: auth
+  - name: usage
+  - name: social
+  - name: omada
+  - name: radiusdesk-proxy
+security:
+  - RadiusToken: []
+components:
+  securitySchemes:
+    RadiusToken:
+      type: apiKey
+      in: query
+      name: token
+      description: RadiusDesk Access Provider token (paired with cloud_id).
+    OmadaSession:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+  schemas:
+    DynamicGalleryItem:
+      type: object
+      properties:
+        file_name:
+          type: string
+        layout:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+    DynamicPage:
+      type: object
+      properties:
+        title: { type: string }
+        content: { type: string }
+    DynamicClientInfo:
+      type: object
+      properties:
+        userAgent: { type: string }
+        isMobile: { type: boolean }
+    DynamicSettings:
+      type: object
+      properties:
+        show_logo: { type: boolean }
+        show_name: { type: boolean }
+        name_colour: { type: string }
+        show_screen_delay: { type: integer }
+        available_languages:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              value: { type: string }
+    DynamicDetail:
+      type: object
+      properties:
+        detail:
+          type: object
+        settings:
+          $ref: '#/components/schemas/DynamicSettings'
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/DynamicGalleryItem'
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/DynamicPage'
+        client_info:
+          $ref: '#/components/schemas/DynamicClientInfo'
+    PermanentUser:
+      type: object
+      properties:
+        id: { type: string }
+        username: { type: string }
+        profile: { type: string }
+    Voucher:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        expire: { type: string, format: date }
+    RadacctSession:
+      type: object
+      properties:
+        radacctid: { type: integer }
+        username: { type: string }
+        acctstarttime: { type: string, format: date-time }
+        acctstoptime: { type: string, format: date-time, nullable: true }
+        framedipaddress: { type: string }
+    UsageStats:
+      type: object
+      properties:
+        username: { type: string }
+        mac: { type: string }
+        dataUsed: { type: number }
+        dataCap: { type: number, nullable: true }
+        timeUsed: { type: number }
+        timeCap: { type: number, nullable: true }
+        depleted: { type: boolean }
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RadacctSession'
+    OmadaAuthPayload:
+      type: object
+      properties:
+        clientMac: { type: string }
+        site: { type: string }
+        radioId: { type: integer }
+        time: { type: integer }
+        redirectUrl: { type: string }
+        apMac: { type: string }
+        gatewayMac: { type: string }
+        ssidName: { type: string }
+        vid: { type: integer }
+        accessToken: { type: string }
+    OmadaLoginResponse:
+      type: object
+      properties:
+        result:
+          type: object
+          properties:
+            token: { type: string }
+    ConnectResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted, pending, rejected]
+        message: { type: string }
+        nextRedirect: { type: string }
+        omadaSite: { type: string }
+        username: { type: string }
+        mac: { type: string }
+        requestId: { type: string }
+    ApiSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+    ApiError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message: { type: string }
+        status: { type: integer }
+paths:
+  /dynamic/details:
+    get:
+      tags: [dynamic, radiusdesk-proxy]
+      summary: Proxy to RadiusDesk dynamic details
+      description: Pass-through to `/dynamic-details/info-for.json` plus caching (15s TTL).
+      parameters:
+        - in: query
+          name: clientMac
+          schema: { type: string }
+        - in: query
+          name: key
+          schema: { type: string }
+      responses:
+        '200':
+          description: Dynamic detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DynamicDetail'
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      detail:
+                        name: Hotel Techzone
+                      settings:
+                        show_logo: true
+                        available_languages:
+                          - { id: fr, value: Français }
+  /connect/{mode}:
+    post:
+      tags: [auth, omada]
+      summary: Authenticate a client session and push authorization to Omada
+      parameters:
+        - in: path
+          name: mode
+          required: true
+          schema:
+            type: string
+            enum: [permanent, voucher, click, social]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+                voucherCode: { type: string }
+                dynamicKey: { type: string }
+                mac: { type: string }
+                omada:
+                  $ref: '#/components/schemas/OmadaAuthPayload'
+            examples:
+              permanent:
+                value:
+                  username: user@example.com
+                  password: secret
+                  mac: AA-BB-CC-00-11-22
+                  omada:
+                    clientMac: AA-BB-CC-00-11-22
+                    site: 22ccb98d-44
+                    radioId: 1
+                    time: 1731512254
+                    authType: 4
+                    redirectUrl: https://portal/success
+      responses:
+        '200':
+          description: Result of the operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectResult'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /usage:
+    get:
+      tags: [usage, radiusdesk-proxy]
+      summary: Aggregate usage for a user and MAC address
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema: { type: string }
+        - in: query
+          name: mac
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10 }
+      responses:
+        '200':
+          description: Usage summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageStats'
+  /usage/disconnect:
+    post:
+      tags: [usage]
+      summary: Disconnect active sessions using RadiusDesk kick
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                radacctIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Disconnect request accepted
+  /social/{provider}/start:
+    get:
+      tags: [social]
+      summary: Begin the OAuth/OIDC handshake for dynamic social providers
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Authorization URL
+  /social/{provider}/callback:
+    get:
+      tags: [social]
+      summary: Callback endpoint storing state before connect/social
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Callback acknowledged
+  /healthz:
+    get:
+      tags: [omada]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Service is alive
+  /readyz:
+    get:
+      tags: [omada, radiusdesk-proxy]
+      summary: Checks Omada session and RadiusDesk cache
+      responses:
+        '200':
+          description: Ready
+  /metrics:
+    get:
+      tags: [omada]
+      summary: Prometheus metrics endpoint
+      responses:
+        '200':
+          description: Prom metrics
+
+x-externalDocs:
+  radiusdesk:
+    description: RadiusDesk endpoints used by the proxy
+    url: https://hotspot.techzone.lat/rd/build/production/Rd/
+  omada:
+    description: Omada FAQ 2907 and API flows
+    url: https://community.tp-link.com/en/business/forum/topic/2907
