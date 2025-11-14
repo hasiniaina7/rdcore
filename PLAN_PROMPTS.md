@@ -650,13 +650,13 @@ Construis `DynamicShell` avec:
 Respecte `settings.show_screen_delay` pour afficher le panneau de connexion après *n* secondes (min 0 / max 30, fallback 10).
 ```
 
-### Prompt G4.3 — Branding & Gallery
+### Prompt G4.3 — Branding & Gallery *(✅ livré dans l'app React actuelle)*
 ```
 BrandingBanner: affiche logo `detail.icon_file_name` si `settings.show_logo`, nom si `settings.show_name` (couleur `settings.name_colour`).
 GalleryCarousel: diaporama basé sur `gallery` (images), temporisation identique au legacy; lightbox; fallback.
 ```
 
-### Prompt G4.4 — Connect Panel (Click-to-Connect, Credentials dynamiques)
+### Prompt G4.4 — Connect Panel (Click-to-Connect, Credentials dynamiques) *(✅ livré)*
 ```
 Implémente `ConnectPanel` avec 3 blocs:
 - ClickToConnect: visible si `connect.click_to_connect=true` → POST /connect/click, puis redirection.
@@ -665,13 +665,13 @@ Implémente `ConnectPanel` avec 3 blocs:
 Backend: POST /connect/{permanent|voucher|click} → orchestrations RD+Omada, renvoie ConnectResult (status/message/nextRedirect). Logguer request_id, dynamic_key, username/voucher.
 ```
 
-### Prompt G4.5 — Social Login (start + callback)
+### Prompt G4.5 — Social Login (start + callback) *(✅ livré)*
 ```
 Frontend: `SocialButtons` selon `social_logins` (providers). Ouvre `/api/social/{provider}/start` dans une popup, puis gère `postMessage` ou redirection finale; expose `checkSocialLoginReturn()` équivalent au legacy.
 Backend: `/social/{provider}/start` et `/social/{provider}/callback` (stubs + intégration réelle ultérieure), qui renvoient ensuite vers `POST /connect/social`.
 ```
 
-### Prompt G4.6 — Success / Info Conso (améliorée sans widgets supplémentaires)
+### Prompt G4.6 — Success / Info Conso (améliorée sans widgets supplémentaires) *(✅ livré)*
 ```
 Frontend: page `/success` affichant:
 - Statut: online/offline, adresse IP (framedipaddress), site/AP/VLAN si disponibles, message personnalisé issu du DynamicDetail.
@@ -691,7 +691,7 @@ Avant soumission, vérifier que la clé dynamique présente dans l’URL corresp
 
 ## G5 — Tests & Observabilité (PM2, sans Docker)
 
-### Prompt G5.1 — Tests Frontend
+### Prompt G5.1 — Tests Frontend *(mise en place initiale ✅ : Vitest/RTL + Playwright configurés, premiers tests écrits)*
 ```
 Ajoute Vitest + React Testing Library:
 - Unitaires: DynamicShell (menu/langue), BrandingBanner, GalleryCarousel, ConnectPanel (génération dynamique de champs), SuccessPage (formatage métriques). 
