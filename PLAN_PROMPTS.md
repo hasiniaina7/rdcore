@@ -422,6 +422,34 @@ Ce document regroupe des prompts détaillés, prêts à être developper pour pi
 - UI (G4): respecter à 100 % la logique `@rdcore/login` (Dynamic Login). Inamovibles: Details, Settings, Logo, Photos, Own Pages, Dynamic Keys, Click to Connect, Social Login, multi-langues, `show_screen_delay`. Page Success/Info Conso: améliorer l’affichage mais **ne pas ajouter** de widgets QR/WhatsApp/PDF.
 - Tests/observabilité: adaptés à PM2 (logs JSON, métriques Prometheus, health endpoints, pas de Docker).
 
+## Statut d'avancement (2025-11-14)
+
+- [x] **G1 – Cadrage & audit**
+  - Audit `installation-script` (phases 10→70, marqueurs `.done`, scripts utilitaires) documenté dans `docs/installation-audit.md`.
+  - Cartographie RadiusDesk (PermanentUsers, Vouchers, Radaccts, DynamicDetails) → `docs/radiusdesk-endpoints.md`.
+  - Cartographie Omada External Portal (login opérateur + extPortal/auth, cookies/CSRF, exemples curl) → `docs/omada-ext-portal.md`.
+- [x] **G2 – Documentation & OpenAPI**
+  - `docs/openapi/openapi.yaml` complet: info/servers/tags, schémas DynamicDetail/Settings/Gallery/Pages, UsageStats, ConnectResult, etc.
+  - Endpoints couverts: `/dynamic/details`, `/connect/{mode}`, `/usage`, `/usage/disconnect`, `/social/...`, `/healthz`, `/readyz`, `/metrics`, `/docs/...`.
+  - `x-externalDocs` vers RadiusDesk/Omada + `docs/endpoints-matrix.md` (mapping Frontend ↔ Backend ↔ APIs externes).
+  - Tooling docs (`docs/README.md`, scripts `docs:serve|lint|test|bundle`, Prism/Newman/Dredd intégrés).
+- [x] **G3 – Architecture monorepo & intégration backend/frontend**
+  - Monorepo root (workspaces frontend/backend/docs, tsconfig partagé, ESLint/Prettier).
+  - Backend Express TS (zod, axios, pino, prom-client) + services `radiusdeskIntegration`, `dynamicService`, `omadaIntegration`, `authService`, `usageService`, observabilité `/metrics`, `/healthz`, `/readyz`.
+  - Frontend Vite React (routes `/`, `/success`, `/support`, `/terms`, `/privacy`, hooks `useDynamicDetail`/`useOmadaParams`, i18n fr/en/es).
+  - `.env.example` & `.env.frontend.example`, validation stricte via zod, secrets masqués.
+  - Swagger UI via `/docs/` + `/docs/openapi.yaml`; tests d’intégration backend (Vitest + supertest).
+  - PM2 + scripts de déploiement (`ecosystem.config.js`, `scripts/deploy_backend.sh`, `scripts/deploy_frontend.sh`).
+  - Intégration réelle RadiusDesk locale validée (`/api/usage`, `/radaccts/get-usage`, `/radaccts/index`), corrections SQL + données de test (user, mac_usage).
+- [ ] **G4 – UI & flux dynamiques (@rdcore/login)**
+  - À implémenter : loader dynamique complet, DynamicShell (Details/Settings/Own Pages/Click/Social), ConnectPanel, Success page (sans widgets additionnels), Dynamic Keys guard.
+- [ ] **G5 – Tests & observabilité avancés**
+  - À mettre en place : tests unitaires/intégration/E2E (frontend & backend), enrichissement metrics/alerting, script `smoke:health`.
+
+### Session 2025-11-14 08 — Synthèse
+- G1 → G3 livrés (docs, OpenAPI, monorepo, services backend, shell frontend, PM2, intégration RadiusDesk / usage).
+- Priorités restantes : exécuter les prompts G4 (UI complète façon `@rdcore/login`) puis G5 (tests exhaustifs + observabilité renforcée).
+
 ---
 
 ## G1 — Audit & Cadrage (exécution unique au démarrage)
