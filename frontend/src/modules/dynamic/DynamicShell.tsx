@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DynamicClientInfo, DynamicGalleryItem, DynamicPage, DynamicSettings } from './types';
 import DOMPurify from 'dompurify';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import BrandingBanner from './BrandingBanner';
 import GalleryCarousel from './GalleryCarousel';
-import type { TFunction } from 'i18next';
 import ConnectPanel from './ConnectPanel';
 import SocialLoginPanel from './SocialLoginPanel';
+import type { DynamicClientInfo, DynamicGalleryItem, DynamicPage, DynamicSettings } from './types';
+import type { CacheStatus } from './useDynamicDetail';
+import './dynamic-shell.css';
 
 const PANELS = ['details', 'settings', 'pages', 'connect', 'social'] as const;
 type Panel = (typeof PANELS)[number];
@@ -20,6 +22,8 @@ interface Props {
   gallery?: DynamicGalleryItem[];
   omadaParams: Record<string, string | undefined>;
   dynamicKey?: string;
+  cacheStatus?: CacheStatus;
+  missingOmada?: string[];
 }
 
 const clampDelay = (screenDelay?: number) => {
@@ -43,6 +47,8 @@ export default function DynamicShell({
   gallery,
   omadaParams,
   dynamicKey,
+  cacheStatus,
+  missingOmada = [],
 }: Props) {
   const { t, i18n } = useTranslation();
   const [panel, setPanel] = useState<Panel>('details');
@@ -79,10 +85,7 @@ export default function DynamicShell({
     { label: t('dynamic.settings.showLogo'), value: localizedBoolean(settings?.show_logo, t) },
     { label: t('dynamic.settings.showName'), value: localizedBoolean(settings?.show_name, t) },
     { label: t('dynamic.settings.nameColour'), value: formatValue(settings?.name_colour) },
-    {
-      label: t('dynamic.settings.screenDelay'),
-      value: `${delaySeconds}s`,
-    },
+    { label: t('dynamic.settings.screenDelay'), value: `${delaySeconds}s` },
     { label: t('dynamic.settings.templateStyle'), value: formatValue(settings?.template_style) },
     {
       label: t('dynamic.settings.allowSocial'),
@@ -91,13 +94,44 @@ export default function DynamicShell({
   ];
 
   const activePage = pages?.[activePageIndex];
+  const statusBadges = useMemo(
+    () => [
+      {
+        id: 'cache',
+        label: cacheStatus ? t('dynamic.status.cache', { status: cacheStatus }) : t('dynamic.status.cacheNone'),
+        tone: cacheStatus === 'HIT' ? 'success' : 'muted',
+      },
+      {
+        id: 'key',
+        label: dynamicKey ? t('dynamic.status.key', { key: dynamicKey }) : t('dynamic.status.keyMissing'),
+        tone: dynamicKey ? 'info' : 'warning',
+      },
+      {
+        id: 'omada',
+        label: missingOmada.length
+          ? t('dynamic.status.omadaMissingDetail', { fields: missingOmada.join(', ') })
+          : t('dynamic.status.omadaReady'),
+        tone: missingOmada.length ? 'warning' : 'success',
+      },
+    ],
+    [cacheStatus, dynamicKey, missingOmada, t]
+  );
 
   return (
-    <div style={shellStyle}>
-      <BrandingBanner detail={detail} settings={settings} />
-      <GalleryCarousel gallery={gallery} photos={photos} />
-      <header style={toolbarStyle}>
-        <nav aria-label={t('dynamic.toolbar.title')} style={toolbarButtonsStyle}>
+    <article className="cp-card dynamic-shell">
+      <div className="dynamic-shell__hero">
+        <BrandingBanner detail={detail} settings={settings} />
+        <GalleryCarousel gallery={gallery} photos={photos} />
+        <div className="dynamic-shell__banners" role="status">
+          {statusBadges.map((badge) => (
+            <span key={badge.id} className={`cp-badge cp-badge--${badge.tone}`}>
+              {badge.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <header className="dynamic-shell__toolbar">
+        <div className="dynamic-shell__tabs" role="tablist" aria-label={t('dynamic.toolbar.title')}>
           <ToolbarButton label={t('dynamic.toolbar.details')} active={panel === 'details'} onClick={() => setPanel('details')} />
           <ToolbarButton label={t('dynamic.toolbar.settings')} active={panel === 'settings'} onClick={() => setPanel('settings')} />
           <ToolbarButton
@@ -108,15 +142,18 @@ export default function DynamicShell({
           />
           <ToolbarButton label={t('dynamic.toolbar.connect')} active={panel === 'connect'} onClick={() => setPanel('connect')} />
           <ToolbarButton label={t('dynamic.toolbar.social')} active={panel === 'social'} onClick={() => setPanel('social')} />
-        </nav>
-        <div style={toolbarExtrasStyle}>
+        </div>
+        <div className="dynamic-shell__controls">
           {languages.length > 0 && (
-            <label style={languageSelectorStyle}>
-              <span className="sr-only">{t('dynamic.toolbar.language')}</span>
+            <>
+              <span id="dynamic-shell-language" className="sr-only">
+                {t('dynamic.toolbar.language')}
+              </span>
               <select
+                aria-labelledby="dynamic-shell-language"
+                className="dynamic-shell__language"
                 value={i18n.language}
                 onChange={(event) => i18n.changeLanguage(event.target.value)}
-                aria-label={t('dynamic.toolbar.language')}
               >
                 {languages.map((lang) => (
                   <option key={lang.id} value={lang.id}>
@@ -124,23 +161,29 @@ export default function DynamicShell({
                   </option>
                 ))}
               </select>
-            </label>
+            </>
           )}
-          <button type="button" onClick={() => setSideMenuOpen(true)} aria-haspopup="dialog" aria-expanded={isSideMenuOpen}>
+          <button
+            type="button"
+            onClick={() => setSideMenuOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={isSideMenuOpen}
+            className="dynamic-shell__menu-btn"
+          >
             {t('dynamic.toolbar.menu')}
           </button>
         </div>
       </header>
 
-      <section style={panelStyle} aria-live="polite">
+      <section className="dynamic-shell__panel" aria-live="polite">
         {panel === 'details' && (
           <div>
             <h2>{formatValue(detail?.name) || t('dynamic.detail.defaultName')}</h2>
             {detailHtml && <div {...sanitize(detailHtml)} />}
             {detailBlocks.length > 0 && (
-              <dl style={dlStyle}>
+              <dl className="dynamic-shell__dl">
                 {detailBlocks.map((entry) => (
-                  <div key={entry.label} style={dlRowStyle}>
+                  <div key={entry.label}>
                     <dt>{entry.label}</dt>
                     <dd>{entry.value}</dd>
                   </div>
@@ -150,7 +193,7 @@ export default function DynamicShell({
             {clientInfo && (
               <details>
                 <summary>{t('dynamic.detail.clientInfo')}</summary>
-                <pre style={clientInfoStyle}>{JSON.stringify(clientInfo, null, 2)}</pre>
+                <pre className="dynamic-shell__client-info">{JSON.stringify(clientInfo, null, 2)}</pre>
               </details>
             )}
           </div>
@@ -159,15 +202,15 @@ export default function DynamicShell({
         {panel === 'settings' && (
           <div>
             <h2>{t('dynamic.settings.title')}</h2>
-            <dl style={dlStyle}>
+            <dl className="dynamic-shell__dl">
               {settingsList.map((entry) => (
-                <div key={entry.label} style={dlRowStyle}>
+                <div key={entry.label}>
                   <dt>{entry.label}</dt>
                   <dd>{entry.value ?? t('dynamic.settings.notSet')}</dd>
                 </div>
               ))}
               {languages.length > 0 && (
-                <div style={dlRowStyle}>
+                <div>
                   <dt>{t('dynamic.settings.languages')}</dt>
                   <dd>{languages.map((lang) => lang.value).join(', ')}</dd>
                 </div>
@@ -177,11 +220,11 @@ export default function DynamicShell({
         )}
 
         {panel === 'pages' && (
-          <div>
+          <div className="dynamic-shell__pages">
             <h2>{t('dynamic.pages.title')}</h2>
             {hasPages ? (
               <>
-                <div style={tabsStyle} role="tablist">
+                <div className="dynamic-shell__page-tabs" role="tablist">
                   {pages!.map((page, index) => (
                     <button
                       key={`${page.title ?? 'page'}-${index}`}
@@ -194,13 +237,9 @@ export default function DynamicShell({
                   ))}
                 </div>
                 {activePage && (
-                  <article role="tabpanel" style={pageContentStyle}>
+                  <article role="tabpanel" className="dynamic-shell__page">
                     <h3>{activePage.title || t('dynamic.pages.untitled')}</h3>
-                    {activePage.content ? (
-                      <div {...sanitize(activePage.content)} />
-                    ) : (
-                      <p>{t('dynamic.pages.emptyContent')}</p>
-                    )}
+                    {activePage.content ? <div {...sanitize(activePage.content)} /> : <p>{t('dynamic.pages.emptyContent')}</p>}
                   </article>
                 )}
               </>
@@ -237,7 +276,7 @@ export default function DynamicShell({
         languages={languages}
         onSelectLanguage={(lang) => i18n.changeLanguage(lang)}
       />
-    </div>
+    </article>
   );
 }
 
@@ -250,7 +289,7 @@ interface ToolbarButtonProps {
 
 function ToolbarButton({ label, active, onClick, disabled }: ToolbarButtonProps) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} disabled={disabled}>
+    <button type="button" onClick={onClick} aria-pressed={active} disabled={disabled} className="dynamic-shell__tab">
       {label}
     </button>
   );
@@ -267,128 +306,43 @@ function SideMenu({ isOpen, onClose, languages, onSelectLanguage }: SideMenuProp
   const { t } = useTranslation();
   if (!isOpen) return null;
   return (
-    <aside role="dialog" aria-modal="true" style={sideMenuStyle}>
-      <header style={sideMenuHeaderStyle}>
-        <h3>{t('dynamic.menu.title')}</h3>
-        <button type="button" onClick={onClose}>
-          {t('dynamic.menu.close')}
-        </button>
-      </header>
-      <section>
-        <h4>{t('dynamic.menu.help')}</h4>
-        <ul>
-          <li>
-            <a href="/support">{t('dynamic.menu.supportLink')}</a>
-          </li>
-          <li>
-            <a href="/terms">{t('dynamic.menu.termsLink')}</a>
-          </li>
-        </ul>
-      </section>
-      {languages && languages.length > 0 && (
-        <section>
-          <h4>{t('dynamic.menu.languages')}</h4>
+    <aside role="dialog" aria-modal="true" className="dynamic-shell__side-menu">
+      <div className="dynamic-shell__side-inner">
+        <header className="dynamic-shell__side-header">
+          <h3>{t('dynamic.menu.title')}</h3>
+          <button type="button" onClick={onClose} className="dynamic-shell__menu-btn">
+            {t('dynamic.menu.close')}
+          </button>
+        </header>
+        <section className="dynamic-shell__side-section">
+          <h4>{t('dynamic.menu.help')}</h4>
           <ul>
-            {languages.map((lang) => (
-              <li key={lang.id}>
-                <button type="button" onClick={() => onSelectLanguage(lang.id)}>
-                  <span className={`rdFlag rdFlag-${lang.id}`} aria-hidden="true" /> {lang.value}
-                </button>
-              </li>
-            ))}
+            <li>
+              <a href="/support">{t('dynamic.menu.supportLink')}</a>
+            </li>
+            <li>
+              <a href="/terms">{t('dynamic.menu.termsLink')}</a>
+            </li>
           </ul>
         </section>
-      )}
+        {languages && languages.length > 0 && (
+          <section className="dynamic-shell__side-section">
+            <h4>{t('dynamic.menu.languages')}</h4>
+            <ul>
+              {languages.map((lang) => (
+                <li key={lang.id}>
+                  <button type="button" className="dynamic-shell__language-button" onClick={() => onSelectLanguage(lang.id)}>
+                    <span className={`rdFlag rdFlag-${lang.id}`} aria-hidden="true" /> {lang.value}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
     </aside>
   );
 }
-
-const shellStyle: React.CSSProperties = {
-  border: '1px solid #e1e4eb',
-  borderRadius: '8px',
-  overflow: 'hidden',
-  backgroundColor: '#fff',
-};
-
-const toolbarStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '0.5rem 1rem',
-  borderBottom: '1px solid #eef0f5',
-};
-
-const toolbarButtonsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.5rem',
-  flexWrap: 'wrap',
-};
-
-const toolbarExtrasStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.5rem',
-  alignItems: 'center',
-};
-
-const languageSelectorStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-};
-
-const panelStyle: React.CSSProperties = {
-  padding: '1rem',
-};
-
-const dlStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 2fr',
-  rowGap: '0.5rem',
-};
-
-const dlRowStyle: React.CSSProperties = {
-  display: 'contents',
-};
-
-const tabsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.5rem',
-  marginBottom: '1rem',
-};
-
-const pageContentStyle: React.CSSProperties = {
-  border: '1px solid #dfe3eb',
-  borderRadius: '6px',
-  padding: '1rem',
-  minHeight: '150px',
-};
-
-const sideMenuStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  right: 0,
-  width: '320px',
-  height: '100%',
-  backgroundColor: '#fff',
-  boxShadow: '-4px 0 16px rgba(0,0,0,0.15)',
-  padding: '1rem',
-  zIndex: 1000,
-  overflowY: 'auto',
-};
-
-const sideMenuHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '1rem',
-};
-
-const clientInfoStyle: React.CSSProperties = {
-  maxHeight: '200px',
-  overflow: 'auto',
-  backgroundColor: '#f6f8fb',
-  padding: '0.75rem',
-  borderRadius: '4px',
-};
 
 function formatValue(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim().length > 0) {

@@ -5,7 +5,7 @@ import useOmadaParams from '../hooks/useOmadaParams';
 import useDynamicDetail from '../modules/dynamic/useDynamicDetail';
 import { readCredentials } from '../modules/dynamic/credentialStorage';
 
-type UsageResponse = {
+interface UsageResponse {
   username: string;
   mac: string;
   dataUsed?: number;
@@ -14,7 +14,7 @@ type UsageResponse = {
   timeCap?: number | null;
   depleted: boolean;
   sessions: Array<Record<string, unknown>>;
-};
+}
 
 export default function Success() {
   const { t } = useTranslation();
@@ -54,7 +54,7 @@ export default function Success() {
     } finally {
       setIsLoading(false);
     }
-  }, [form.username, form.mac, t]);
+  }, [form.username, form.password, form.mac, t]);
 
   const disconnectSession = async (radacctId: string) => {
     try {
@@ -75,167 +75,162 @@ export default function Success() {
     return undefined;
   }, [form.username, form.password, refreshUsage]);
 
-  return (
-    <section>
-      <header>
-        <h1>{t('nav.success')}</h1>
-        <p>{t('success.subtitle')}</p>
-      </header>
+  const dataProgress = usage?.dataCap ? Math.min(100, Math.round(((usage.dataUsed ?? 0) / usage.dataCap) * 100)) : null;
+  const timeProgress = usage?.timeCap ? Math.min(100, Math.round(((usage.timeUsed ?? 0) / usage.timeCap) * 100)) : null;
 
-      <form
-        data-testid="usage-form"
-        style={formStyle}
-        onSubmit={(event) => {
-          event.preventDefault();
-          refreshUsage();
-        }}
-      >
-        <label>
-          {t('success.username')}
-          <input
-            value={form.username}
-            onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-            required
-          />
-        </label>
-        <label>
-          {t('success.password')}
-          <input
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-            required
-          />
-        </label>
-        <label>
-          {t('success.mac')}
-          <input value={form.mac} onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))} />
-        </label>
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? t('success.loading') : t('success.refresh')}
-        </button>
-      </form>
+  return (
+    <div className="cp-stack">
+      <article className="cp-card">
+        <div className="cp-card__header">
+          <div>
+            <p className="cp-eyebrow">{t('success.eyebrow')}</p>
+            <h1 className="cp-title">{t('nav.success')}</h1>
+          </div>
+          <span className={`cp-badge ${isOnline ? 'cp-badge--success' : 'cp-badge--warning'}`}>
+            {t(isOnline ? 'success.statusOnline' : 'success.statusOffline')}
+          </span>
+        </div>
+        <p>{t('success.subtitle')}</p>
+        <form
+          data-testid="usage-form"
+          className="cp-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            refreshUsage();
+          }}
+        >
+          <label className="cp-field" htmlFor="usage-username">
+            {t('success.username')}
+            <input
+              id="usage-username"
+              className="cp-input"
+              value={form.username}
+              onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
+              required
+            />
+          </label>
+          <label className="cp-field" htmlFor="usage-password">
+            {t('success.password')}
+            <input
+              id="usage-password"
+              className="cp-input"
+              type="password"
+              value={form.password}
+              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+              required
+            />
+          </label>
+          <label className="cp-field" htmlFor="usage-mac">
+            {t('success.mac')}
+            <input
+              id="usage-mac"
+              className="cp-input"
+              value={form.mac}
+              onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
+            />
+          </label>
+          <button type="submit" className="cp-btn cp-btn--primary" disabled={isLoading}>
+            {isLoading ? t('success.loading') : t('success.refresh')}
+          </button>
+        </form>
+      </article>
 
       {error && (
-        <p role="alert" style={{ color: '#e11d48' }}>
+        <p role="alert" className="cp-alert cp-alert--danger">
           {error}
         </p>
       )}
 
       {usage && (
         <>
-          <section style={cardsStyle}>
-            <article style={cardStyle}>
-              <h2>{t('success.statusTitle')}</h2>
-              <p>
-                {t(isOnline ? 'success.statusOnline' : 'success.statusOffline')}
-                {ipAddress && (
-                  <>
-                    {' '}
-                    — IP: <strong>{ipAddress as string}</strong>
-                  </>
-                )}
-              </p>
-              <p>{t('success.deviceInfo', { site: params.site || 'N/A', ssid: params.ssidName || 'N/A' })}</p>
-            </article>
-            <article style={cardStyle}>
-              <h2>{t('success.quotaTitle')}</h2>
-              <p>
-                {t('success.dataUsed', { used: formatBytes(usage.dataUsed), cap: formatBytes(usage.dataCap) })}
-              </p>
-              <p>{t('success.timeUsed', { used: formatDuration(usage.timeUsed), cap: formatDuration(usage.timeCap) })}</p>
-              {usage.depleted && <p style={{ color: '#b45309' }}>{t('success.depleted')}</p>}
-            </article>
-            <article style={cardStyle}>
-              <h2>{t('success.supportTitle')}</h2>
-              <p>{formatText(dynamicDetail?.detail?.email, t('success.supportFallback'))}</p>
-              <p>{formatText(dynamicDetail?.detail?.phone)}</p>
-            </article>
-          </section>
+          <article className="cp-card">
+            <div className="cp-card__header">
+              <div>
+                <p className="cp-eyebrow">{t('success.statusTitle')}</p>
+                <h2 className="cp-title">{t('success.deviceInfo', { site: params.site || 'N/A', ssid: params.ssidName || 'N/A' })}</h2>
+              </div>
+              {ipAddress && <span className="cp-badge cp-badge--info">IP {ipAddress}</span>}
+            </div>
+            <p>{t('success.messageHint')}</p>
+            {usage.depleted && <p className="cp-alert cp-alert--warning">{t('success.depleted')}</p>}
+          </article>
 
-          <section>
-            <header style={sectionHeader}>
-              <h2>{t('success.sessionsTitle')}</h2>
-              <button type="button" onClick={refreshUsage}>
+          <article className="cp-card">
+            <div className="cp-card__header">
+              <div>
+                <p className="cp-eyebrow">{t('success.quotaTitle')}</p>
+                <h2 className="cp-title">{t('success.quotaSubtitle')}</h2>
+              </div>
+            </div>
+            <div>
+              <p>{t('success.dataUsed', { used: formatBytes(usage.dataUsed), cap: formatBytes(usage.dataCap) })}</p>
+              <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={dataProgress ?? 0} role="progressbar">
+                <div className="cp-progress__bar" style={{ width: `${dataProgress ?? 0}%` }} />
+              </div>
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <p>{t('success.timeUsed', { used: formatDuration(usage.timeUsed), cap: formatDuration(usage.timeCap) })}</p>
+              <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={timeProgress ?? 0} role="progressbar">
+                <div className="cp-progress__bar" style={{ width: `${timeProgress ?? 0}%` }} />
+              </div>
+            </div>
+          </article>
+
+          <article className="cp-card">
+            <div className="cp-card__header">
+              <div>
+                <p className="cp-eyebrow">{t('success.supportTitle')}</p>
+                <h2 className="cp-title">{t('success.supportSubtitle')}</h2>
+              </div>
+            </div>
+            <dl className="cp-description-list">
+              <div>
+                <dt>Email</dt>
+                <dd>{formatText(dynamicDetail?.detail?.email, t('success.supportFallback'))}</dd>
+              </div>
+              <div>
+                <dt>{t('success.phoneLabel')}</dt>
+                <dd>{formatText(dynamicDetail?.detail?.phone, t('success.supportFallback'))}</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="cp-card">
+            <div className="cp-card__header">
+              <h2 className="cp-title">{t('success.sessionsTitle')}</h2>
+              <button type="button" className="cp-btn cp-btn--ghost" onClick={refreshUsage}>
                 {t('success.refresh')}
               </button>
-            </header>
+            </div>
             {usage.sessions.length === 0 ? (
               <p>{t('success.noSessions')}</p>
             ) : (
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th>{t('success.sessionStart')}</th>
-                    <th>{t('success.sessionStop')}</th>
-                    <th>{t('success.sessionDuration')}</th>
-                    <th>{t('success.sessionIp')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {usage.sessions.map((session) => {
-                    const id = String(session.radacctid ?? session.id ?? '');
-                    const durationSeconds = session.acctsessiontime ? Number(session.acctsessiontime) : undefined;
-                    return (
-                      <tr key={id}>
-                        <td>{formatDate(session.acctstarttime)}</td>
-                        <td>{session.acctstoptime ? formatDate(session.acctstoptime) : t('success.sessionOngoing')}</td>
-                        <td>{formatDuration(durationSeconds)}</td>
-                        <td>{formatText(session.framedipaddress)}</td>
-                        <td>
-                          {id && (
-                            <button type="button" onClick={() => disconnectSession(id)}>
-                              {t('success.disconnect')}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <ul className="cp-list">
+                {usage.sessions.map((session) => {
+                  const id = String(session.radacctid ?? session.id ?? '');
+                  const durationSeconds = session.acctsessiontime ? Number(session.acctsessiontime) : undefined;
+                  return (
+                    <li key={id} className="cp-list__item">
+                      <p className="cp-list__title">{formatDate(session.acctstarttime)}</p>
+                      <p>{session.acctstoptime ? formatDate(session.acctstoptime) : t('success.sessionOngoing')}</p>
+                      <p>{formatDuration(durationSeconds)}</p>
+                      <p>{formatText(session.framedipaddress)}</p>
+                      {id && (
+                        <button type="button" className="cp-btn cp-btn--outline" onClick={() => disconnectSession(id)}>
+                          {t('success.disconnect')}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </section>
+          </article>
         </>
       )}
-    </section>
+    </div>
   );
 }
-
-const formStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '1rem',
-  alignItems: 'flex-end',
-  flexWrap: 'wrap',
-  marginBottom: '1rem',
-};
-
-const cardsStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: '1rem',
-  marginBottom: '1.5rem',
-};
-
-const cardStyle: React.CSSProperties = {
-  border: '1px solid #dfe3eb',
-  borderRadius: '8px',
-  padding: '1rem',
-  backgroundColor: '#fff',
-  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
-};
-
-const sectionHeader: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
-
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-};
 
 function formatBytes(bytes?: number | null) {
   if (bytes == null) {

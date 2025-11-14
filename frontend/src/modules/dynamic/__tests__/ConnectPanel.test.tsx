@@ -12,6 +12,8 @@ vi.mock('../../../api/client', () => ({
 
 import client from '../../../api/client';
 
+const mockedClient = client as { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
+
 describe('ConnectPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,7 +30,7 @@ describe('ConnectPanel', () => {
     );
     const submitBtn = screen.getAllByRole('button', { name: 'dynamic.connect.submit' })[0];
     fireEvent.submit(submitBtn.closest('form')!);
-    expect((client as any).post).not.toHaveBeenCalled();
+    expect(mockedClient.post).not.toHaveBeenCalled();
     expect(await screen.findByText('dynamic.connect.missingOmada')).toBeInTheDocument();
   });
 

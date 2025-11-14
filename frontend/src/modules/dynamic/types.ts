@@ -31,7 +31,7 @@ export type DynamicSettings = {
     active?: boolean;
     temp_username?: string;
     temp_password?: string;
-    items?: { name: string }[];
+    items?: { name: string; display_name?: string }[];
   };
   click_to_connect?: ClickToConnectConfig;
   user_login_check?: boolean;

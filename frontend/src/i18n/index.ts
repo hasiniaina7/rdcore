@@ -11,6 +11,12 @@ const resources = {
         terms: 'Terms',
         privacy: 'Privacy'
       },
+      layout: {
+        eyebrow: 'Omada hotspot',
+        title: 'Dynamic login',
+        language: 'Choose language',
+        navLabel: 'Primary navigation'
+      },
       loading: 'Loading dynamic settings…',
       error: 'Unable to load the captive portal configuration.',
       lastUpdated: 'Last updated',
@@ -20,12 +26,24 @@ const resources = {
           no: 'No'
         },
         requestError: 'Unable to contact the captive portal. Please try again shortly.',
+        loaderHint: 'Fetching the dynamic pages and connection options from RadiusDesk…',
         modal: {
           title: 'Dynamic key required',
           subtitle: 'Please use one of the dynamic keys authorized for this hotspot.',
           emptyList: 'No dynamic keys were received from RadiusDesk.',
           supportCta: 'Contact support'
         },
+        status: {
+          cache: 'Cache {{status}} from RadiusDesk',
+          cacheNone: 'No cache metadata',
+          key: 'Key {{key}}',
+          keyMissing: 'Dynamic key missing',
+          omadaReady: 'Omada ready',
+          omadaMissing: 'Omada incomplete',
+          omadaMissingDetail: 'Missing: {{fields}}'
+        },
+        omadaContext: 'Omada context',
+        omadaEyebrow: 'Network metadata',
         toolbar: {
           title: 'Dynamic toolbar',
           details: 'Details',
@@ -110,6 +128,7 @@ const resources = {
         }
       },
       success: {
+        eyebrow: 'Connection summary',
         subtitle: 'Monitor your connection status and usage.',
         username: 'Username',
         password: 'Password',
@@ -123,11 +142,15 @@ const resources = {
         statusOnline: 'Online',
         statusOffline: 'Offline',
         deviceInfo: 'Site: {{site}} — SSID: {{ssid}}',
+        messageHint: 'These details come directly from RadiusDesk and refresh automatically.',
         quotaTitle: 'Usage',
+        quotaSubtitle: 'Data and time allowances',
         dataUsed: '{{used}} used / {{cap}} cap',
         timeUsed: '{{used}} used / {{cap}} cap',
         depleted: 'Quota depleted',
         supportTitle: 'Support',
+        supportSubtitle: 'Need human assistance?',
+        phoneLabel: 'Phone',
         supportFallback: 'Contact the operator for help.',
         sessionsTitle: 'Recent sessions',
         noSessions: 'No sessions recorded yet.',
@@ -137,6 +160,35 @@ const resources = {
         sessionIp: 'IP address',
         sessionOngoing: 'Ongoing',
         disconnect: 'Disconnect'
+      },
+      support: {
+        eyebrow: 'Need help?',
+        subtitle: 'Reach the operator team for vouchers, credentials or device support.',
+        response: 'Avg. response <10min',
+        email: 'Email',
+        phone: 'Phone',
+        hours: 'Hours',
+        hoursValue: '24/7 hotline',
+        address: 'Address',
+        fallback: 'Contact operator'
+      },
+      terms: {
+        eyebrow: 'Usage policy',
+        scopeTitle: 'Scope',
+        scopeBody: 'These terms govern access to the captive portal and the Omada hotspot managed by Techzone.',
+        usageTitle: 'Acceptable use',
+        usageBody: 'You agree not to disrupt the network, abuse bandwidth or share credentials with unauthorised users.',
+        responsibilityTitle: 'Operator responsibility',
+        responsibilityBody: 'The operator may suspend access in case of abuse or security risk and records sessions for auditing.'
+      },
+      privacy: {
+        eyebrow: 'Privacy notice',
+        collectionTitle: 'Data collection',
+        collectionBody: 'We collect MAC address, username, usage metrics and Omada parameters to grant access.',
+        usageTitle: 'Data usage',
+        usageBody: 'Metrics are used to maintain sessions, display consumption and troubleshoot support tickets.',
+        rightsTitle: 'Your rights',
+        rightsBody: 'Contact support to request data export or deletion according to local regulations.'
       }
     }
   },
@@ -149,6 +201,12 @@ const resources = {
         terms: 'Conditions',
         privacy: 'Confidentialité'
       },
+      layout: {
+        eyebrow: 'Portail Omada',
+        title: 'Connexion dynamique',
+        language: 'Changer de langue',
+        navLabel: 'Navigation principale'
+      },
       loading: 'Chargement de la configuration dynamique…',
       error: 'Impossible de charger la configuration du portail.',
       lastUpdated: 'Dernière mise à jour',
@@ -158,12 +216,24 @@ const resources = {
           no: 'Non'
         },
         requestError: 'Impossible de joindre le portail captif. Réessayez dans quelques instants.',
+        loaderHint: 'Récupération des pages dynamiques et formulaires depuis RadiusDesk…',
         modal: {
           title: 'Clé dynamique requise',
           subtitle: 'Utilisez l’une des clés autorisées pour ce hotspot.',
           emptyList: 'Aucune clé dynamique n’a été fournie par RadiusDesk.',
           supportCta: 'Contacter le support'
         },
+        status: {
+          cache: 'Cache {{status}} depuis RadiusDesk',
+          cacheNone: 'Pas de cache disponible',
+          key: 'Clé {{key}}',
+          keyMissing: 'Clé dynamique manquante',
+          omadaReady: 'Paramètres Omada prêts',
+          omadaMissing: 'Paramètres Omada incomplets',
+          omadaMissingDetail: 'Champs manquants : {{fields}}'
+        },
+        omadaContext: 'Contexte Omada',
+        omadaEyebrow: 'Métadonnées réseau',
         toolbar: {
           title: 'Barre dynamique',
           details: 'Détails',
@@ -248,6 +318,7 @@ const resources = {
         }
       },
       success: {
+        eyebrow: 'Résumé de connexion',
         subtitle: 'Surveillez le statut de votre connexion et vos consommations.',
         username: "Nom d'utilisateur",
         password: 'Mot de passe',
@@ -261,11 +332,15 @@ const resources = {
         statusOnline: 'En ligne',
         statusOffline: 'Hors ligne',
         deviceInfo: 'Site : {{site}} — SSID : {{ssid}}',
+        messageHint: 'Ces informations proviennent de RadiusDesk et se rafraîchissent automatiquement.',
         quotaTitle: 'Consommation',
+        quotaSubtitle: 'Données et temps restants',
         dataUsed: '{{used}} utilisés / {{cap}} limite',
         timeUsed: '{{used}} utilisés / {{cap}} limite',
         depleted: 'Quota épuisé',
         supportTitle: 'Support',
+        supportSubtitle: 'Besoin d’un opérateur ?',
+        phoneLabel: 'Téléphone',
         supportFallback: "Contactez l'exploitant pour obtenir de l’aide.",
         sessionsTitle: 'Sessions récentes',
         noSessions: 'Aucune session pour le moment.',
@@ -275,6 +350,35 @@ const resources = {
         sessionIp: 'Adresse IP',
         sessionOngoing: 'En cours',
         disconnect: 'Déconnecter'
+      },
+      support: {
+        eyebrow: 'Besoin d’aide ?',
+        subtitle: 'Contactez l’équipe opérateur pour les identifiants ou tout souci de connexion.',
+        response: 'Réponse <10 min',
+        email: 'Email',
+        phone: 'Téléphone',
+        hours: 'Horaires',
+        hoursValue: 'Hotline 24/7',
+        address: 'Adresse',
+        fallback: 'Voir opérateur'
+      },
+      terms: {
+        eyebrow: 'Politique d’usage',
+        scopeTitle: 'Champ',
+        scopeBody: 'Ces conditions régissent l’accès au portail captif et au hotspot Omada opéré par Techzone.',
+        usageTitle: 'Bon usage',
+        usageBody: 'Vous vous engagez à ne pas perturber le réseau, partager vos identifiants ni saturer la bande passante.',
+        responsibilityTitle: 'Responsabilité opérateur',
+        responsibilityBody: 'L’opérateur peut suspendre l’accès en cas d’abus ou risque de sécurité et journalise les sessions.'
+      },
+      privacy: {
+        eyebrow: 'Confidentialité',
+        collectionTitle: 'Données collectées',
+        collectionBody: 'MAC, identifiant, métriques de consommation et paramètres Omada sont collectés pour autoriser l’accès.',
+        usageTitle: 'Utilisation des données',
+        usageBody: 'Les métriques servent à maintenir les sessions, afficher la consommation et traiter les tickets support.',
+        rightsTitle: 'Vos droits',
+        rightsBody: 'Contactez le support pour toute exportation ou suppression selon la réglementation locale.'
       }
     }
   },
@@ -287,6 +391,12 @@ const resources = {
         terms: 'Términos',
         privacy: 'Privacidad'
       },
+      layout: {
+        eyebrow: 'Portal Omada',
+        title: 'Inicio dinámico',
+        language: 'Cambiar idioma',
+        navLabel: 'Navegación principal'
+      },
       loading: 'Cargando configuración dinámica…',
       error: 'No se pudo cargar la configuración del portal.',
       lastUpdated: 'Última actualización',
@@ -296,12 +406,24 @@ const resources = {
           no: 'No'
         },
         requestError: 'No es posible contactar al portal cautivo. Inténtalo de nuevo más tarde.',
+        loaderHint: 'Obteniendo páginas dinámicas y formularios desde RadiusDesk…',
         modal: {
           title: 'Se requiere una clave dinámica',
           subtitle: 'Utiliza una de las claves autorizadas para este hotspot.',
           emptyList: 'RadiusDesk no devolvió claves dinámicas.',
           supportCta: 'Contactar soporte'
         },
+        status: {
+          cache: 'Cache {{status}} desde RadiusDesk',
+          cacheNone: 'Sin información de cache',
+          key: 'Clave {{key}}',
+          keyMissing: 'Falta la clave dinámica',
+          omadaReady: 'Parámetros Omada listos',
+          omadaMissing: 'Parámetros Omada incompletos',
+          omadaMissingDetail: 'Faltan: {{fields}}'
+        },
+        omadaContext: 'Contexto Omada',
+        omadaEyebrow: 'Metadatos de red',
         toolbar: {
           title: 'Barra dinámica',
           details: 'Detalles',
@@ -386,6 +508,7 @@ const resources = {
         }
       },
       success: {
+        eyebrow: 'Resumen de conexión',
         subtitle: 'Revisa el estado y consumo de tu conexión.',
         username: 'Usuario',
         password: 'Contraseña',
@@ -399,11 +522,15 @@ const resources = {
         statusOnline: 'En línea',
         statusOffline: 'Fuera de línea',
         deviceInfo: 'Sitio: {{site}} — SSID: {{ssid}}',
+        messageHint: 'Estos datos vienen de RadiusDesk y se actualizan automáticamente.',
         quotaTitle: 'Consumo',
+        quotaSubtitle: 'Datos y tiempo disponibles',
         dataUsed: '{{used}} usados / {{cap}} límite',
         timeUsed: '{{used}} usados / {{cap}} límite',
         depleted: 'Cuota agotada',
         supportTitle: 'Soporte',
+        supportSubtitle: '¿Necesitas ayuda?',
+        phoneLabel: 'Teléfono',
         supportFallback: 'Contacta al operador para recibir ayuda.',
         sessionsTitle: 'Sesiones recientes',
         noSessions: 'No hay sesiones registradas.',
@@ -413,6 +540,35 @@ const resources = {
         sessionIp: 'Dirección IP',
         sessionOngoing: 'En curso',
         disconnect: 'Desconectar'
+      },
+      support: {
+        eyebrow: '¿Necesitas ayuda?',
+        subtitle: 'Escribe al operador para vouchers, credenciales o soporte de dispositivos.',
+        response: 'Respuesta <10 min',
+        email: 'Correo',
+        phone: 'Teléfono',
+        hours: 'Horario',
+        hoursValue: 'Hotline 24/7',
+        address: 'Dirección',
+        fallback: 'Contacta al operador'
+      },
+      terms: {
+        eyebrow: 'Política de uso',
+        scopeTitle: 'Alcance',
+        scopeBody: 'Estos términos regulan el acceso al portal cautivo y al hotspot Omada operado por Techzone.',
+        usageTitle: 'Uso aceptable',
+        usageBody: 'Te comprometes a no interrumpir la red ni compartir credenciales o saturar el ancho de banda.',
+        responsibilityTitle: 'Responsabilidad del operador',
+        responsibilityBody: 'El operador puede suspender el acceso ante abuso o riesgo de seguridad y registra las sesiones.'
+      },
+      privacy: {
+        eyebrow: 'Aviso de privacidad',
+        collectionTitle: 'Datos recolectados',
+        collectionBody: 'Se registran MAC, usuario, métricas de consumo y parámetros Omada para otorgar acceso.',
+        usageTitle: 'Uso de los datos',
+        usageBody: 'Las métricas se usan para mantener sesiones, mostrar consumo y resolver tickets de soporte.',
+        rightsTitle: 'Tus derechos',
+        rightsBody: 'Contacta soporte para exportar o eliminar datos según la normativa local.'
       }
     }
   }

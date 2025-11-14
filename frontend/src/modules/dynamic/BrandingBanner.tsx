@@ -15,40 +15,27 @@ export default function BrandingBanner({ detail, settings }: Props) {
   }
 
   return (
-    <div style={wrapperStyle} aria-label="branding">
+    <div className="dynamic-shell__branding" aria-label="branding">
       {showLogo && (
         <img
           src={String(detail!.icon_file_name)}
           alt={name || 'Brand logo'}
-          style={logoStyle}
+          className="dynamic-shell__logo"
           onError={(event) => {
             event.currentTarget.style.display = 'none';
           }}
         />
       )}
       {showName && (
-        <span style={{ ...nameStyle, color: settings?.name_colour || '#0c1b33' }} role="heading" aria-level={2}>
+        <span
+          className="dynamic-shell__brand-name"
+          role="heading"
+          aria-level={2}
+          style={{ color: settings?.name_colour || '#0c1b33' }}
+        >
           {name || 'Captive Portal'}
         </span>
       )}
     </div>
   );
 }
-
-const wrapperStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '1rem',
-  padding: '1rem',
-  borderBottom: '1px solid #eef0f5',
-};
-
-const logoStyle: React.CSSProperties = {
-  maxHeight: '56px',
-  objectFit: 'contain',
-};
-
-const nameStyle: React.CSSProperties = {
-  fontSize: '1.5rem',
-  fontWeight: 600,
-};

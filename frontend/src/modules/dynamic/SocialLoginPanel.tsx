@@ -4,6 +4,7 @@ import type { DynamicSettings } from './types';
 import { useTranslation } from 'react-i18next';
 import { buildOmadaPayload } from './connectUtils';
 import { saveCredentials } from './credentialStorage';
+import './dynamic-shell.css';
 
 interface Props {
   settings?: DynamicSettings;
@@ -63,26 +64,23 @@ export default function SocialLoginPanel({ settings, omadaParams }: Props) {
     }
   }
 
+  const badgeClass =
+    status.type === 'error' ? 'cp-alert cp-alert--danger' : status.type === 'success' ? 'cp-alert cp-alert--success' : 'cp-alert cp-alert--warning';
+
   return (
     <div>
-      <div style={socialListStyle}>
+      <div className="social-panel__list">
         {providers.map((item) => (
-          <button key={item.name} onClick={() => startSocial(item.name)}>
-            {item.name}
+          <button key={item.name} className="social-panel__button" onClick={() => startSocial(item.name)}>
+            {item.display_name || item.name}
           </button>
         ))}
       </div>
       {status.type !== 'idle' && (
-        <p role="status" style={{ color: status.type === 'error' ? '#e11d48' : '#059669' }}>
+        <p role="status" className={`${badgeClass} connect-panel__message`}>
           {status.message}
         </p>
       )}
     </div>
   );
 }
-
-const socialListStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.5rem',
-  flexWrap: 'wrap',
-};

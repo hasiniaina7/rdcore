@@ -30,7 +30,7 @@ export default function GalleryCarousel({ gallery, photos, intervalMs = DEFAULT_
 
   if (!images.length) {
     return (
-      <div style={emptyStyle}>
+      <div className="dynamic-shell__gallery dynamic-shell__gallery-empty">
         <p>{t('dynamic.gallery.empty')}</p>
       </div>
     );
@@ -39,16 +39,16 @@ export default function GalleryCarousel({ gallery, photos, intervalMs = DEFAULT_
   const activeImage = images[activeIndex];
 
   return (
-    <div style={carouselStyle} aria-label={t('dynamic.gallery.title')}>
-      <div style={imageFrameStyle}>
+    <div className="dynamic-shell__gallery" aria-label={t('dynamic.gallery.title')}>
+      <div className="dynamic-shell__gallery-frame">
         <img
           src={String(activeImage.file_name)}
           alt={activeImage.layout || t('dynamic.gallery.slide')}
-          style={imageStyle}
+          className="dynamic-shell__gallery-img"
           onClick={() => setLightboxIndex(activeIndex)}
         />
       </div>
-      <div style={controlsStyle}>
+      <div className="dynamic-shell__gallery-controls">
         <button type="button" onClick={() => setActiveIndex((prev) => (prev - 1 + images.length) % images.length)}>
           {t('dynamic.gallery.prev')}
         </button>
@@ -59,104 +59,26 @@ export default function GalleryCarousel({ gallery, photos, intervalMs = DEFAULT_
           {t('dynamic.gallery.next')}
         </button>
       </div>
-      <div style={thumbnailsStyle}>
+      <div className="dynamic-shell__gallery-thumbs">
         {images.map((img, index) => (
           <button
             key={`${img.file_name}-${index}`}
-            style={{ ...thumbnailButtonStyle, borderColor: index === activeIndex ? '#0057ff' : 'transparent' }}
+            className={`dynamic-shell__gallery-thumb${index === activeIndex ? ' dynamic-shell__gallery-thumb--active' : ''}`}
             onClick={() => setActiveIndex(index)}
             aria-label={t('dynamic.gallery.thumbnail', { index: index + 1 })}
           >
-            <img src={String(img.file_name)} alt="" style={thumbnailImgStyle} />
+            <img src={String(img.file_name)} alt="" />
           </button>
         ))}
       </div>
       {lightboxIndex !== null && (
-        <div style={lightboxStyle} role="dialog" aria-modal="true">
-          <button style={lightboxCloseStyle} onClick={() => setLightboxIndex(null)}>
+        <div className="dynamic-shell__lightbox" role="dialog" aria-modal="true">
+          <button className="dynamic-shell__lightbox-close" onClick={() => setLightboxIndex(null)}>
             {t('dynamic.gallery.close')}
           </button>
-          <img src={String(images[lightboxIndex].file_name)} alt="" style={lightboxImgStyle} />
+          <img src={String(images[lightboxIndex].file_name)} alt="" />
         </div>
       )}
     </div>
   );
 }
-
-const carouselStyle: React.CSSProperties = {
-  padding: '1rem',
-  borderBottom: '1px solid #eef0f5',
-};
-
-const imageFrameStyle: React.CSSProperties = {
-  width: '100%',
-  maxHeight: '320px',
-  overflow: 'hidden',
-  borderRadius: '8px',
-  backgroundColor: '#000',
-};
-
-const imageStyle: React.CSSProperties = {
-  width: '100%',
-  height: '320px',
-  objectFit: 'cover',
-  cursor: 'pointer',
-};
-
-const controlsStyle: React.CSSProperties = {
-  marginTop: '0.5rem',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
-
-const thumbnailsStyle: React.CSSProperties = {
-  marginTop: '0.5rem',
-  display: 'flex',
-  gap: '0.5rem',
-  overflowX: 'auto',
-};
-
-const thumbnailButtonStyle: React.CSSProperties = {
-  padding: 0,
-  border: '2px solid transparent',
-  borderRadius: '4px',
-  background: 'none',
-  cursor: 'pointer',
-};
-
-const thumbnailImgStyle: React.CSSProperties = {
-  width: '80px',
-  height: '60px',
-  objectFit: 'cover',
-  borderRadius: '4px',
-};
-
-const emptyStyle: React.CSSProperties = {
-  padding: '1rem',
-  borderBottom: '1px solid #eef0f5',
-  fontStyle: 'italic',
-};
-
-const lightboxStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  backgroundColor: 'rgba(0,0,0,0.8)',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 2000,
-};
-
-const lightboxImgStyle: React.CSSProperties = {
-  maxWidth: '90%',
-  maxHeight: '90%',
-};
-
-const lightboxCloseStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: '2rem',
-  right: '2rem',
-  padding: '0.5rem 1rem',
-};

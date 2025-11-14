@@ -4,6 +4,7 @@ import type { DynamicSettings } from './types';
 import { useTranslation } from 'react-i18next';
 import { buildOmadaPayload, formatUsername } from './connectUtils';
 import { saveCredentials } from './credentialStorage';
+import './dynamic-shell.css';
 
 type ConnectMode = 'click' | 'permanent' | 'voucher';
 
@@ -22,6 +23,10 @@ interface ConnectResult {
 }
 
 const initialStatus = { type: 'idle' as const, message: '' };
+const clampDelay = (value?: number) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(30, value));
+};
 
 export default function ConnectPanel({ settings, dynamicKey, omadaParams, connectVisible }: ConnectPanelProps) {
   const { t } = useTranslation();
@@ -32,6 +37,7 @@ export default function ConnectPanel({ settings, dynamicKey, omadaParams, connec
   const autoSuffix = settings?.auto_suffix_check && settings?.auto_suffix ? `@${settings.auto_suffix}` : '';
   const omadaPayload = useMemo(() => buildOmadaPayload(omadaParams), [omadaParams]);
   const isOmadaReady = Boolean(omadaPayload);
+  const displayDelay = clampDelay(settings?.show_screen_delay);
 
   const showUserForm = settings?.connect_only ? false : settings?.user_login_check !== false;
   const showVoucherForm = settings?.connect_only ? false : settings?.voucher_login_check !== false;
@@ -89,87 +95,102 @@ export default function ConnectPanel({ settings, dynamicKey, omadaParams, connec
     }
   }
 
-  return (
-    <div>
-      {!connectVisible && <p>{t('dynamic.connect.countdown', { seconds: settings?.show_screen_delay ?? 0 })}</p>}
-      <div style={sectionStyle}>
-        {showClickBlock && (
-          <div style={cardStyle}>
-            <h3>{t('dynamic.connect.clickTitle')}</h3>
-            <p>{t('dynamic.connect.clickBody')}</p>
-            <button
-              type="button"
-              onClick={() => handleConnect('click')}
-              disabled={!connectVisible || !dynamicKey || !isOmadaReady}
-            >
-              {settings?.click_to_connect?.button_title || t('dynamic.connect.clickCta')}
-            </button>
-          </div>
-        )}
+  const statusTone =
+    status.type === 'error' ? 'cp-alert cp-alert--danger' : status.type === 'success' ? 'cp-alert cp-alert--success' : 'cp-alert cp-alert--warning';
 
-        {showUserForm && (
-          <form
-            style={cardStyle}
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleConnect('permanent');
-            }}
+  return (
+    <div className="connect-panel__grid">
+      {!connectVisible && (
+        <p role="status" className="cp-alert cp-alert--warning">
+          {t('dynamic.connect.countdown', { seconds: displayDelay })}
+        </p>
+      )}
+      {showClickBlock && (
+        <article className="connect-panel__card">
+          <h3 className="connect-panel__head">{t('dynamic.connect.clickTitle')}</h3>
+          <p>{t('dynamic.connect.clickBody')}</p>
+          <button
+            type="button"
+            className="cp-btn cp-btn--primary"
+            onClick={() => handleConnect('click')}
+            disabled={!connectVisible || !dynamicKey || !isOmadaReady}
           >
-            <h3>{t('dynamic.connect.userTitle')}</h3>
-            <label style={labelStyle}>
-              {t('dynamic.connect.username')}
+            {settings?.click_to_connect?.button_title || t('dynamic.connect.clickCta')}
+          </button>
+        </article>
+      )}
+
+      {showUserForm && (
+        <form
+          className="connect-panel__card cp-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleConnect('permanent');
+          }}
+        >
+          <h3 className="connect-panel__head">{t('dynamic.connect.userTitle')}</h3>
+          <label className="cp-field" htmlFor="permanent-username">
+            {t('dynamic.connect.username')}
+            <div className="connect-panel__input-group">
               <input
+                id="permanent-username"
+                className="cp-input"
                 type="text"
                 value={userForm.username}
                 onChange={(event) => setUserForm((prev) => ({ ...prev, username: event.target.value }))}
                 required
                 disabled={!connectVisible}
               />
-              {autoSuffix && <span style={suffixStyle}>{autoSuffix}</span>}
-            </label>
-            <label style={labelStyle}>
-              {t('dynamic.connect.password')}
-              <input
-                type="password"
-                value={userForm.password}
-                onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
-                required
-                disabled={!connectVisible}
-              />
-            </label>
-            <button type="submit" disabled={!connectVisible || !isOmadaReady}>
-              {t('dynamic.connect.submit')}
-            </button>
-          </form>
-        )}
+              {autoSuffix && <span className="connect-panel__suffix">{autoSuffix}</span>}
+            </div>
+          </label>
+          <label className="cp-field" htmlFor="permanent-password">
+            {t('dynamic.connect.password')}
+            <input
+              id="permanent-password"
+              className="cp-input"
+              type="password"
+              value={userForm.password}
+              onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
+              required
+              disabled={!connectVisible}
+            />
+          </label>
+          <button type="submit" className="cp-btn cp-btn--primary" disabled={!connectVisible || !isOmadaReady}>
+            {t('dynamic.connect.submit')}
+          </button>
+        </form>
+      )}
 
-        {showVoucherForm && (
-          <form
-            style={cardStyle}
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleConnect('voucher', { voucherCode });
-            }}
-          >
-            <h3>{t('dynamic.connect.voucherTitle')}</h3>
-            <label style={labelStyle}>
-              {t('dynamic.connect.voucherCode')}
-              <input
-                type="text"
-                value={voucherCode}
-                onChange={(event) => setVoucherCode(event.target.value)}
-                required
-                disabled={!connectVisible}
-              />
-            </label>
-            <button type="submit" disabled={!connectVisible || !isOmadaReady}>
-              {t('dynamic.connect.submit')}
-            </button>
-          </form>
-        )}
-      </div>
+      {showVoucherForm && (
+        <form
+          className="connect-panel__card cp-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleConnect('voucher', { voucherCode });
+          }}
+        >
+          <h3 className="connect-panel__head">{t('dynamic.connect.voucherTitle')}</h3>
+          <label className="cp-field" htmlFor="voucher-code">
+            {t('dynamic.connect.voucherCode')}
+            <input
+              id="voucher-code"
+              className="cp-input"
+              type="text"
+              value={voucherCode}
+              onChange={(event) => setVoucherCode(event.target.value)}
+              required
+              disabled={!connectVisible}
+            />
+          </label>
+          <button type="submit" className="cp-btn cp-btn--primary" disabled={!connectVisible || !isOmadaReady}>
+            {t('dynamic.connect.submit')}
+          </button>
+        </form>
+      )}
+
       {status.type !== 'idle' && (
-        <p role="status" style={{ color: status.type === 'error' ? '#e11d48' : '#059669' }}>
+        <p role="status" className={`${statusTone} connect-panel__message`}>
           {status.message}
         </p>
       )}
@@ -206,29 +227,3 @@ function applyRedirectParams(nextRedirect: string, params: { username?: string; 
     return nextRedirect;
   }
 }
-
-const sectionStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-  gap: '1rem',
-};
-
-const cardStyle: React.CSSProperties = {
-  border: '1px solid #e5e7eb',
-  borderRadius: '8px',
-  padding: '1rem',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.75rem',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.25rem',
-};
-
-const suffixStyle: React.CSSProperties = {
-  fontSize: '0.85rem',
-  color: '#6b7280',
-};
