@@ -408,6 +408,36 @@ Summarize what you did and what is left, if anything.
 Continue iterating through G2 then G3 until all items are fully implemented and validated, or until you are explicitly stopped by the environment or the user.
 
 <!-- g2 & g3 -->
+# Session checklists
+
+### Session 2025-11-14 08:10
+
+**Done**
+- [x] G1.1–G1.3 — Audit installation scripts, RadiusDesk controllers and Omada external portal, with docs added under `docs/installation-audit.md`, `docs/radiusdesk-endpoints.md`, `docs/omada-ext-portal.md`.
+- [x] G2.1 — Created `docs/openapi/openapi.yaml` with info, servers, tags, security schemes (RadiusToken, OmadaSession) and all required schemas.
+- [x] G2.2 — Documented backend endpoints in OpenAPI: `/dynamic/details`, `/connect/{mode}`, `/usage`, `/usage/disconnect`, `/social/{provider}/{start|callback}`, `/healthz`, `/readyz`, `/metrics` with parameters, responses and examples.
+- [x] G2.3 — Added `x-externalDocs` references in OpenAPI and `docs/endpoints-matrix.md` mapping Frontend ↔ Backend ↔ RadiusDesk/Omada.
+- [x] G2.4 — Wired documentation tooling: Spectral (`npm run docs:lint`), Redocly, Dredd/Newman, and documented flows in `docs/README.md`.
+- [x] G3.1 — Bootstrapped monorepo: root `package.json` with workspaces, shared `tsconfig.base.json`, ESLint/Prettier, and `backend/`, `frontend/`, `docs/` structure.
+- [x] G3.2 — Implemented env validation with zod in `backend/src/config.ts`, created `.env.example` and `.env.frontend.example`, and masked secrets in pino logger.
+- [x] G3.3 — Implemented backend modules: `radiusdeskIntegration`, `dynamicService`, `omadaIntegration`, `authService`, `usageService`, plus metrics (`prom-client`) and JSON logging.
+- [x] G3.4 — Scaffolded frontend shell (Vite React TS) with routes `/`, `/success`, `/support`, `/terms`, `/privacy`, hooks `useDynamicDetail` / `useOmadaParams`, and i18n (fr/en/es).
+- [x] G3.5 — Added PM2 config (`ecosystem.config.js`) and deployment scripts (`scripts/deploy_backend.sh`, `scripts/deploy_frontend.sh`) using `TARGET_HOST`, `TARGET_DIR`, `GIT_REF`, `ENV_FILE`, `PUBLIC_DIR`.
+- [x] Swagger UI — Exposed OpenAPI docs via backend routes `/docs/` and `/docs/openapi.yaml` using `swagger-ui-express`, with basic integration tests (Vitest + supertest).
+- [x] /usage endpoint — Fixed RadiusDesk proxy (`RADIUS_BASE_URL` to local instance, `RADIUS_TOKEN_LOCAL` to root token, `RADIUS_CLOUD_ID` to cloud 23) and normalized `/radaccts/get-usage.json` and `/radaccts/index.json` calls, including pagination params (`page`, `start`).
+- [x] Demo data — Created test `permanent_users` and `mac_usages` entries (`testuser` / `AA-BB-CC-00-11-22`) to validate `/api/usage` end-to-end.
+- [x] Error handling — Updated Express error middleware to always return JSON errors and improved dev startup (dotenv-cli with default `.env.example` fallbacks).
+
+**In progress**
+- [ ] G4.x — Dynamic Login UI parity with @rdcore/login (Details, Settings, Own Pages, Connect Panel, Social Login, Success/Info Conso).
+- [ ] G5.x — Comprehensive frontend/backend tests (Vitest, Jest, Playwright) and observability enhancements beyond basic metrics/logs.
+
+**TODO / Next session**
+- [ ] Implement full G4 flows: `DynamicShell`, `ConnectPanel` (permanent/voucher/click/social), Success/Info Conso page wired to `/usage` and `/connect/{mode}`.
+- [ ] Add backend test coverage for dynamic/detail proxy, connect orchestration, and usage aggregation (including error paths and Omada failures).
+- [ ] Extend frontend tests (Vitest + RTL) and add minimal Playwright E2E smoke tests aligned with G5.1.
+- [ ] Finalize observability per G5.4: richer Prometheus metrics, /readyz checks against Omada and RadiusDesk, and `npm run smoke:health` for post-deploy checks.
+
 # Captive Portal Omada/Radiusdesk — Prompts G1 à G5 (Final)
 
 Ce document regroupe des prompts détaillés, prêts à être developper pour piloter la réalisation complète du projet selon nos décisions et contraintes validées.
