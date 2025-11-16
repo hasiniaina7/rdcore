@@ -44,8 +44,8 @@ Ce mémo consolide (1) l’état actuel des flux RadiusDesk/FreeRADIUS dans `rdc
 
 - **Mode Local Web Portal (page interne/importée)** :
   - Le contrôleur Omada héberge lui‑même la page de portail.
-  - La personnalisation peut se faire via “Import Customized Page” à partir d’un bundle statique, par exemple `frontend/omada-captive-portal-exemple` (projet de référence fourni par Omada, avec formulaires voucher/local user/RADIUS/form auth).
-  - Dans ce mode, notre projet `dev/captive-portail` peut servir de backend API ou de modèle UX, mais le HTML final est servi par Omada.
+  - La personnalisation se fait via “Import Customized Page” à partir d’un bundle statique, désormais maintenu dans `frontend/omada-captive-portail-exemple`. Ce bundle reproduit une Dynamic Login Page RadiusDesk (Bootstrap 5, i18n, bloc usage) tout en conservant le flux RADIUS natif Omada.
+  - Dans ce mode, notre projet `dev/captive-portail` n’héberge pas l’UI : les assets (HTML/CSS/JS) sont servis par Omada, mais ils consomment encore les endpoints publics RadiusDesk (`dynamic-details`, `radaccts`) pour le contenu dynamique/usage.
 - **Mode External Web Portal (HTTP/HTTPS)** :
   - **Approche RadiusDesk native (cible actuelle)** : Omada redirige directement vers la Dynamic Login Page RadiusDesk via `https://<RD_HOST>/cake4/rd_cake/dynamic-details/omada-browser-detect?dynamic_key=<KEY>`. Le JS natif (`rdcore/login/cp/js/rdDynamic.js` + `rdConnect.js`) récupère les paramètres Omada (clientMac, ssidName, radioId…) depuis la query string, appelle `DynamicDetails::infoFor()` pour construire l’UI, puis parle directement à l’API Omada via `OmadaController::extPortalAuth()` sans passer par le portail Node/React.
   - `Authentication Type = RADIUS Server` reste actif : Omada continue d’envoyer l’authentification et l’accounting RADIUS vers FreeRADIUS/RadiusDesk, indépendamment du fait que la page soit locale ou externe.
@@ -54,6 +54,27 @@ Dans les deux modes, dès que `Authentication Type = RADIUS Server` est configur
 
 - Omada agit comme NAS RADIUS (auth + accounting) pour RadiusDesk.
 - `radacct` / `MacUsages` restent la source d’autorité pour l’usage, les quotas et la FUP.
+
+#### 3.0.1 Bundle `frontend/omada-captive-portail-exemple`
+
+- **Entrée / fichiers clés** :
+  - `index.html` : formulaire username/password/voucher, panneau `#alertWarn`, consentement et parsing complet des paramètres Omada (`clientMac`, `ssidName`, `site`, `radioId`, `originUrl`, `link_login_only`, etc.) via `assets/js/portal-utils.js`.
+  - `success.html` : page “Info Conso” Mikrotik-like. Après Access‑Accept, `main.js` redirige automatiquement vers cette page en injectant `username`, `clientMac`, `dynamic_key`, `site`, etc. `success.js` appelle `radaccts/get-usage.json` pour afficher temps/data utilisés et un bouton “Continuer vers Internet” qui cible l’`originUrl` renvoyé par Omada.
+  - `assets/js/portal-utils.js` : dictionnaire FR/EN, helpers pour sérialiser le contexte Omada, construire les appels `dynamic-details/info-for` et formatter temps/données.
+  - `package.sh` : génère `omada-captive-portail-exemple.zip` (bundle importable dans l’UI Omada).
+- **Flux** :
+  1. L’appareil est redirigé vers `index.html?...` avec tous les paramètres Omada.
+  2. `main.js` récupère `https://rd.techzone.lat/cake4/rd_cake/dynamic-details/info-for.json?dynamic_key=<KEY>&clientMac=…` pour afficher logos, textes, langue et règles de consentement RadiusDesk.
+  3. La soumission du formulaire POST vers `link_login_only` / `/portal/radius/browserauth` renvoie les identifiants au NAS Omada (pas de décision côté RadiusDesk).
+  4. En cas de succès (`errorCode=0`), `main.js` redirige vers `success.html?...` (bundle local) qui affiche l’usage via `radaccts/get-usage.json` tout en proposant le bouton “Continuer vers Internet”.
+- **Pré-requis infra** :
+  - Omada configuré en `Authentication Type = RADIUS Server` + `Accounting` vers FreeRADIUS/RadiusDesk (ports 1812/1813).
+  - `Portal Customization = Local Web Portal`, import du ZIP via l’UI Omada, mode HTTPS recommandé.
+  - Côté RadiusDesk : autoriser le FQDN Omada dans les headers CORS (`Access-Control-Allow-Origin`) et placer `rd.techzone.lat` dans le walled garden / pré-auth ACL afin que la page puisse charger CSS/JS/logo et JSON avant authentification.
+  - Optionnel : renseigner `dynamic_key`, `site`, `ssidName` dans la query string pour permettre au backend RadiusDesk (`DynamicDetailsController::infoFor`) de cibler les bons assets/branding.
+- **Validation rapide** :
+  - Localement : `npx serve frontend/omada-captive-portail-exemple` puis `http://localhost:4173/index.html?clientMac=AA...&link_login_only=https://controller:8843/portal/radius/browserauth`.
+  - En prod : importer `omada-captive-portail-exemple.zip`, associer au SSID, puis vérifier que les Access-Request/Accounting partent bien vers FreeRADIUS et que `success.html` remonte l’usage `radaccts`.
 
 ### 3.1 Nouveaux services côté RadiusDesk (PHP)
 
@@ -150,12 +171,13 @@ Ce plan couvre les items demandés : analyse détaillée des flux RadiusDesk/Fre
   - Les déconnexions/Kick sont pilotées par l’API northbound Omada (OpenAPI) comme on le fait avec l’API RouterOS.
 - **Modes supportés** :
   - **Mode cible** : Hotspot Omada + “RADIUS Server” (FreeRADIUS/RadiusDesk) + “Import Customized Page”.
-  - **Mode optionnel** : External Portal Server (cf. `docs/omada-ext-portal.md`) avec `Authentication Type = RADIUS Server` actif : la signalisation RADIUS (auth + accounting) reste gérée par Omada vers FreeRADIUS/RadiusDesk, seule la page d’auth est externalisée.
+- **Mode optionnel** : External Portal Server (cf. `docs/omada-ext-portal.md`) avec `Authentication Type = RADIUS Server` actif : la signalisation RADIUS (auth + accounting) reste gérée par Omada vers FreeRADIUS/RadiusDesk, seule la page d’auth est externalisée.
 - **Portée** :
   - Spécifier la page de portail importée côté Omada (Hotspot + RADIUS).
   - Décrire l’option External Portal et les adaptations nécessaires pour l’UX et le flux HTTP, sans remettre en cause le rôle central de `radacct` / `MacUsages` pour l’accounting.
   - Lister les modifications RadiusDesk (CakePHP + FreeRADIUS).
   - Lister les modifications backend du portail Node (API de connexion, usage, déconnexion).
+  - **Bundle livré** : `frontend/omada-captive-portail-exemple/` (HTML/JS/CSS prêt à zipper via `zip -r omada-captive-portail-exemple.zip .`) qui consomme `dynamic-details/info-for.json` / `radaccts/get-usage.json` et poste les identifiants vers `/portal/radius/browserauth`.
 
 ### G6.2 Portail Hotspot + RADIUS (mode optione)
 

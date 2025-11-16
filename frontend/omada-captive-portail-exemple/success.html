@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RadiusDesk Session Info</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="portal-header">
+        <img id="logo" src="" alt="Logo" class="logo hidden" />
+        <div>
+          <h1 id="brandName">Loading…</h1>
+          <p id="brandSubtitle"></p>
+        </div>
+      </header>
+
+      <section id="alerts">
+        <div id="alertWarn" class="alert alert-warning hidden"></div>
+        <div id="alertInfo" class="alert alert-info hidden"></div>
+      </section>
+
+      <section class="card" id="sessionCard">
+        <h2 id="successTitle">Session active</h2>
+        <p id="successSubtitle">Votre connexion est en place.</p>
+        <dl class="usage-grid">
+          <div>
+            <dt id="usageLabelTime">Temps utilisé</dt>
+            <dd id="usageTime">—</dd>
+          </div>
+          <div>
+            <dt id="usageLabelData">Données utilisées</dt>
+            <dd id="usageData">—</dd>
+          </div>
+          <div>
+            <dt id="usageLabelRemaining">Restant</dt>
+            <dd id="usageRemaining">—</dd>
+          </div>
+        </dl>
+        <p id="sessionDetails"></p>
+      </section>
+
+      <section class="card actions">
+        <button id="btnContinue" type="button">Continuer vers Internet</button>
+        <button id="btnRefreshUsage" type="button" class="secondary">Actualiser l’usage</button>
+        <button id="btnBackLogin" type="button" class="ghost">Retour à la page de connexion</button>
+      </section>
+
+      <footer id="footer" class="portal-footer">
+        <p id="footerText"></p>
+      </footer>
+    </div>
+
+    <script src="assets/js/portal-utils.js"></script>
+    <script src="assets/js/success.js"></script>
+  </body>
+</html>

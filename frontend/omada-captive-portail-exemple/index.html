@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RadiusDesk Omada Portal</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <div id="portal" class="container">
+      <header class="portal-header">
+        <img id="logo" src="" alt="Logo" class="logo hidden" />
+        <div>
+          <h1 id="brandName">Loading…</h1>
+          <p id="brandSubtitle"></p>
+        </div>
+      </header>
+
+      <section id="alerts">
+        <div id="alertWarn" class="alert alert-warning hidden"></div>
+        <div id="alertInfo" class="alert alert-info hidden"></div>
+      </section>
+
+      <section class="card" id="loginCard">
+        <h2 id="loginTitle">Connectez-vous</h2>
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="username">Identifiant</label>
+            <input type="text" id="username" autocomplete="username" required />
+          </div>
+          <div class="form-group">
+            <label for="password">Mot de passe</label>
+            <input type="password" id="password" autocomplete="current-password" required />
+          </div>
+          <div class="form-group checkbox">
+            <label class="voucher-label">
+              <input type="checkbox" id="voucherMode" />
+              <span id="voucherLabelText">Mode voucher (username = mot de passe)</span>
+            </label>
+          </div>
+          <p class="consent" id="consentText">
+            En vous connectant vous acceptez les conditions d'utilisation.
+          </p>
+          <button id="btnConnect" type="submit">Connexion</button>
+        </form>
+      </section>
+
+      <footer id="footer" class="portal-footer">
+        <p id="footerText"></p>
+      </footer>
+    </div>
+
+    <script src="assets/js/portal-utils.js"></script>
+    <script src="assets/js/main.js"></script>
+  </body>
+</html>
