@@ -24,7 +24,7 @@ Ce mémo consolide (1) l’état actuel des flux RadiusDesk/FreeRADIUS dans `rdc
 
 | Capability               | Mikrotik (actuel)                                                                                  | Omada (cible)                                                                                                                                                                              | Écart                                                                                                                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth portail             | Hotspot ou PPPoE via RADIUS standard, rien à faire côté RouterOS (Access‑Accept suffit).           | Mode cible : **Hotspot Omada + “RADIUS Server”** avec notre FreeRADIUS/RadiusDesk comme NAS, et page d’auth personnalisée via **“Import Customized Page”** (le contrôleur reste client RADIUS et gère l’Accounting standard). Mode alternatif : “External Portal” (cf. `docs/omada-ext-portal.md`) en HTTP pur, avec des limitations possibles côté accounting. L’OpenAPI northbound ne modélise pas ces flux et n’expose pas d’endpoint `/hotspot/extPortal/*`. | Le design “parfait Mikrotik‑like” consiste à utiliser Omada comme simple NAS RADIUS (auth + accounting) avec page importée, et à réserver l’OpenAPI aux opérations de gestion (liste de clients, déconnexion), comme on le fait avec l’API Mikrotik.               |
+| Auth portail             | Hotspot ou PPPoE via RADIUS standard, rien à faire côté RouterOS (Access‑Accept suffit).           | Mode cible : **Hotspot Omada + “RADIUS Server”** avec notre FreeRADIUS/RadiusDesk comme NAS, et page d’auth personnalisée via **“Import Customized Page”**. En variante, **Portal Customization = External Web Portal (HTTP/HTTPS)** avec `Authentication Type = RADIUS Server` actif : Omada continue d’interroger FreeRADIUS pour l’authentification et d’envoyer l’Accounting RADIUS standard. L’OpenAPI northbound ne modélise pas ces flux et n’expose pas d’endpoint `/hotspot/extPortal/*`. | Le design “parfait Mikrotik‑like” consiste à utiliser Omada comme simple NAS RADIUS (auth + accounting) – que la page soit importée ou externalisée – et à réserver l’OpenAPI aux opérations de gestion (liste de clients, déconnexion), comme on le fait avec l’API Mikrotik.               |
 | Fonction                          | MikroTik                                                                                          | Omada SDN / Cloud                                                                                                                                                               | Impact backend                                                                                                                                              |
 |-----------------------------------|---------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Détection session active          | `/ip/hotspot/active/print`, `/ppp/active/print` via `MikrotikApiComponent` (lignes 17-108).      | Utiliser l’Omada OpenAPI (**Client**) : `GET /openapi/v1/{omadacId}/sites/{siteId}/clients` (`getGridActiveClients`) + `GET /openapi/v1/{omadacId}/sites/{siteId}/clients/{clientMac}` (`getClientDetail`) pour lister les clients actifs. | Prévoir un éventuel `OmadaSessionsStore` si l’on doit persister la corrélation `authCode ⇔ username` issue du portail externe (non exposée telle quelle par l’OpenAPI). |
@@ -39,6 +39,21 @@ Ce mémo consolide (1) l’état actuel des flux RadiusDesk/FreeRADIUS dans `rdc
 
 
 ## 3. Architecture proposée pour l’intégration Omada
+
+### 3.0 Modes de portail Omada (Local vs External)
+
+- **Mode Local Web Portal (page interne/importée)** :
+  - Le contrôleur Omada héberge lui‑même la page de portail.
+  - La personnalisation peut se faire via “Import Customized Page” à partir d’un bundle statique, par exemple `frontend/omada-captive-portal-exemple` (projet de référence fourni par Omada, avec formulaires voucher/local user/RADIUS/form auth).
+  - Dans ce mode, notre projet `dev/captive-portail` peut servir de backend API ou de modèle UX, mais le HTML final est servi par Omada.
+- **Mode External Web Portal (HTTP/HTTPS)** :
+  - **Approche RadiusDesk native (cible actuelle)** : Omada redirige directement vers la Dynamic Login Page RadiusDesk via `https://<RD_HOST>/cake4/rd_cake/dynamic-details/omada-browser-detect?dynamic_key=<KEY>`. Le JS natif (`rdcore/login/cp/js/rdDynamic.js` + `rdConnect.js`) récupère les paramètres Omada (clientMac, ssidName, radioId…) depuis la query string, appelle `DynamicDetails::infoFor()` pour construire l’UI, puis parle directement à l’API Omada via `OmadaController::extPortalAuth()` sans passer par le portail Node/React.
+  - `Authentication Type = RADIUS Server` reste actif : Omada continue d’envoyer l’authentification et l’accounting RADIUS vers FreeRADIUS/RadiusDesk, indépendamment du fait que la page soit locale ou externe.
+
+Dans les deux modes, dès que `Authentication Type = RADIUS Server` est configuré :
+
+- Omada agit comme NAS RADIUS (auth + accounting) pour RadiusDesk.
+- `radacct` / `MacUsages` restent la source d’autorité pour l’usage, les quotas et la FUP.
 
 ### 3.1 Nouveaux services côté RadiusDesk (PHP)
 
@@ -135,14 +150,14 @@ Ce plan couvre les items demandés : analyse détaillée des flux RadiusDesk/Fre
   - Les déconnexions/Kick sont pilotées par l’API northbound Omada (OpenAPI) comme on le fait avec l’API RouterOS.
 - **Modes supportés** :
   - **Mode cible** : Hotspot Omada + “RADIUS Server” (FreeRADIUS/RadiusDesk) + “Import Customized Page”.
-  - **Mode optionnel** : External Portal Server (cf. `docs/omada-ext-portal.md`), avec une stratégie spécifique pour limiter les problèmes d’accounting.
+  - **Mode optionnel** : External Portal Server (cf. `docs/omada-ext-portal.md`) avec `Authentication Type = RADIUS Server` actif : la signalisation RADIUS (auth + accounting) reste gérée par Omada vers FreeRADIUS/RadiusDesk, seule la page d’auth est externalisée.
 - **Portée** :
   - Spécifier la page de portail importée côté Omada (Hotspot + RADIUS).
-  - Décrire l’option External Portal et les adaptations nécessaires pour l’accounting.
+  - Décrire l’option External Portal et les adaptations nécessaires pour l’UX et le flux HTTP, sans remettre en cause le rôle central de `radacct` / `MacUsages` pour l’accounting.
   - Lister les modifications RadiusDesk (CakePHP + FreeRADIUS).
   - Lister les modifications backend du portail Node (API de connexion, usage, déconnexion).
 
-### G6.2 Portail Hotspot + RADIUS (mode cible)
+### G6.2 Portail Hotspot + RADIUS (mode optione)
 
 #### G6.2.1 Configuration Omada cible
 
@@ -156,6 +171,8 @@ Ce plan couvre les items demandés : analyse détaillée des flux RadiusDesk/Fre
   - Héberger la logique UI (login/voucher) mais laisser la décision d’Accept/Reject à FreeRADIUS.
   - Transmettre au backend portail les paramètres Omada utiles : `clientMac`, `site`, `radioId`, `ssidName`/`vid`, éventuellement un identifiant de session Omada si disponible.
   - Supporter un mode “multi‑NAS” : la même page peut être importée sur plusieurs SSID/sites avec des paramètres dynamiques.
+
+> **Remarque** : le dossier `frontend/omada-captive-portal-exemple` (lorsqu’il est présent dans l’arborescence) représente un exemple de portail local compatible Omada. Il doit être conservé comme référence technique/UX pour le mode Local Web Portal et ne doit pas être cassé par les évolutions du projet `dev/captive-portail`.
 
 #### G6.2.2 Exigences UI/UX de la page importée
 
@@ -187,22 +204,20 @@ Ce plan couvre les items demandés : analyse détaillée des flux RadiusDesk/Fre
   - Stocker la corrélation `{clientMac, site, radacctId, requestId}` dans `OmadaSessionStore`.
   - Pouvoir retrouver la session Omada à partir de `clientMac` pour déclencher un kick via OpenAPI.
 
-### G6.3 External Portal Omada (mode optionnel)
+### G6.3 External Portal Omada (mode cible)
 
 #### G6.3.1 Rappel des contraintes
 
 - External Portal décrit dans `docs/omada-ext-portal.md` :
   - Flux HTTP `extPortal/auth` + cookie jar opérateur.
   - Omada décide d’ouvrir/fermer la session en fonction de la réponse du portail.
-  - L’accounting RADIUS standard peut être **moins direct** (le NAS ne fait pas forcément la même séquence qu’en mode RADIUS Server).
+  - Dès lors que `Authentication Type = RADIUS Server` est activé, Omada continue d’émettre les paquets RADIUS **Accounting** (Start / Interim‑Update / Stop) vers FreeRADIUS/RadiusDesk, exactement comme en mode portail local.
 
-#### G6.3.2 Stratégie pour préserver l’accounting
+#### G6.3.2 Accounting et implications pour RadiusDesk
 
-- **Objectif** : garder un `radacct` cohérent même en External Portal.
-- Pistes à combiner :
-  - S’assurer que le contrôleur Omada continue d’interroger FreeRADIUS pour l’authentification RADIUS (si configuration hybride possible).
-  - À défaut, utiliser `extPortal/auth` uniquement pour un sous‑ensemble d’offres (ou comme fallback), et privilégier Hotspot+RADIUS pour la production.
-  - Exploiter les vues Omada (OpenAPI `Client`/`Hotspot`) pour reconstruire un pseudo‑accounting complémentaire (durée de session, volume) et le rapprocher de `radacct` via `clientMac`.
+- **Constat** : en mode **Hotspot + RADIUS Server + External Web Portal**, `radacct` et `MacUsages` restent la source d’autorité pour l’usage (temps/data), comme en portail local.
+- Il n’est **pas nécessaire** de reconstruire un pseudo‑accounting à partir de l’OpenAPI Omada (`Client`/`Hotspot`) tant que le contrôleur continue d’agir comme NAS RADIUS vers FreeRADIUS.
+- Les profils simple/advanced/FUP, les quotas et la logique de FUP restent gérés par les attributs `Rd-*` et la pipeline RadiusDesk, sans changement de schéma pour `radacct`.
 - **Exigences frontend** :
   - Adapter les Dynamic Login Pages pour :
     - Gérer le cas où Omada redirige directement vers le portail externe (`/api/v2/hotspot/extPortal/auth`).
@@ -267,3 +282,194 @@ Ce plan couvre les items demandés : analyse détaillée des flux RadiusDesk/Fre
   - Compléter la documentation interne avec :
     - Guide de configuration Omada (Hotspot+RADIUS, Import Customized Page, External Portal en option).
     - Exemple de mapping entre `DynamicClients` Omada et la configuration du contrôleur.
+
+## Prompts d’implémentation Omada Hotspot ↔ RadiusDesk
+
+### Prompt G6.F1 — Consolidation du mode Local Web Portal
+
+**Contexte**  
+Omada est configuré en Hotspot avec `Authentication Type = RADIUS Server` et `Portal Customization = Local Web Portal` (page interne ou importée). Le bundle `frontend/omada-captive-portal-exemple` sert de base de portail local compatible Omada (voucher, local user, RADIUS, form auth…).
+
+**Objectif**  
+Consolider ce mode Local Web Portal en :
+- préservant `frontend/omada-captive-portal-exemple`,
+- documentant clairement son rôle et ses possibilités,
+- garantissant la compatibilité avec RadiusDesk/FreeRADIUS (auth + accounting).
+
+**Périmètre & fichiers concernés**  
+- `frontend/omada-captive-portal-exemple` (structure, README, assets).  
+- `docs/omada-radiusdesk-integration.md` (section modes Local/External).  
+- Éventuellement `docs/` annexes si besoin (guide d’intégration Omada).
+
+**Étapes d’implémentation**  
+1. Auditer le bundle `frontend/omada-captive-portal-exemple` (types d’auth supportés, paramètres attendus, hooks Omada).  
+2. Documenter son comportement dans `docs/omada-radiusdesk-integration.md` (modes supportés, limites, scénarios cibles).  
+3. Vérifier que la configuration Omada “Import Customized Page” avec ce bundle fonctionne en conjonction avec `Authentication Type = RADIUS Server` (auth + accounting RADIUS vers RadiusDesk).  
+4. Ajouter, si nécessaire, un guide succinct (README) dans `frontend/omada-captive-portal-exemple` expliquant comment builder et importer le bundle dans Omada.  
+
+**Contraintes**  
+- Ne pas casser le bundle existant : pas de refacto profond ni de dépendance directe avec le monorepo `frontend/`.  
+- Ne pas introduire de logique spécifique RadiusDesk dans ce bundle (il doit rester générique pour Omada).  
+
+**Critères d’acceptation / tests**  
+- Un opérateur peut :  
+  - builder/importer le bundle `omada-captive-portal-exemple` dans Omada,  
+  - s’authentifier (voucher/local user/RADIUS) et voir ses sessions apparaître dans `radacct`.  
+- La doc explique clairement comment configurer Omada pour ce mode (Hotspot + RADIUS Server + Local Web Portal).  
+
+---
+
+### Prompt G6.F2 — Implémenter le mode External Web Portal (HTTP/HTTPS)
+
+**Contexte**  
+Omada est configuré avec :  
+- `Authentication Type = RADIUS Server` (NAS Omada → FreeRADIUS/RadiusDesk),  
+- `Portal Customization = External Web Portal` vers l’URL publique du portail React/Node (`PORTAL_PUBLIC_URL`).  
+Le backend dispose déjà d’un client `omadaIntegration` pour `hotspot/login` / `extPortal/auth`, et le frontend récupère les paramètres Omada via `useOmadaParams`.
+
+**Objectif**  
+Rendre le mode External Web Portal pleinement fonctionnel en :  
+- orchestrant le flux complet (redirection Omada → portail → `/connect/:mode` → `extPortal/auth` → landing page),  
+- tout en conservant l’accounting RADIUS standard vers RadiusDesk.
+
+**Périmètre & fichiers concernés**  
+- Backend :  
+  - `backend/src/config.ts` (flag de mode External).  
+  - `backend/src/services/omadaIntegration.ts` (client HTTP Omada).  
+  - `backend/src/services/authService.ts` (orchestrateur connect + extPortal/auth).  
+  - `backend/src/routes/connect.ts` (endpoint `/connect/:mode`).  
+- Frontend :  
+  - `frontend/src/hooks/useOmadaParams.ts`.  
+  - `frontend/src/modules/dynamic/connectUtils.ts`.  
+  - `frontend/src/modules/dynamic/ConnectPanel.tsx`.  
+  - `frontend/src/pages/Home.tsx`.  
+- Documentation :  
+  - `docs/omada-ext-portal.md`.  
+  - `docs/omada-radiusdesk-integration.md` (sections G6.2 / G6.3).
+  - https://use1-omada-northbound.tplinkcloud.com/v3/api-docs 
+
+**Étapes d’implémentation**  
+1. **Configuration** :  
+   - Ajouter un flag `OMADA_EXTERNAL_PORTAL_ENABLED` dans `backend/src/config.ts` (déjà présent si ce prompt a été appliqué une première fois), par défaut `true`.  
+   - Documenter la variable dans `docs/omada-ext-portal.md` (section “Configuration serveur”).  
+2. **Flux backend** :  
+   - Dans `authService.connect`, valider les identifiants via RadiusDesk (`findPermanentUser`, `findVoucher`) et contrôler les paramètres Omada (`clientMac`, `site`, `radioId`).  
+   - Si `OMADA_EXTERNAL_PORTAL_ENABLED=true`, appeler `authorizeClient()` (service `omadaIntegration`) avec le payload `extPortal/auth` construit à partir des paramètres Omada + `accessToken`.  
+   - Gérer les erreurs Omada (`errorCode`, HTTP 401/4xx/5xx) en renvoyant une réponse JSON explicite au frontend.  
+3. **Flux frontend** :  
+   - Dans `Home.tsx`, continuer à récupérer les paramètres Omada (query) et à les injecter dans `ConnectPanel` via `omadaParams`.  
+   - Dans `connectUtils.buildOmadaPayload`, s’assurer que tous les champs nécessaires à `extPortal/auth` sont présents (`clientMac`, `site`, `radioId`, `time`, `authType`, `apMac/gatewayMac`, `ssidName/vid`, `redirectUrl`).  
+   - Dans `ConnectPanel`, bloquer la connexion si les paramètres Omada essentiels sont absents, afficher un message explicite, et envoyer `omada: omadaPayload` au backend.  
+4. **Redirection & UX** :  
+   - Côté backend, renvoyer `nextRedirect` (URL finale) dans `ConnectResult` :  
+     - soit `ctx.omada.redirectUrl` (reçu d’Omada),  
+     - soit `config.PORTAL_SUCCESS_URL` si on veut forcer la page Success locale.  
+   - Côté frontend, appliquer `nextRedirect` en y ajoutant `username` et `mac` comme query params pour diagnostics (sans casser la redirection Omada par défaut).  
+5. **Documentation** :  
+   - Mettre à jour `docs/omada-ext-portal.md` avec :  
+     - l’URL exacte à renseigner dans Omada (`PORTAL_PUBLIC_URL`),  
+     - les paramètres attendus,  
+     - l’explication que l’accounting reste RADIUS, et que `radacct` est la source d’autorité.  
+
+**Contraintes**   
+- Ne pas modifier la logique d’accounting côté RadiusDesk/FreeRADIUS (pas de pseudo‑accounting via OpenAPI).  
+- Supporter à la fois `http://` (lab) et `https://` (prod) dans la configuration External Web Portal.  
+
+**Critères d’acceptation / tests**  
+- Sur un contrôleur Omada configuré en External Web Portal :  
+  - un client est redirigé vers `PORTAL_PUBLIC_URL` avec les bons paramètres,  
+  - l’utilisateur saisit ses identifiants (permanent/voucher),  
+  - le backend valide via RadiusDesk et appelle `extPortal/auth`,  
+  - Omada autorise la session et envoie l’accounting RADIUS vers RadiusDesk (`radacct` mis à jour),  
+  - la redirection finale est cohérente (landing page Omada ou page Success locale ou notre page d'infocoso d'usage comme par defaut).  
+- Les erreurs Omada (auth refusée, timeout, session invalide) sont renvoyées au frontend avec un message lisible pour l’utilisateur.  
+
+---
+
+### Prompt G6.F3 — CoA / Kick Omada via OpenAPI + intégration RadiusDesk
+
+**Contexte**  
+Les kicks manuels dans RadiusDesk (page radaccts) doivent :  
+- fermer la session du client côté Omada (Hotspot),  
+- mettre à jour ou clôturer l’entrée `radacct` comme pour les autres NAS (Mikrotik, Coova…).  
+L’OpenAPI Omada expose plusieurs endpoints de déconnexion (`cancelAuthClient`, `disconnectHotspotAuthedClient`, `disconnectClient`).
+
+**Objectif**  
+Mettre en place un `OmadaCoaService` CakePHP + un raccord backend Node pour :  
+- déclencher les déconnexions Omada via OpenAPI,  
+- garder un fallback CoA RADIUS générique (`Disconnect-Request`) pour les cas d’échec.
+
+**Périmètre & fichiers concernés**  
+- CakePHP / RadiusDesk :  
+  - `cake4/rd_cake/src/Controller/Component/KickerComponent.php`.  
+  - `cake4/rd_cake/src/Controller/Component/OmadaApiComponent.php` (nouveau).  
+  - Tables `DynamicClients`.  
+- Backend Node :  
+  - `backend/src/services/radiusdeskIntegration.ts` (`kickSessions`).  
+  - Éventuels endpoints internes si nécessaire pour instrumenter les kicks.  
+- Doc :  
+  - `docs/omada-radiusdesk-integration.md` (section CoA).  
+
+**Étapes d’implémentation**  
+1. Ajouter dans RadiusDesk un type `OmadaPortal` dans les `DynamicClients` (avec `omadac_id`, `site_id`).  
+2. Créer `OmadaApiComponent` (CakePHP) pour encapsuler :  
+   - login OAuth2/OpenAPI,  
+   - appels `cancelAuthClient`, `disconnectHotspotAuthedClient`, `disconnectClient`.  
+3. Étendre `KickerComponent` :  
+   - pour les entrées `radacct` appartenant à un NAS de type Omada,  
+   - appeler `OmadaApiComponent->cancelAuthClient($omadacId, $siteId, $clientMac)` (puis éventuellement d’autres variantes),  
+   - en cas d’échec, retomber sur `kickByDisconnectRequest` (CoA RADIUS générique).  
+4. Instrumenter les kicks (métriques + logs) côté backend Node et/ou RadiusDesk (compteurs Prometheus, journaux).  
+
+**Contraintes**  
+- Ne pas modifier le comportement de kick pour les autres NAS (Mikrotik, Coova, Juniper…).  
+- Gérer proprement les erreurs OpenAPI (site inexistant, client introuvable, contrôleur indisponible…).  
+
+**Critères d’acceptation / tests**  
+- Depuis l’interface RadiusDesk (radaccts), déclencher un “kick” sur un client Omada :  
+  - la session est coupée côté Omada,  
+  - l’entrée `radacct` est mise à jour/fermée,  
+  - les métriques/logs de kick Omada sont visibles.  
+- Les kicks continuent de fonctionner pour les autres types de NAS sans régression.  
+
+---
+
+### Prompt G6.F4 — Tests et observabilité Omada ↔ RadiusDesk
+
+**Contexte**  
+L’intégration Omada ↔ RadiusDesk implique plusieurs couches : RADIUS, OpenAPI, portail HTTP, backend Node, front React. Il est nécessaire d’avoir une couverture de tests et une observabilité suffisantes pour diagnostiquer les incidents (auth, accounting, CoA…).
+
+**Objectif**  
+Mettre en place une stratégie de tests et d’observabilité couvrant :  
+- les flux de connexion (Local & External Web Portal),  
+- l’accounting (radacct, MacUsages),  
+- les déconnexions (CoA RADIUS + OpenAPI Omada),  
+- les erreurs et timeouts.
+
+**Périmètre & fichiers concernés**  
+- Backend :  
+  - tests unitaires/integration (`backend/tests` ou équivalent).  
+  - instrumentation metrics/logs (`backend/src/utils/metrics.ts`, logger).  
+- Frontend :  
+  - tests unitaires (Vitest) sur `ConnectPanel`, `useOmadaParams`, pages `Home`/`Success`.  
+  - tests e2e (Playwright) pour les scénarios Omada.  
+- RadiusDesk :  
+  - tests PHPUnit ciblés sur `KickerComponent`, `OmadaApiComponent`.  
+- Docs :  
+  - `docs/omada-radiusdesk-integration.md` (section G6.6).  
+
+**Étapes d’implémentation**  
+1. Définir les scénarios de test clés (connexion OK/KO, quota atteint, FUP actif, kick Omada, erreur OpenAPI).  
+2. Implémenter les tests unitaires backend (Node) pour les services `authService`, `omadaIntegration`, `radiusdeskIntegration`.  
+3. Implémenter les tests unitaires frontend (React) pour `ConnectPanel` et `useOmadaParams` en simulant des URLs Omada.  
+4. Ajouter ou compléter des tests e2e Playwright simulant un parcours Omada (redirection → login → succès → déconnexion).  
+5. Ajouter des métriques Prometheus pertinentes (latence des appels OpenAPI/RADIUS, compteurs de succès/erreur, kicks, etc.) et s’assurer qu’elles sont exposées dans les endpoints de metrics.  
+
+**Contraintes**  
+- Ne pas rendre les tests dépendants d’un contrôleur Omada réel : utiliser des mocks/stubs pour l’API Omada.  
+- Garder les tests rapides et reproductibles en CI.  
+
+**Critères d’acceptation / tests**  
+- La suite de tests (backend + frontend) passe sans erreur (`npm test`, `npm run test` côté frontend).  
+- Les scénarios Omada essentiels sont couverts par au moins un test automatisé (unitaire ou e2e).  
+- Les métriques/logs permettent de diagnostiquer un échec de connexion ou de déconnexion Omada sans instrumentation manuelle supplémentaire.  

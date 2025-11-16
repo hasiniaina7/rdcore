@@ -5,7 +5,8 @@ import DynamicKeyHelp from '../modules/dynamic/DynamicKeyHelp';
 import DynamicShell from '../modules/dynamic/DynamicShell';
 import useOmadaParams from '../hooks/useOmadaParams';
 
-const IMPORTANT_PARAMS = ['clientMac', 'site', 'radioId', 'ssidName'];
+// Paramètres Omada minimaux pour autoriser le formulaire
+const IMPORTANT_PARAMS = ['clientMac', 'radioId', 'ssidName'];
 
 export default function Home() {
   const { data, isLoading, error, supportHref, cacheStatus } = useDynamicDetail();
@@ -20,6 +21,13 @@ export default function Home() {
     () => Object.entries(params).filter(([, value]) => Boolean(value)),
     [params]
   );
+
+  // Clé dynamique principale : priorité au paramètre ?key= fourni par RadiusDesk.
+  // À défaut, on peut dériver une clé déterministe à partir de {site, ssidName}
+  // pour permettre un mapping automatique côté RadiusDesk (optionnel).
+  const dynamicKey =
+    params.key || (params.site && params.ssidName ? `${params.site}:${params.ssidName}` : undefined);
+
   const missingOmadaFields = IMPORTANT_PARAMS.filter((field) => !params[field as keyof typeof params]);
 
   return (
@@ -48,7 +56,7 @@ export default function Home() {
             photos={data.photos}
             gallery={data.gallery}
             omadaParams={params}
-            dynamicKey={params.key}
+            dynamicKey={dynamicKey}
             cacheStatus={cacheStatus}
             missingOmada={missingOmadaFields}
           />

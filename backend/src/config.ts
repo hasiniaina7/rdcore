@@ -14,6 +14,11 @@ const envSchema = z.object({
   OMADA_PASSWORD: z.string(),
   PORTAL_PUBLIC_URL: z.string().url(),
   PORTAL_SUCCESS_URL: z.string().url(),
+  OMADA_EXTERNAL_PORTAL_ENABLED: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((value) => value === 'true'),
   LOG_LEVEL: z.string().default('info'),
   DEFAULT_LANGUAGE: z.string().default('fr_FR'),
   ENABLE_SSE_USAGE: z

@@ -7,7 +7,7 @@ const router = Router();
 
 const omadaSchema = z.object({
   clientMac: z.string(),
-  site: z.string(),
+  site: z.string().optional(),
   radioId: z.number(),
   time: z.number().default(() => Date.now() * 1000),
   authType: z.number().default(4),

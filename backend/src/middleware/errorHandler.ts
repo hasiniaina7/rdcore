@@ -2,7 +2,8 @@ import { ErrorRequestHandler } from 'express';
 import createError from 'http-errors';
 import logger from '../utils/logger';
 
-const errorHandler: ErrorRequestHandler = (err, req, res) => {
+// 4 arguments obligatoires pour qu'Express reconnaisse bien le middleware d'erreur.
+const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   const message = typeof err.message === 'string' && err.message.length > 0 ? err.message : 'Internal Server Error';
   const httpErr = createError(status, message);

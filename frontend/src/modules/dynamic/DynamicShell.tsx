@@ -51,12 +51,14 @@ export default function DynamicShell({
   missingOmada = [],
 }: Props) {
   const { t, i18n } = useTranslation();
-  const [panel, setPanel] = useState<Panel>('details');
+  const hasOmadaContext = Boolean(omadaParams.clientMac && omadaParams.radioId && omadaParams.ssidName);
+  const [panel, setPanel] = useState<Panel>(() => (hasOmadaContext ? 'connect' : 'details'));
   const [isSideMenuOpen, setSideMenuOpen] = useState(false);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [connectVisible, setConnectVisible] = useState(false);
 
-  const delaySeconds = clampDelay(settings?.show_screen_delay);
+  // En mode Omada External Portal (contexte complet), on affiche le panneau de connexion immédiatement.
+  const delaySeconds = hasOmadaContext ? 0 : clampDelay(settings?.show_screen_delay);
 
   useEffect(() => {
     if (delaySeconds === 0) {

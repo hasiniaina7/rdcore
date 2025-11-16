@@ -18,31 +18,47 @@ export async function connect(ctx: ConnectRequestContext, requestId?: string): P
   const basePayload = { ...ctx.omada };
   basePayload.accessToken = ctx.omada.accessToken || ctx.username || ctx.voucherCode || ctx.mac || rid;
   ensure(basePayload.clientMac, 'clientMac is required');
-  ensure(basePayload.site, 'site is required');
   ensure(basePayload.radioId !== undefined, 'radioId is required');
 
-  switch (ctx.mode) {
-    case 'permanent':
-      ensure(ctx.username, 'username required');
-      ensure(ctx.password, 'password required');
-      await findPermanentUser(ctx.username!);
-      break;
-    case 'voucher':
-      ensure(ctx.voucherCode, 'voucher code required');
-      await findVoucher(ctx.voucherCode!);
-      break;
-    case 'click':
-      ensure(ctx.dynamicKey, 'dynamic key required');
-      break;
-    case 'social':
-      ensure(ctx.username, 'social username required');
-      break;
-    default:
-      throw createError(400, 'Unsupported mode');
+  // Validation côté RadiusDesk (PermanentUsers / Vouchers / DynamicKey)
+  try {
+    switch (ctx.mode) {
+      case 'permanent':
+        ensure(ctx.username, 'username required');
+        ensure(ctx.password, 'password required');
+        await findPermanentUser(ctx.username!);
+        break;
+      case 'voucher':
+        ensure(ctx.voucherCode, 'voucher code required');
+        await findVoucher(ctx.voucherCode!);
+        break;
+      case 'click':
+        ensure(ctx.dynamicKey, 'dynamic key required');
+        break;
+      case 'social':
+        ensure(ctx.username, 'social username required');
+        break;
+      default:
+        throw createError(400, 'Unsupported mode');
+    }
+  } catch (error: unknown) {
+    logger.error({ error, requestId: rid, mode: ctx.mode }, 'RadiusDesk verification failed');
+    // Si l’erreur vient d’Axios (appel RadiusDesk), essayer de refléter le statut HTTP pour le frontend.
+    if (typeof error === 'object' && error && 'response' in error) {
+      const errObj = error as { response?: { status?: number; data?: { message?: string } } };
+      const status = errObj.response?.status || 502;
+      const msg = errObj.response?.data?.message || `RadiusDesk verification failed (HTTP ${status})`;
+      throw createError(status, msg);
+    }
+    throw createError(502, 'RadiusDesk verification failed');
   }
 
+  // Si le mode External Web Portal Omada est activé, on doit notifier le contrôleur via extPortal/auth.
+  // Sinon (par ex. mode portail local / page importée), on se contente de valider côté RadiusDesk/FreeRADIUS.
   try {
-    await authorizeClient(basePayload);
+    if (config.OMADA_EXTERNAL_PORTAL_ENABLED) {
+      await authorizeClient(basePayload);
+    }
     authRequestsTotal.inc({ mode: ctx.mode, status: 'success' });
     const result: ConnectResult = {
       status: 'accepted',

@@ -1,5 +1,7 @@
 export function buildOmadaPayload(params: Record<string, string | undefined>) {
-  if (!params.clientMac || !params.site || !params.radioId) {
+  // Pour le mode External Web Portal, Omada ne fournit pas toujours `site`,
+  // on se contente donc des paramètres strictement nécessaires côté portail.
+  if (!params.clientMac || !params.radioId) {
     return null;
   }
   const nowMicros = Date.now() * 1000;

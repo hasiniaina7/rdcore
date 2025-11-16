@@ -28,6 +28,33 @@ Paramètres typiques transmis au portail externe:
 
 Le portail doit conserver ces valeurs pour les relayer à `extPortal/auth`.
 
+## Accounting RADIUS (comportement Omada)
+
+Lorsque le portail est configuré avec :
+
+- `Authentication Type = RADIUS Server`, et
+- `Portal Customization = External Web Portal` (HTTP ou HTTPS),
+
+le contrôleur Omada continue de jouer le rôle de NAS RADIUS :
+
+- Authentification : émission des `Access-Request` / `Access-Accept` / `Access-Reject` vers FreeRADIUS/RadiusDesk.
+- Accounting : envoi des paquets `Accounting-Request` (Start / Interim‑Update / Stop) vers FreeRADIUS/RadiusDesk.
+
+Conséquences pour RadiusDesk :
+
+- Les tables `radacct` et `MacUsages` restent la source d’autorité pour l’usage (temps/data), comme en portail local.
+- Les profils simple/advanced/FUP (`Rd-*`) et la logique de quotas ne nécessitent aucun changement de schéma.
+
+## Configuration Omada ↔ portail externe
+
+- **URL External Web Portal** : renseigner dans Omada l’URL publique du portail React/Node, par exemple la valeur de `PORTAL_PUBLIC_URL` (racine du frontend).  
+- **HTTPS / HTTP** :
+  - En lab : `http://…` possible si le contrôleur Omada l’autorise.
+  - En production : privilégier `https://…` avec certificat valide (conforme à la politique TLS de l’infra).
+- **Backend Node** :
+  - La variable d’environnement `OMADA_EXTERNAL_PORTAL_ENABLED` (voir `backend/src/config.ts`) permet d’activer/désactiver l’appel `extPortal/auth` côté backend.
+  - Quand ce flag est `true`, le backend appelle `POST /api/v2/hotspot/extPortal/auth` après validation des identifiants via RadiusDesk.
+
 ## Étape 1 — Auth opérateur
 
 ```
