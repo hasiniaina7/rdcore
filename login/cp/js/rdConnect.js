@@ -7,10 +7,12 @@ var rdConnect = (function () {
 
         var h               = document.location.hostname;
         var isMikroTik      = getParameterByName('link_status') != "";
+        var isOmada         = (getParameterByName('clientMac') != "" && getParameterByName('ssidName') != "" && getParameterByName('radioId') != "");
         //!!!!
         var urlUse          = location.protocol+'//'+h+'/cake4/rd_cake/radaccts/get_usage.json'
         //!!!!
         var urlUam          = location.protocol+'//'+h+'/login/services/uam.php';
+        var urlOmadaAuth    = location.protocol+'//'+h+'/cake4/rd_cake/omada/ext-portal-auth.json';
         
         //Be sure this is the same as specified in FB e.g. IP or DNS!!
 	    var urlSocialBase   = location.protocol+'//'+h+'/cake4/rd_cake/third-party-auths/index.json'; 
@@ -139,21 +141,29 @@ var rdConnect = (function () {
 
             
             //==== END Connect Events ====
-        
-            if(uamIp == undefined){
-                if(testForHotspot()){
+
+            // Cas Omada External Portal : on ne parle pas au NAS (Coova/Mikrotik),
+            // on se contente d’afficher la fenêtre de connexion.
+            if (isOmada) {
+                fDebug("Omada context detected, skipping hotspot detection");
+                window.rdDynamic.showConnect();
+                return;
+            }
+
+            if (uamIp == undefined) {
+                if (testForHotspot()) {
                     fDebug("It is a hotspot, now check if connected or not...");
-                    
-				    if(cDynamicData.settings.usage_show_check){
-					    timeUntilUsage = cDynamicData.settings.usage_refresh_interval;
-					    usageInterval  = timeUntilUsage;
-				    }
+
+                    if (cDynamicData.settings.usage_show_check) {
+                        timeUntilUsage = cDynamicData.settings.usage_refresh_interval;
+                        usageInterval = timeUntilUsage;
+                    }
                     refresh(true);
-                }else{
+                } else {
                     fDebug("It is NOT a hotspot");
                     window.rdDynamic.showNotHotspot();
-                }  
-            }else{
+                }
+            } else {
                 refresh(true);  //Already established we are a hotspot, simply refresh
             }
             
@@ -883,11 +893,59 @@ $$('sliderData').refresh();
 			
 			
 			showOverlay();
-         	if (isMikroTik) {
+            // Flux Omada External Portal : on ne parle pas au NAS, on délègue à OmadaController
+            if (isOmada) {
+                omadaConnect();
+            } else if (isMikroTik) {
                 login(password);
             } else {
                 getLatestChallenge();
             }  
+        }
+        
+        var omadaConnect = function () {
+            showFeedback(i18n('sPlease_wait'));
+
+            var dynamic_key = getParameterByName('dynamic_key');
+            if (dynamic_key == "") {
+                dynamic_key = getParameterByName('key');
+            }
+
+            var payload = {
+                username    : decodeURIComponent(userName || ''),
+                password    : password || '',
+                voucher     : ($$('voucher') != undefined) ? $$('voucher').getValue() : '',
+                dynamic_key : dynamic_key,
+                clientMac   : getParameterByName('clientMac'),
+                apMac       : getParameterByName('apMac'),
+                gatewayMac  : getParameterByName('gatewayMac'),
+                ssidName    : getParameterByName('ssidName'),
+                vid         : getParameterByName('vid'),
+                radioId     : getParameterByName('radioId'),
+                originUrl   : getParameterByName('originUrl'),
+                redirectUrl : getParameterByName('redirectUrl')
+            };
+
+            webix.ajax().timeout(ajaxTimeout).post(
+                urlOmadaAuth,
+                payload,
+                {
+                    error: function (text, data, XmlHttpRequest) {
+                        hideOverlay();
+                        showLoginError(i18n('sOmada_login_failed'));
+                    },
+                    success: function (text, data, XmlHttpRequest) {
+                        hideOverlay();
+                        var json = data.json();
+                        if (json.success) {
+                            var redir = (json.data && (json.data.redirect_url || json.data.redirectUrl)) || payload.originUrl || payload.redirectUrl || 'http://google.com';
+                            execRedirect(redir);
+                        } else {
+                            showLoginError(json.message || i18n('sOmada_login_failed'));
+                        }
+                    }
+                }
+            );
         }
         
         var getLatestChallenge = function(){
@@ -1858,4 +1916,3 @@ $$('sliderData').refresh();
         }   
   }
 })();
-

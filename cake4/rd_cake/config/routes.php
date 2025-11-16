@@ -55,6 +55,11 @@ return static function (RouteBuilder $routes) {
          */
         $builder->connect('/', ['controller' => 'Pages', 'action' => 'display', 'home']);
 
+        $builder->connect(
+            '/omada/ext-portal-auth',
+            ['controller' => 'Omada', 'action' => 'extPortalAuth']
+        )->setMethods(['GET', 'POST']);
+
         /*
          * ...and connect the rest of 'Pages' controller's URLs.
          */

@@ -7,8 +7,19 @@ var sConnect = (function () {
         
         var h               = document.location.hostname;
         var isMikroTik      = getParameterByName('link_status') != "";
+        var dynamicKeyRaw   = getParameterByName('dynamic_key');
+        if(dynamicKeyRaw == ""){
+            dynamicKeyRaw = getParameterByName('key');
+        }
+        var dynamicKeyLower = (dynamicKeyRaw || '').toLowerCase();
+        var omadaParamDetected = (getParameterByName('clientMac') != "" &&
+                                 getParameterByName('ssidName')  != "" &&
+                                 getParameterByName('radioId')   != "");
+        var isOmada         = (omadaParamDetected || (dynamicKeyLower === 'omada'));
+        console.log('Omada detection', {omadaParamDetected: omadaParamDetected, dynamicKey: dynamicKeyLower, isOmada: isOmada});
         var urlUse          = location.protocol+'//'+h+'/cake4/rd_cake/radaccts/get_usage.json'
         var urlUam          = 'uam.php'
+        var urlOmadaAuth    = location.protocol+'//'+h+'/cake4/rd_cake/omada/ext-portal-auth.json';
         
         var retryCount      = 4;
         var currentRetry    = 0;
@@ -34,6 +45,9 @@ var sConnect = (function () {
         var cDynamicData    = undefined;
         var redirect_check 	= false;
         var redirect_url    = undefined;
+        var omadaConfig     = undefined;
+        var omadaDefaultHost= 'omada.techzone.lat';
+        var lastVoucherValue= undefined;
 
         if(co.cDynamicData != undefined){
             cDynamicData = co.cDynamicData;
@@ -130,20 +144,90 @@ var sConnect = (function () {
                 });
             }
                         
-            if(uamIp == undefined){
+            // Cas Omada External Portal : pas de uamip / link_status, on ne teste pas le hotspot,
+            // on affiche directement la modale de login et on réaffecte le bouton Connect.
+            if (isOmada) {
+                initOmadaMode();
+                return;
+            }
+
+            if (uamIp == undefined) {
                 fDebug("First time hotspot test");
-                if(testForHotspot()){
+                if (testForHotspot()) {
                     fDebug("It is a hotspot, now check if connected or not...");                 
                     refresh(true);
-                }else{
+                } else {
                     fShowError(i18n('sPlease_connect_through_a_valid_Hotspot'));
                     fDebug("It is NOT a hotspot");
                 }  
-            }else{
+            } else {
                 refresh(true);  //Already established we are a hotspot, simply refresh
             }
             
         }
+        
+        var initOmadaMode = function(){
+            fDebug("Omada context detected, skipping hotspot detection");
+            omadaConfig = buildOmadaConfig();
+            $("#btnConnect").off("click", onBtnConnectClick);
+            $("#btnConnect").on("click", onOmadaConnectClick);
+            $('#modalLogin').modal('show');
+            if((omadaConfig == undefined) || (omadaConfig.submitUrl == undefined)){
+                fShowError('Missing Omada target / port parameters');
+                $("#btnConnect").attr('disabled', true);
+            }
+        };
+        
+        var isIpv4Address = function(value){
+            if((value === undefined) || (value === null)){
+                return false;
+            }
+            return /^(\d{1,3}\.){3}\d{1,3}$/.test(value);
+        };
+
+        var buildOmadaConfig = function(){
+            var scheme      = getParameterByName('scheme') || location.protocol.replace(':','');
+            scheme          = scheme.replace(/:$/, '');
+            var target      = getParameterByName('target');
+            var targetPort  = getParameterByName('targetPort') || getParameterByName('serverPort');
+            var hostOverride= getParameterByName('controllerHost');
+            if(hostOverride == ""){
+                hostOverride = getParameterByName('hostname');
+            }
+            var targetHost  = target;
+            if((hostOverride !== '') && (!isIpv4Address(hostOverride))){
+                targetHost = hostOverride;
+            }
+            if((targetHost == '' || isIpv4Address(targetHost)) && omadaDefaultHost !== ''){
+                targetHost = omadaDefaultHost;
+            }
+            if(targetPort == ''){
+                targetPort = '8843';
+            }
+            var submitUrl   = undefined;
+            if((targetHost !== '') && (targetPort !== '')){
+                submitUrl = scheme+'://'+targetHost+':'+targetPort+'/portal/radius/browserauth';
+            }
+            return {
+                submitUrl   : submitUrl,
+                scheme      : scheme || 'https',
+                target      : targetHost,
+                targetPort  : targetPort,
+                originUrl   : getParameterByName('originUrl') || getParameterByName('redirectUrl') || '',
+                params      : {
+                    clientMac   : getParameterByName('clientMac'),
+                    clientIp    : getParameterByName('clientIp'),
+                    apMac       : getParameterByName('apMac'),
+                    gatewayMac  : getParameterByName('gatewayMac'),
+                    hostname    : getParameterByName('hostname'),
+                    ssidName    : getParameterByName('ssidName'),
+                    radioId     : getParameterByName('radioId'),
+                    vid         : getParameterByName('vid'),
+                    site        : getParameterByName('site'),
+                    token       : getParameterByName('token') || getParameterByName('t')
+                }
+            };
+        };
         
         var fDebug  = function(message){  
             if(cDebug){
@@ -1216,6 +1300,35 @@ var sConnect = (function () {
                 getLatestChallenge(); 
             }                  
         }
+        
+        var prepareLoginCredentials = function(auto_suffix_check, auto_suffix){
+            var credentialSource = null;
+            lastVoucherValue = undefined;
+            if($("#txtVoucher").length){
+                var voucher = $("#txtVoucher").val();
+                if((voucher !== undefined) && (voucher !== '')){
+                    userName = voucher.toLowerCase();
+                    password = voucher;
+                    lastVoucherValue = voucher;
+                    credentialSource = 'voucher';
+                }
+            }
+            if($("#txtUsername").length){
+                var tmpUsername = $("#txtUsername").val();
+                if((tmpUsername !== undefined) && (tmpUsername !== '')){
+                    if(auto_suffix_check){
+                        var re = new RegExp(".+@"+auto_suffix+"$");
+                        if(tmpUsername.match(re)==null){
+                            tmpUsername = tmpUsername+'@'+auto_suffix;
+                        }
+                    }
+                    userName = tmpUsername.toLowerCase();
+                    password = $("#txtPassword").val();
+                    credentialSource = 'username';
+                }
+            }
+            return credentialSource;
+        };
                  
         var onBtnConnectClick = function(event){  //Get the latest challenge and continue from there onwards....
             event.preventDefault();
@@ -1229,26 +1342,7 @@ var sConnect = (function () {
             currentRetry = 0;
                  
             $('#btnConnect').button('loading');
-            if($("#txtVoucher").length){ //It might not be there depending on the settings
-                if($("#txtVoucher").val() !== ''){
-                     userName = $("#txtVoucher").val().toLowerCase();
-                     password = $("#txtVoucher").val();
-                }
-            }
-            if($("#txtUsername").length){ //It might not be there depending on the settings
-                if($("#txtUsername").val() !== ''){
-                    userName = $("#txtUsername").val();
-                    if(auto_suffix_check){
-				        //Check if not already in username
-				        var re = new RegExp(".+@"+auto_suffix+"$");
-				        if(userName.match(re)==null){
-				            userName = userName+'@'+auto_suffix;
-				        }
-			        }
-                    userName = userName.toLowerCase();
-                    password = $("#txtPassword").val();
-                }           
-            }
+            prepareLoginCredentials(auto_suffix_check, auto_suffix);
 
             if (isMikroTik) {
                 login();
@@ -1256,6 +1350,107 @@ var sConnect = (function () {
                 getLatestChallenge();
             }    
         }
+
+        var onOmadaConnectClick = function(event){
+            if(event !== undefined){
+                event.preventDefault();
+            }
+            $('#alertWarn').removeClass('show');
+            currentRetry = 0;
+            $('#btnConnect').button('loading');
+            fDebug('Omada connect button clicked');
+
+            var auto_suffix_check   = cDynamicData.settings.auto_suffix_check;
+		    var auto_suffix			= cDynamicData.settings.auto_suffix;
+            var credentialSource    = prepareLoginCredentials(auto_suffix_check, auto_suffix);
+
+            if(credentialSource == null){
+                fShowError(i18n('sSupply_Username'));
+                loadingReset();
+                return;
+            }
+            if((credentialSource == 'username') && (($("#txtPassword").val() || '') === '')){
+                fShowError(i18n('sSupply_Password'));
+                loadingReset();
+                return;
+            }
+
+            var submitData = buildOmadaPayload();
+            if(submitData == null){
+                loadingReset();
+                return;
+            }
+            submitOmadaBrowserAuth(submitData);
+        };
+
+        var buildOmadaPayload = function(){
+            if(omadaConfig == undefined){
+                omadaConfig = buildOmadaConfig();
+            }
+            var dynamic_key = dynamicKeyRaw;
+            var payload = {
+                username    : userName || '',
+                password    : password || '',
+                voucher     : lastVoucherValue || '',
+                dynamic_key : dynamic_key,
+                clientMac   : getParameterByName('clientMac'),
+                clientIp    : getParameterByName('clientIp'),
+                apMac       : getParameterByName('apMac'),
+                gatewayMac  : getParameterByName('gatewayMac'),
+                ssidName    : getParameterByName('ssidName'),
+                radioId     : getParameterByName('radioId'),
+                vid         : getParameterByName('vid'),
+                site        : getParameterByName('site'),
+                originUrl   : getParameterByName('originUrl'),
+                redirectUrl : getParameterByName('redirectUrl'),
+                omadaTarget : omadaConfig.target,
+                omadaPort   : omadaConfig.targetPort,
+                omadaScheme : omadaConfig.scheme
+            };
+            if((payload.clientMac || '') === ''){
+                fShowError('Missing clientMac parameter in Omada request');
+                return null;
+            }
+            return payload;
+        };
+
+        var submitOmadaBrowserAuth = function(payload){
+            fDebug('Submitting Omada auth via backend proxy: '+JSON.stringify(payload));
+            $.ajax({
+                url: urlOmadaAuth,
+                method: 'POST',
+                dataType: 'json',
+                timeout: ajaxTimeout,
+                data: payload
+            })
+            .done(function(resp){
+                if(resp.success){
+                    var redirectCandidate = '';
+                    if(resp.data){
+                        redirectCandidate = resp.data.redirect_url || resp.data.redirectUrl || '';
+                    }
+                    if(redirectCandidate == ''){
+                        redirectCandidate = payload.redirectUrl || payload.originUrl || omadaConfig.originUrl || 'http://google.com';
+                    }
+                    fDebug('Omada backend success - redirect to '+redirectCandidate);
+                    window.location = redirectCandidate;
+                }else{
+                    var msg = resp.message || i18n('sOmada_login_failed');
+                    fShowError(msg);
+                    loadingReset();
+                    fDebug('Omada backend error: '+msg);
+                }
+            })
+            .fail(function(jqXHR){
+                var msg = i18n('sOmada_login_failed');
+                if(jqXHR.responseJSON && jqXHR.responseJSON.message){
+                    msg = jqXHR.responseJSON.message;
+                }
+                fShowError(msg);
+                fDebug('Omada backend AJAX failure: '+msg);
+                loadingReset();
+            });
+        };
                 
         var onBtnDisconnectClick = function(){
 	        $('#btnDisconnect').button('loading');

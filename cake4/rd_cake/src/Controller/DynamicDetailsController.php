@@ -8,6 +8,7 @@ use Cake\Core\Configure\Engine\PhpConfig;
 
 use Cake\Utility\Inflector;
 use Cake\I18n\FrozenTime;
+use Cake\Event\EventInterface;
 
 
 class DynamicDetailsController extends AppController{
@@ -35,20 +36,25 @@ class DynamicDetailsController extends AppController{
             'model' => $this->main_model
         ]);
         $this->loadComponent('JsonErrors');
-        $this->Authentication->allowUnauthenticated([
-            'infoFor', 
-            'idMe', 
+    }
+
+    public function beforeFilter(EventInterface $event)
+    {
+        parent::beforeFilter($event);
+        // Autoriser explicitement l’accès non authentifié aux actions de portail captif.
+        $this->Authentication->addUnauthenticatedActions([
+            'infoFor',
+            'idMe',
             'chilliSessionWrite',
             'chilliSessionRead',
             'chilliBrowserDetect',
             'mikrotikBrowserDetect',
             'ruckusBrowserDetect',
+            'omadaBrowserDetect',
             'previewChilliDesktop',
             'previewChilliMobile',
             'i18n',
-            'infoFor'
-        ]); 
-
+        ]);
     }
     
     public function infoFor(){
@@ -148,6 +154,14 @@ class DynamicDetailsController extends AppController{
 		$redir_to = $this->_doBrowserDetectFor('coova');
 		$this->response = $this->response->withHeader('Location', $redir_to);
         return $this->response;	
+    }
+    
+    public function omadaBrowserDetect(){
+        // Pour Omada, on réutilise la même logique que pour Coova/MikroTik :
+        // la Dynamic Login Page choisira le template en fonction de la dynamic_key.
+        $redir_to = $this->_doBrowserDetectFor('coova');
+        $this->response = $this->response->withHeader('Location', $redir_to);
+        return $this->response;
     }
     
     public function ruckusBrowserDetect(){  
