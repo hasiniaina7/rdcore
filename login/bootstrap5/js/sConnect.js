@@ -186,15 +186,22 @@ var sConnect = (function () {
         };
 
         var buildOmadaConfig = function(){
-            var scheme      = getParameterByName('scheme') || location.protocol.replace(':','');
-            scheme          = scheme.replace(/:$/, '');
-            var target      = getParameterByName('target');
-            var targetPort  = getParameterByName('targetPort') || getParameterByName('serverPort');
-            var hostOverride= getParameterByName('controllerHost');
-            if(hostOverride == ""){
-                hostOverride = getParameterByName('hostname');
+            var scheme              = getParameterByName('scheme') || location.protocol.replace(':','');
+            scheme                  = scheme.replace(/:$/, '');
+            var target              = getParameterByName('target');
+            var targetPort          = getParameterByName('targetPort') || getParameterByName('serverPort');
+            var controllerHostParam = getParameterByName('controllerHost');
+            var hostnameParam       = getParameterByName('hostname');
+            var timeParam           = getParameterByName('time');
+            if(timeParam == ''){
+                timeParam = getParameterByName('t');
             }
-            var targetHost  = target;
+            var authTypeParam       = getParameterByName('authType');
+            var hostOverride        = controllerHostParam;
+            if(hostOverride == ""){
+                hostOverride = hostnameParam;
+            }
+            var targetHost          = target;
             if((hostOverride !== '') && (!isIpv4Address(hostOverride))){
                 targetHost = hostOverride;
             }
@@ -209,11 +216,16 @@ var sConnect = (function () {
                 submitUrl = scheme+'://'+targetHost+':'+targetPort+'/portal/radius/browserauth';
             }
             return {
-                submitUrl   : submitUrl,
-                scheme      : scheme || 'https',
-                target      : targetHost,
-                targetPort  : targetPort,
-                originUrl   : getParameterByName('originUrl') || getParameterByName('redirectUrl') || '',
+                submitUrl       : submitUrl,
+                scheme          : scheme || 'https',
+                target          : targetHost,
+                targetPort      : targetPort,
+                rawTarget       : target,
+                controllerHost  : controllerHostParam,
+                hostnameParam   : hostnameParam,
+                timeParam       : timeParam,
+                authType        : authTypeParam,
+                originUrl       : getParameterByName('originUrl') || getParameterByName('redirectUrl') || '',
                 params      : {
                     clientMac   : getParameterByName('clientMac'),
                     clientIp    : getParameterByName('clientIp'),
@@ -1388,6 +1400,18 @@ var sConnect = (function () {
                 omadaConfig = buildOmadaConfig();
             }
             var dynamic_key = dynamicKeyRaw;
+            var authType = parseInt(omadaConfig.authType || getParameterByName('authType') || '4', 10);
+            if(isNaN(authType)){
+                authType = 4;
+            }
+            var omadaTime = omadaConfig.timeParam;
+            if((omadaTime == undefined) || (omadaTime == '')){
+                omadaTime = (new Date()).getTime()*1000;
+            }
+            omadaTime = parseInt(omadaTime,10);
+            if(isNaN(omadaTime)){
+                omadaTime = (new Date()).getTime()*1000;
+            }
             var payload = {
                 username    : userName || '',
                 password    : password || '',
@@ -1403,9 +1427,15 @@ var sConnect = (function () {
                 site        : getParameterByName('site'),
                 originUrl   : getParameterByName('originUrl'),
                 redirectUrl : getParameterByName('redirectUrl'),
+                nasid       : getParameterByName('nasid') || getParameterByName('nasId'),
                 omadaTarget : omadaConfig.target,
                 omadaPort   : omadaConfig.targetPort,
-                omadaScheme : omadaConfig.scheme
+                omadaScheme : omadaConfig.scheme,
+                omadaRawTarget     : omadaConfig.rawTarget,
+                omadaControllerHost: omadaConfig.controllerHost,
+                omadaHostname      : omadaConfig.hostnameParam,
+                omadaAuthType      : authType,
+                omadaTime          : omadaTime
             };
             if((payload.clientMac || '') === ''){
                 fShowError('Missing clientMac parameter in Omada request');
@@ -1431,6 +1461,11 @@ var sConnect = (function () {
                     }
                     if(redirectCandidate == ''){
                         redirectCandidate = payload.redirectUrl || payload.originUrl || omadaConfig.originUrl || 'http://google.com';
+                    }
+                    if(cDynamicData && cDynamicData.settings){
+                        if(cDynamicData.settings.redirect_check && (cDynamicData.settings.redirect_url || '') !== ''){
+                            redirectCandidate = cDynamicData.settings.redirect_url;
+                        }
                     }
                     fDebug('Omada backend success - redirect to '+redirectCandidate);
                     window.location = redirectCandidate;
