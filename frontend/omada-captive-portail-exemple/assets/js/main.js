@@ -1,6 +1,8 @@
 (function () {
   const { parseOmadaParams, pickLang, buildStrings } = window.PortalUtils;
   const MODES = { USER: 'user', VOUCHER: 'voucher' };
+  const AUTH_TYPE_EXTERNAL_RADIUS = '2';
+  const AUTH_TYPE_RADIUS_ACCESS = '8';
 
   const state = {
     context: {},
@@ -186,6 +188,11 @@
       payload.append('redirectUrl', state.context.originUrl);
     }
 
+    const authType = resolveAuthType();
+    if (authType) {
+      payload.append('authType', authType);
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
@@ -252,6 +259,15 @@
 
     successUrl.search = params.toString();
     window.location.assign(successUrl.toString());
+  }
+
+  function resolveAuthType() {
+    const rawType = state.context.authType || (state.context.raw && state.context.raw.authType);
+    if (rawType && (rawType === AUTH_TYPE_EXTERNAL_RADIUS || rawType === AUTH_TYPE_RADIUS_ACCESS)) {
+      return rawType;
+    }
+    // Default to EXTERNAL_RADIUS; allow overriding to RADIUS_ACCESS via query string if needed.
+    return AUTH_TYPE_EXTERNAL_RADIUS;
   }
 
   function toggleTheme() {

@@ -33,7 +33,7 @@ Importer ensuite `omada-captive-portail-exemple.zip` dans l’interface Omada (`
 
 1. **Paramètres Omada** : `portal-utils.js` lit `clientMac`, `ssidName`, `site`, `radioId`, `originUrl`, `link_login_only`, etc. fournis par Omada. Ces valeurs servent uniquement à construire l’URL de POST (Omada) ainsi que le lien Info Conso (`infoUrl=?` optionnel dans la query string).
 2. **Modes Utilisateur/Voucher** : `main.js` présente deux onglets. Chaque changement d’onglet vide les champs correspondants afin d’éviter toute confusion. En mode “Voucher”, le code est réutilisé comme `username/password` pour Omada.
-3. **Soumission** : le formulaire poste vers `link_login_only` (ou `/portal/radius/browserauth`). Pas de requête AJAX vers RadiusDesk → aucun problème de CORS.
+3. **Soumission** : le formulaire poste vers `link_login_only` (ou `/portal/radius/browserauth`). L’attribut `authType` vaut par défaut `2` (EXTERNAL_RADIUS) mais peut être forcé via `?authType=8` (RADIUS_ACCESS_TYPE) pour coller à la configuration hotspot. Pas de requête AJAX vers RadiusDesk → aucun problème de CORS.
 4. **Page de succès** : après Accept, `main.js` redirige vers `success.html` en transmettant `username/password/clientMac`. `success.js` lance un compte à rebours de 15 s, puis affiche un bouton et un lien qui ouvrent `https://hotspot.techzone.lat/portal/success?fromOmada=1&username=...&password=...`. L’Espace Info Conso (React) détecte `fromOmada=1` et affiche directement l’usage sans demander de login.
 
 ### Configuration Omada / RadiusDesk requise

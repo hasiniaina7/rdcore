@@ -64,7 +64,7 @@ Dans les deux modes, dès que `Authentication Type = RADIUS Server` est configur
   - `package.sh` : génère `omada-captive-portail-exemple.zip` (bundle importable dans l’UI Omada).
 - **Flux** :
   1. L’appareil est redirigé vers `index.html?...` avec tous les paramètres Omada.
-  2. `main.js` n’effectue plus aucun appel HTTP externe (pas de `dynamic-details`, donc aucun warning “Failed to fetch”). Seul le POST vers Omada est réalisé.
+  2. `main.js` n’effectue plus aucun appel HTTP externe (pas de `dynamic-details`, donc aucun warning “Failed to fetch”). Seul le POST vers Omada est réalisé et `authType` est forcé à `2 = EXTERNAL_RADIUS` (ou `8 = RADIUS_ACCESS_TYPE` si `?authType=8` est passé dans l’URL du contrôleur) afin d’éviter l’erreur “invalid authentication type”.
   3. Après Accept, `main.js` transmet `username/password/clientMac/infoUrl` à `success.html`.
   4. `success.js` affiche un compte à rebours de 15 s (pour laisser Omada finaliser l’ouverture) puis propose un bouton + un lien qui ouvrent l’Espace Info Conso (React) déjà présent dans ce dépôt. L’URL contient `fromOmada=1`, ce qui supprime la demande de re-saisie des identifiants sur `/success`.
 - **Pré-requis infra** :
