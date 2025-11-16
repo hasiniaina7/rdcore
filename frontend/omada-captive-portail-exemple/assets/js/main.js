@@ -1,11 +1,13 @@
 (function () {
-  const { RD_BASE, parseOmadaParams, pickLang, buildStrings, buildDynamicParams } = window.PortalUtils;
+  const { parseOmadaParams, pickLang, buildStrings } = window.PortalUtils;
+  const MODES = { USER: 'user', VOUCHER: 'voucher' };
+
   const state = {
     context: {},
-    dynamic: null,
-    loading: false,
     lang: 'fr',
     texts: {},
+    mode: null,
+    loading: false,
     credentials: null,
   };
 
@@ -16,12 +18,14 @@
     document.documentElement.lang = state.lang;
     hydrateStaticTexts();
     bootstrapEvents();
-    fetchDynamicDetail();
+    switchMode(MODES.USER);
   });
 
   function bootstrapEvents() {
-    const form = document.getElementById('loginForm');
-    form.addEventListener('submit', onSubmitLogin);
+    document.querySelectorAll('.login-tab').forEach((tab) => {
+      tab.addEventListener('click', () => switchMode(tab.dataset.mode === MODES.VOUCHER ? MODES.VOUCHER : MODES.USER));
+    });
+    document.getElementById('loginForm').addEventListener('submit', onSubmitLogin);
   }
 
   function hydrateStaticTexts() {
@@ -31,91 +35,73 @@
     document.getElementById('footerText').textContent = state.texts.footer;
     document.getElementById('btnConnect').textContent = state.texts.connectCta;
 
+    const usernameLabel = document.querySelector('label[for="username"]');
+    const passwordLabel = document.querySelector('label[for="password"]');
+    const voucherLabel = document.querySelector('label[for="voucherCode"]');
     const usernameField = document.getElementById('username');
     const passwordField = document.getElementById('password');
+    const voucherField = document.getElementById('voucherCode');
+    if (usernameLabel) usernameLabel.textContent = state.texts.usernameLabel;
+    if (passwordLabel) passwordLabel.textContent = state.texts.passwordLabel;
+    if (voucherLabel) voucherLabel.textContent = state.texts.voucherTab;
     usernameField.placeholder = state.texts.usernamePlaceholder;
     passwordField.placeholder = state.texts.passwordPlaceholder;
+    voucherField.placeholder = state.texts.voucherPlaceholder;
 
-    document.querySelector('label[for="username"]').textContent = state.texts.usernameLabel;
-    document.querySelector('label[for="password"]').textContent = state.texts.passwordLabel;
-
-    const voucherLabel = document.getElementById('voucherLabelText');
-    voucherLabel.textContent = state.texts.voucherToggle;
+    document.getElementById('tabUser').textContent = state.texts.userTab;
+    document.getElementById('tabVoucher').textContent = state.texts.voucherTab;
     document.getElementById('consentText').textContent = state.texts.consentLabel;
   }
 
-  async function fetchDynamicDetail() {
-    const params = buildDynamicParams(state.context);
-    try {
-      const resp = await fetch(
-        `${RD_BASE}/cake4/rd_cake/dynamic-details/info-for.json?${params.toString()}`,
-        { credentials: 'include' }
-      );
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      const payload = await resp.json();
-      if (!payload.success) {
-        throw new Error(payload.message || 'Dynamic detail unavailable');
-      }
-      state.dynamic = payload.data;
-      applyDynamicDetail();
-    } catch (error) {
-      showWarn(`Impossible de charger la configuration dynamique (${error.message})`);
-    }
-  }
+  function switchMode(nextMode) {
+    const previousMode = state.mode;
+    state.mode = nextMode;
 
-  function applyDynamicDetail() {
-    if (!state.dynamic) return;
-    const detail = state.dynamic.detail || {};
-    const settings = state.dynamic.settings || {};
-    const customLang = settings.language || detail.language;
-    const hasOverride = settings.texts_override && Object.keys(settings.texts_override).length > 0;
+    document.querySelectorAll('.login-tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.mode === state.mode);
+    });
+    document.querySelectorAll('.mode-panel').forEach((panel) => {
+      const isActive = panel.getAttribute('data-mode') === state.mode;
+      panel.classList.toggle('hidden', !isActive);
+    });
 
-    if (customLang || hasOverride) {
-      if (customLang) {
-        state.lang = pickLang(customLang);
-      }
-      state.texts = buildStrings(state.lang, settings.texts_override);
-      document.documentElement.lang = state.lang;
-      hydrateStaticTexts();
+    if (previousMode && previousMode !== state.mode) {
+      document.querySelectorAll('.mode-panel input').forEach((input) => {
+        input.value = '';
+      });
     }
 
-    const logo = detail.icon_file_name;
-    const brand = detail.name || 'Hotspot';
-    const subtitle =
-      detail.city || detail.country ? `${detail.city || ''} ${detail.country || ''}`.trim() : '';
-
-    const logoImg = document.getElementById('logo');
-    if (logo) {
-      logoImg.src = logo.startsWith('http') ? logo : `${RD_BASE}${logo}`;
-      logoImg.classList.remove('hidden');
+    if (state.mode === MODES.USER) {
+      document.getElementById('voucherCode').value = '';
+    } else {
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
     }
-    document.getElementById('brandName').textContent = brand;
-    document.getElementById('brandSubtitle').textContent = subtitle;
-
-    if (settings.user_login_check === false && settings.voucher_login_check) {
-      document.getElementById('loginTitle').textContent = state.texts.voucherOnlyTitle;
-      document.getElementById('voucherMode').checked = true;
-      document.getElementById('voucherMode').disabled = true;
-    }
-
-    if (settings.terms_text) {
-      document.getElementById('consentText').textContent = settings.terms_text;
-    }
-
-    const footer = detail.email ? `Support : ${detail.email}` : state.texts.supportFallback;
-    document.getElementById('footerText').textContent = footer;
   }
 
   async function onSubmitLogin(event) {
     event.preventDefault();
-    if (state.loading) return;
+    if (state.loading) {
+      return;
+    }
 
-    const username = document.getElementById('username').value.trim();
+    const mode = state.mode || MODES.USER;
+    const usernameField = document.getElementById('username');
     const passwordField = document.getElementById('password');
-    const voucherMode = document.getElementById('voucherMode').checked;
-    const password = voucherMode ? username : passwordField.value.trim();
+    const voucherField = document.getElementById('voucherCode');
+
+    let username = '';
+    let password = '';
+    let voucherCode = '';
+
+    if (mode === MODES.VOUCHER) {
+      voucherCode = voucherField.value.trim();
+      username = voucherCode;
+      password = voucherCode;
+    } else {
+      username = usernameField.value.trim();
+      password = passwordField.value.trim();
+    }
 
     if (!username || !password) {
       showWarn(state.texts.warnMissing);
@@ -124,14 +110,19 @@
 
     hideWarn();
     setLoading(true);
-    state.credentials = { username, voucherMode };
+    state.credentials = { username, password, voucherMode: mode === MODES.VOUCHER };
 
     try {
-      const res = await submitToOmada({ username, password, voucherMode });
-      if (res.success) {
-        redirectAfterSuccess(res.redirectUrl);
+      const result = await submitToOmada({
+        username,
+        password,
+        voucherMode: mode === MODES.VOUCHER,
+        voucher: voucherCode,
+      });
+      if (result.success) {
+        redirectAfterSuccess(result.redirectUrl);
       } else {
-        showWarn(res.message || 'Authentification refusée');
+        showWarn(result.message || 'Authentification refusée');
       }
     } catch (error) {
       showWarn(error.message || 'Connexion impossible');
@@ -150,22 +141,20 @@
     return `${scheme}://${host}${port ? `:${port}` : ''}/portal/radius/browserauth`;
   }
 
-  async function submitToOmada({ username, password, voucherMode }) {
+  async function submitToOmada({ username, password, voucherMode, voucher }) {
     const url = buildLoginUrl();
     const payload = new URLSearchParams();
     payload.append('username', username);
     payload.append('password', password);
-    if (voucherMode) {
-      payload.append('voucher', username);
+    if (voucherMode && voucher) {
+      payload.append('voucher', voucher);
     }
 
-    ['clientMac', 'clientIp', 'apMac', 'gatewayMac', 'ssidName', 'radioId', 'vid', 'site'].forEach(
-      (key) => {
-        if (state.context[key]) {
-          payload.append(key, state.context[key]);
-        }
+    ['clientMac', 'clientIp', 'apMac', 'gatewayMac', 'ssidName', 'radioId', 'vid', 'site'].forEach((key) => {
+      if (state.context[key]) {
+        payload.append(key, state.context[key]);
       }
-    );
+    });
 
     const authType = state.context.authType || state.context.raw.authType || '4';
     if (authType) {
@@ -197,11 +186,7 @@
       if ((json.errorCode ?? 0) === 0) {
         return {
           success: true,
-          redirectUrl:
-            json.result?.redirectUrl ||
-            state.context.originUrl ||
-            state.dynamic?.settings?.redirect_url ||
-            '',
+          redirectUrl: json.result?.redirectUrl || state.context.originUrl || '',
         };
       }
       const reply = json.msg || json.message;
@@ -226,25 +211,24 @@
     const successUrl = new URL('success.html', window.location.href);
     const params = new URLSearchParams();
     params.set('username', state.credentials.username);
-    params.set('dynamic_key', state.context.dynamicKey || 'omada');
+    params.set('password', state.credentials.password);
+    params.set('mode', state.mode || MODES.USER);
+    params.set('fromOmada', '1');
 
-    ['clientMac', 'ssidName', 'site', 'radioId', 'lang', 'nasid'].forEach((key) => {
-      if (state.context[key]) {
-        params.set(key, state.context[key]);
-      }
-    });
-
-    if (state.context.originUrl) {
-      params.set('originUrl', state.context.originUrl);
+    if (state.context.clientMac) {
+      params.set('clientMac', state.context.clientMac);
+    }
+    if (state.context.ssidName) {
+      params.set('ssidName', state.context.ssidName);
+    }
+    if (state.context.site) {
+      params.set('site', state.context.site);
+    }
+    if (state.context.infoUrl) {
+      params.set('infoUrl', state.context.infoUrl);
     }
     if (omadaRedirect) {
       params.set('redirectUrl', omadaRedirect);
-    }
-    if (state.context.sessionId) {
-      params.set('sessionId', state.context.sessionId);
-    }
-    if (state.context.clientIp) {
-      params.set('clientIp', state.context.clientIp);
     }
 
     successUrl.search = params.toString();

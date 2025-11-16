@@ -159,7 +159,8 @@ const resources = {
         sessionDuration: 'Duration',
         sessionIp: 'IP address',
         sessionOngoing: 'Ongoing',
-        disconnect: 'Disconnect'
+        disconnect: 'Disconnect',
+        omadaBridgeHint: 'You signed in via the Omada local portal. Usage data loads automatically without re-entering your credentials.'
       },
       support: {
         eyebrow: 'Need help?',
@@ -349,7 +350,8 @@ const resources = {
         sessionDuration: 'Durée',
         sessionIp: 'Adresse IP',
         sessionOngoing: 'En cours',
-        disconnect: 'Déconnecter'
+        disconnect: 'Déconnecter',
+        omadaBridgeHint: 'Vous venez de vous authentifier via le portail Omada local. L’usage se charge automatiquement, inutile de ressaisir vos identifiants.'
       },
       support: {
         eyebrow: 'Besoin d’aide ?',
@@ -539,7 +541,8 @@ const resources = {
         sessionDuration: 'Duración',
         sessionIp: 'Dirección IP',
         sessionOngoing: 'En curso',
-        disconnect: 'Desconectar'
+        disconnect: 'Desconectar',
+        omadaBridgeHint: 'Acabas de autenticarte mediante el portal local Omada. El uso se cargará automáticamente, sin volver a introducir tus credenciales.'
       },
       support: {
         eyebrow: '¿Necesitas ayuda?',

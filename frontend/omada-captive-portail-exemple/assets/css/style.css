@@ -66,10 +66,34 @@ p {
   font-size: 1rem;
 }
 
-.form-group.checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
+.login-tabs {
+  display: flex;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.login-tab {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #475569;
+  font-weight: 600;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.login-tab.active {
+  background: #0f172a;
+  color: #fff;
+}
+
+.mode-panel {
+  display: block;
 }
 
 .consent {
@@ -130,6 +154,36 @@ button.ghost {
   color: #1e3a8a;
 }
 
+.countdown {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.link-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  color: #0f172a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.link-button.disabled {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
 .hidden {
   display: none !important;
 }
@@ -188,6 +242,10 @@ dd {
     color: #0f172a;
   }
   button.ghost {
+    border-color: rgba(241, 245, 249, 0.4);
+    color: #f8fafc;
+  }
+  .link-button {
     border-color: rgba(241, 245, 249, 0.4);
     color: #f8fafc;
   }

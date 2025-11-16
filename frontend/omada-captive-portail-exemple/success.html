@@ -21,30 +21,22 @@
         <div id="alertInfo" class="alert alert-info hidden"></div>
       </section>
 
-      <section class="card" id="sessionCard">
-        <h2 id="successTitle">Session active</h2>
-        <p id="successSubtitle">Votre connexion est en place.</p>
-        <dl class="usage-grid">
-          <div>
-            <dt id="usageLabelTime">Temps utilisé</dt>
-            <dd id="usageTime">—</dd>
-          </div>
-          <div>
-            <dt id="usageLabelData">Données utilisées</dt>
-            <dd id="usageData">—</dd>
-          </div>
-          <div>
-            <dt id="usageLabelRemaining">Restant</dt>
-            <dd id="usageRemaining">—</dd>
-          </div>
-        </dl>
-        <p id="sessionDetails"></p>
+      <section class="card" id="waitingCard">
+        <h2 id="successTitle">Connexion validée</h2>
+        <p id="successSubtitle">Veuillez patienter avant d’ouvrir l’espace Info Conso.</p>
+        <div class="countdown" aria-live="polite">
+          <span id="countdownValue">15</span>s
+        </div>
+        <p id="countdownHint"></p>
       </section>
 
-      <section class="card actions">
-        <button id="btnContinue" type="button">Continuer vers Internet</button>
-        <button id="btnRefreshUsage" type="button" class="secondary">Actualiser l’usage</button>
-        <button id="btnBackLogin" type="button" class="ghost">Retour à la page de connexion</button>
+      <section class="card hidden" id="ctaCard">
+        <h2 id="infoReadyTitle">Info Conso</h2>
+        <p id="infoReadySubtitle">Votre tableau de bord s’ouvre dans un nouvel onglet sécurisé.</p>
+        <div class="actions-stack">
+          <button id="btnOpenInfo" type="button">Ouvrir l’info conso</button>
+          <a id="infoLink" href="#" target="_blank" rel="noopener" class="link-button">Ouvrir dans un nouvel onglet</a>
+        </div>
       </section>
 
       <footer id="footer" class="portal-footer">

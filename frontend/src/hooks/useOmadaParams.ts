@@ -15,7 +15,10 @@ const keys = [
   'key',
   'lang',
   'username',
+  'password',
   'mac',
+  'fromOmada',
+  'mode',
 ] as const;
 
 type OmadaParams = Partial<Record<(typeof keys)[number], string>>;

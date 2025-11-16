@@ -22,22 +22,29 @@
       </section>
 
       <section class="card" id="loginCard">
-        <h2 id="loginTitle">Connectez-vous</h2>
+        <div class="login-tabs" role="tablist">
+          <button type="button" class="login-tab active" data-mode="user" id="tabUser">Utilisateur</button>
+          <button type="button" class="login-tab" data-mode="voucher" id="tabVoucher">Voucher</button>
+        </div>
         <form id="loginForm">
-          <div class="form-group">
-            <label for="username">Identifiant</label>
-            <input type="text" id="username" autocomplete="username" required />
+          <div class="mode-panel" data-mode="user">
+            <div class="form-group">
+              <label for="username">Identifiant</label>
+              <input type="text" id="username" autocomplete="username" required />
+            </div>
+            <div class="form-group">
+              <label for="password">Mot de passe</label>
+              <input type="password" id="password" autocomplete="current-password" required />
+            </div>
           </div>
-          <div class="form-group">
-            <label for="password">Mot de passe</label>
-            <input type="password" id="password" autocomplete="current-password" required />
+
+          <div class="mode-panel hidden" data-mode="voucher">
+            <div class="form-group">
+              <label for="voucherCode">Code voucher</label>
+              <input type="text" id="voucherCode" autocomplete="off" />
+            </div>
           </div>
-          <div class="form-group checkbox">
-            <label class="voucher-label">
-              <input type="checkbox" id="voucherMode" />
-              <span id="voucherLabelText">Mode voucher (username = mot de passe)</span>
-            </label>
-          </div>
+
           <p class="consent" id="consentText">
             En vous connectant vous acceptez les conditions d'utilisation.
           </p>

@@ -24,11 +24,15 @@ export default function Success() {
   const [form, setForm] = useState({
     username: stored?.username || params.username || '',
     mac: stored?.mac || params.mac || params.clientMac || '',
-    password: stored?.password || '',
+    password: stored?.password || params.password || '',
   });
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isOmadaBridge = useMemo(
+    () => params.fromOmada === '1' || params.mode === 'omada',
+    [params.fromOmada, params.mode]
+  );
 
   const isOnline = useMemo(() => usage?.sessions?.some((session) => session.acctstoptime == null) ?? false, [usage]);
   const ipAddress = useMemo(() => {
@@ -91,48 +95,57 @@ export default function Success() {
           </span>
         </div>
         <p>{t('success.subtitle')}</p>
-        <form
-          data-testid="usage-form"
-          className="cp-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            refreshUsage();
-          }}
-        >
-          <label className="cp-field" htmlFor="usage-username">
-            {t('success.username')}
-            <input
-              id="usage-username"
-              className="cp-input"
-              value={form.username}
-              onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-              required
-            />
-          </label>
-          <label className="cp-field" htmlFor="usage-password">
-            {t('success.password')}
-            <input
-              id="usage-password"
-              className="cp-input"
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-              required
-            />
-          </label>
-          <label className="cp-field" htmlFor="usage-mac">
-            {t('success.mac')}
-            <input
-              id="usage-mac"
-              className="cp-input"
-              value={form.mac}
-              onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
-            />
-          </label>
-          <button type="submit" className="cp-btn cp-btn--primary" disabled={isLoading}>
-            {isLoading ? t('success.loading') : t('success.refresh')}
-          </button>
-        </form>
+        {isOmadaBridge ? (
+          <div className="cp-form" aria-live="polite">
+            <p>{t('success.omadaBridgeHint')}</p>
+            <button type="button" className="cp-btn cp-btn--ghost" disabled={isLoading} onClick={refreshUsage}>
+              {isLoading ? t('success.loading') : t('success.refresh')}
+            </button>
+          </div>
+        ) : (
+          <form
+            data-testid="usage-form"
+            className="cp-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              refreshUsage();
+            }}
+          >
+            <label className="cp-field" htmlFor="usage-username">
+              {t('success.username')}
+              <input
+                id="usage-username"
+                className="cp-input"
+                value={form.username}
+                onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="cp-field" htmlFor="usage-password">
+              {t('success.password')}
+              <input
+                id="usage-password"
+                className="cp-input"
+                type="password"
+                value={form.password}
+                onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="cp-field" htmlFor="usage-mac">
+              {t('success.mac')}
+              <input
+                id="usage-mac"
+                className="cp-input"
+                value={form.mac}
+                onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
+              />
+            </label>
+            <button type="submit" className="cp-btn cp-btn--primary" disabled={isLoading}>
+              {isLoading ? t('success.loading') : t('success.refresh')}
+            </button>
+          </form>
+        )}
       </article>
 
       {error && (
