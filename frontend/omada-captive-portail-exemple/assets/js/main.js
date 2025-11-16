@@ -9,6 +9,7 @@
     mode: null,
     loading: false,
     credentials: null,
+    forceLight: false,
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -28,6 +29,11 @@
     const form = document.getElementById('loginForm');
     if (form) {
       form.addEventListener('submit', onSubmitLogin);
+    }
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', toggleTheme);
+      updateThemeButton();
     }
   }
 
@@ -61,6 +67,7 @@
     setText('tabUser', state.texts.userTab);
     setText('tabVoucher', state.texts.voucherTab);
     setText('consentText', state.texts.consentLabel);
+    updateThemeButton();
   }
 
   function switchMode(nextMode) {
@@ -175,13 +182,6 @@
       }
     });
 
-    const authType = state.context.authType || state.context.raw.authType || '4';
-    if (authType) {
-      payload.append('authType', authType);
-    }
-    if (state.context.omadaTime) {
-      payload.append('time', state.context.omadaTime);
-    }
     if (state.context.originUrl) {
       payload.append('redirectUrl', state.context.originUrl);
     }
@@ -252,6 +252,18 @@
 
     successUrl.search = params.toString();
     window.location.assign(successUrl.toString());
+  }
+
+  function toggleTheme() {
+    state.forceLight = !state.forceLight;
+    document.body.classList.toggle('force-light', state.forceLight);
+    updateThemeButton();
+  }
+
+  function updateThemeButton() {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    btn.textContent = state.forceLight ? state.texts.themeToggleDark : state.texts.themeToggleLight;
   }
 
   function showWarn(message) {

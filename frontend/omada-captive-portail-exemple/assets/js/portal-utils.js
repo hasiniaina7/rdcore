@@ -8,7 +8,7 @@
       usernameLabel: 'Identifiant utilisateur',
       passwordLabel: 'Mot de passe',
       usernamePlaceholder: "Nom d'utilisateur",
-      passwordPlaceholder: 'Mot de passe RadiusDesk',
+      passwordPlaceholder: 'Mot de passe',
       voucherPlaceholder: 'Code voucher',
       connectCta: 'Connexion Omada',
       userTab: 'Utilisateur',
@@ -22,6 +22,8 @@
       infoReady: 'Info consommation disponible',
       infoButton: 'Ouvrir l’info conso',
       infoLink: 'Consultation dans un nouvel onglet',
+      themeToggleLight: 'Mode clair',
+      themeToggleDark: 'Mode sombre',
     },
     en: {
       loadingTitle: 'Loading…',
@@ -45,6 +47,8 @@
       infoReady: 'Usage dashboard is ready',
       infoButton: 'Open usage dashboard',
       infoLink: 'Open in new tab',
+      themeToggleLight: 'Light mode',
+      themeToggleDark: 'Dark mode',
     },
   };
 
