@@ -25,15 +25,25 @@
     document.querySelectorAll('.login-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchMode(tab.dataset.mode === MODES.VOUCHER ? MODES.VOUCHER : MODES.USER));
     });
-    document.getElementById('loginForm').addEventListener('submit', onSubmitLogin);
+    const form = document.getElementById('loginForm');
+    if (form) {
+      form.addEventListener('submit', onSubmitLogin);
+    }
   }
 
   function hydrateStaticTexts() {
-    document.getElementById('brandName').textContent = state.texts.loadingTitle;
-    document.getElementById('brandSubtitle').textContent = state.texts.loadingSubtitle;
-    document.getElementById('loginTitle').textContent = state.texts.loginTitle;
-    document.getElementById('footerText').textContent = state.texts.footer;
-    document.getElementById('btnConnect').textContent = state.texts.connectCta;
+    const setText = (id, value) => {
+      const node = document.getElementById(id);
+      if (node) {
+        node.textContent = value;
+      }
+    };
+
+    setText('brandName', state.texts.loadingTitle);
+    setText('brandSubtitle', state.texts.loadingSubtitle);
+    setText('loginTitle', state.texts.loginTitle);
+    setText('footerText', state.texts.footer);
+    setText('btnConnect', state.texts.connectCta);
 
     const usernameLabel = document.querySelector('label[for="username"]');
     const passwordLabel = document.querySelector('label[for="password"]');
@@ -44,13 +54,13 @@
     if (usernameLabel) usernameLabel.textContent = state.texts.usernameLabel;
     if (passwordLabel) passwordLabel.textContent = state.texts.passwordLabel;
     if (voucherLabel) voucherLabel.textContent = state.texts.voucherTab;
-    usernameField.placeholder = state.texts.usernamePlaceholder;
-    passwordField.placeholder = state.texts.passwordPlaceholder;
-    voucherField.placeholder = state.texts.voucherPlaceholder;
+    if (usernameField) usernameField.placeholder = state.texts.usernamePlaceholder;
+    if (passwordField) passwordField.placeholder = state.texts.passwordPlaceholder;
+    if (voucherField) voucherField.placeholder = state.texts.voucherPlaceholder;
 
-    document.getElementById('tabUser').textContent = state.texts.userTab;
-    document.getElementById('tabVoucher').textContent = state.texts.voucherTab;
-    document.getElementById('consentText').textContent = state.texts.consentLabel;
+    setText('tabUser', state.texts.userTab);
+    setText('tabVoucher', state.texts.voucherTab);
+    setText('consentText', state.texts.consentLabel);
   }
 
   function switchMode(nextMode) {
@@ -72,10 +82,13 @@
     }
 
     if (state.mode === MODES.USER) {
-      document.getElementById('voucherCode').value = '';
+      const voucherInput = document.getElementById('voucherCode');
+      if (voucherInput) voucherInput.value = '';
     } else {
-      document.getElementById('username').value = '';
-      document.getElementById('password').value = '';
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      if (usernameInput) usernameInput.value = '';
+      if (passwordInput) passwordInput.value = '';
     }
   }
 
@@ -95,12 +108,12 @@
     let voucherCode = '';
 
     if (mode === MODES.VOUCHER) {
-      voucherCode = voucherField.value.trim();
+      voucherCode = voucherField ? voucherField.value.trim() : '';
       username = voucherCode;
       password = voucherCode;
     } else {
-      username = usernameField.value.trim();
-      password = passwordField.value.trim();
+      username = usernameField ? usernameField.value.trim() : '';
+      password = passwordField ? passwordField.value.trim() : '';
     }
 
     if (!username || !password) {
@@ -132,13 +145,19 @@
   }
 
   function buildLoginUrl() {
-    if (state.context.linkLogin) {
-      return state.context.linkLogin;
+    const candidate = state.context.linkLogin;
+    if (candidate) {
+      try {
+        const parsed = new URL(candidate, window.location.href);
+        if (parsed.pathname.includes('/portal/radius/')) {
+          return parsed.toString();
+        }
+      } catch {
+        // ignore
+      }
     }
-    const host = state.context.targetHost || window.location.hostname;
-    const port = state.context.targetPort || window.location.port || '8843';
-    const scheme = state.context.scheme || window.location.protocol.replace(':', '') || 'https';
-    return `${scheme}://${host}${port ? `:${port}` : ''}/portal/radius/browserauth`;
+    const base = new URL(window.location.href);
+    return `${base.protocol}//${base.host}/portal/radius/browserauth`;
   }
 
   async function submitToOmada({ username, password, voucherMode, voucher }) {

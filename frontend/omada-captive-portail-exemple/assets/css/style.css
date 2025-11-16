@@ -48,6 +48,11 @@ p {
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.12);
 }
 
+.card-title {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
