@@ -6,8 +6,8 @@ DEPLOY_ENV="${DEPLOY_ENV:-local}"          # local | test | prod
 TIMEZONE="${TIMEZONE:-Etc/UTC}"            # Utiliser un TZ valide, ex: Africa/Nairobi
 SERVER_HOSTNAME="${SERVER_HOSTNAME:-radiusdesk}"
 
-SERVER_FQDN="${SERVER_FQDN:-localhost}"
-SERVER_IP="${SERVER_IP:-127.0.0.1}"
+SERVER_FQDN="${SERVER_FQDN:-rd.techzone.lat}"
+SERVER_IP="${SERVER_IP:-167.86.71.186}"
 
 # Pile web
 WEB_STACK="${WEB_STACK:-nginx}"
@@ -39,4 +39,4 @@ RD_UPLOADS_PERSIST_DIR="${RD_UPLOADS_PERSIST_DIR:-/var/local/radiusdesk-data/upl
 
 # TLS / Let's Encrypt
 LE_EMAIL="${LE_EMAIL:-contact@techzone.lat}"
-AUTO_LE="${AUTO_LE:-0}"                     # 1 pour lancer certbot automatiquement
+AUTO_LE="${AUTO_LE:-1}"                     # 1 pour lancer certbot automatiquement
