@@ -331,9 +331,12 @@ paths:
     get:
       tags: [usage, radiusdesk-proxy]
       summary: Aggregate usage for a user
-      description: Combine RadiusDesk quota information with the most recent session list for the client.
+      description: >
+        Combine RadiusDesk quota information with the most recent session list for the client.
         When the upstream usage API returns no stats (typical for fresh accounts), the service responds
-        with zeroed counters and an empty sessions array.
+        with zeroed counters and an empty sessions array. If you omit the `mac` query parameter the backend
+        automatically fetches the latest sessions to derive it before calling RadiusDesk (you can still append
+        `?mac=` manually to override).
       operationId: getUsageStats
       parameters:
         - in: query
@@ -347,10 +350,6 @@ paths:
             type: string
             format: password
           description: User or voucher password; required to validate the usage lookup.
-        - in: query
-          name: mac
-          schema: { type: string }
-          description: Optional client MAC if available from Omada.
         - in: query
           name: limit
           schema: { type: integer, default: 10 }
@@ -404,6 +403,12 @@ paths:
                       sessions: []
         '400':
           description: Missing username or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Unable to determine MAC address for the requested user
           content:
             application/json:
               schema:
