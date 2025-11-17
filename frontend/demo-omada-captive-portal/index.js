@@ -17,6 +17,7 @@ var welcomeRedirectTimeout;
 var TECHZONE_SUCCESS_BASE_URL = "http://167.86.71.186:5173/success?key=test_dynamic_keys";
 var lastAuthContext = { username: "", password: "" };
 var lastSuccessUrl = TECHZONE_SUCCESS_BASE_URL;
+var THEME_STORAGE_KEY = "demoOmadaTheme";
 
 var Ajax = {
     post: function (url, data, fn) {
@@ -167,11 +168,95 @@ function buildSuccessUrl() {
     return TECHZONE_SUCCESS_BASE_URL + separator + params.join("&");
 }
 
+function updateSuccessLink() {
+    var links = document.querySelectorAll(".info-link");
+    var url = buildSuccessUrl();
+    links.forEach(function(link){
+        link.setAttribute("href", url);
+        link.setAttribute("target", "_blank");
+        link.setAttribute("rel", "noopener noreferrer");
+    });
+}
+
 function openSuccessPage() {
     var url = buildSuccessUrl();
     lastSuccessUrl = url;
     window.open(url, "_blank");
 }
+
+function applyPortalTheme(mode) {
+    var body = document.body;
+    var toggle = document.getElementById("themeToggle");
+    if (mode === "light") {
+        body.classList.add("light-theme");
+        if (toggle) {
+            toggle.textContent = "Mode sombre";
+        }
+    } else {
+        body.classList.remove("light-theme");
+        if (toggle) {
+            toggle.textContent = "Mode clair";
+        }
+    }
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+}
+
+function initThemeToggle() {
+    var saved = localStorage.getItem(THEME_STORAGE_KEY) || "dark";
+    applyPortalTheme(saved);
+    var toggle = document.getElementById("themeToggle");
+    if (toggle) {
+        toggle.addEventListener("click", function () {
+            var next = document.body.classList.contains("light-theme") ? "dark" : "light";
+            applyPortalTheme(next);
+        });
+    }
+}
+
+function initLegalModal() {
+    var modal = document.getElementById("legal-popup");
+    var openers = document.querySelectorAll(".terms-trigger");
+    var closers = [document.getElementById("close-legal"), document.getElementById("close-legal-ok")];
+    if (!modal) {
+        return;
+    }
+    function openModal(e) {
+        if (e) {
+            e.preventDefault();
+        }
+        modal.classList.remove("hidden");
+        modal.setAttribute("aria-hidden", "false");
+    }
+    function closeModal() {
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+        var submitBtn = document.getElementById("button-login");
+        if (submitBtn) {
+            submitBtn.focus();
+        }
+    }
+    openers.forEach(function (btn) {
+        if (btn) {
+            btn.addEventListener("click", openModal);
+        }
+    });
+    closers.forEach(function (btn) {
+        if (btn) {
+            btn.addEventListener("click", function () {
+                closeModal();
+            });
+        }
+    });
+    modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+}
+
+updateSuccessLink();
+initThemeToggle();
+initLegalModal();
 
 function showWelcomeOverlay(landingUrl) {
     var overlay = document.getElementById("welcome-overlay");
@@ -202,13 +287,7 @@ function showWelcomeOverlay(landingUrl) {
         }
         timerEl.innerHTML = remaining;
     }, 1000);
-    var openButton = document.getElementById("open-success-button");
-    if (openButton) {
-        openButton.disabled = false;
-        openButton.onclick = function () {
-            openSuccessPage();
-        };
-    }
+    updateSuccessLink();
     welcomeRedirectTimeout = setTimeout(function () {
         window.location.href = landingUrl;
     }, 60000);
@@ -459,26 +538,6 @@ Ajax.post(
             });
             tabVoucher.addEventListener("click", function () {
                 setRadiusMode("voucher");
-            });
-        }
-        var quickInfoLink = document.getElementById("quick-info-link");
-        if (quickInfoLink) {
-            quickInfoLink.addEventListener("click", function (e) {
-                e.preventDefault();
-                if (!lastAuthContext.username && !lastAuthContext.password) {
-                    setStatusMessage("Connectez-vous avant d'accéder à la page info conso.", "error");
-                    return;
-                }
-                openSuccessPage();
-            });
-        }
-        var closeLegal = document.getElementById("close-legal");
-        if (closeLegal) {
-            closeLegal.addEventListener("click", function () {
-                var popup = document.getElementById("legal-popup");
-                if (popup) {
-                    popup.style.display = "none";
-                }
             });
         }
         document.getElementById("button-login").addEventListener("click", function () {

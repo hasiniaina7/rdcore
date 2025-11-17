@@ -20,10 +20,16 @@ body.portal {
     flex-direction: column;
     align-items: center;
     padding: 24px 16px 40px;
+    transition: background 0.35s ease, color 0.35s ease;
+}
+
+body.portal.light-theme {
+    background: #f5f6fb;
+    color: #0f172a;
 }
 
 .status-banner {
-    width: min(600px, 100%);
+    width: min(640px, 100%);
     background: rgba(69, 110, 255, 0.18);
     border: 1px solid rgba(121, 159, 255, 0.35);
     color: #dfe6ff;
@@ -34,8 +40,15 @@ body.portal {
     min-height: 44px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    gap: 1rem;
     transition: background 0.3s ease;
+}
+
+body.portal.light-theme .status-banner {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: rgba(15, 23, 42, 0.15);
+    color: #0f172a;
 }
 .status-banner.success {
     background: rgba(40, 179, 149, 0.2);
@@ -66,9 +79,17 @@ body.portal {
     border: 1px solid rgba(95, 134, 255, 0.15);
 }
 
+body.portal.light-theme .portal-card {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 20px 55px rgba(15, 23, 42, 0.12);
+}
+
 .card-header {
     text-align: left;
     margin-bottom: 24px;
+    color: inherit;
 }
 
 .eyebrow {
@@ -88,7 +109,11 @@ body.portal {
     color: #b8c3ef;
     font-size: 15px;
 }
-
+body.portal.light-theme .subtitle,
+body.portal.light-theme .eyebrow,
+body.portal.light-theme .card-header h1 {
+    color: #0f172a;
+}
 .auth-tabs {
     display: none;
     background: rgba(17, 30, 74, 0.85);
@@ -127,6 +152,10 @@ body.portal {
     color: #c6d0ff;
     font-size: 14px;
 }
+body.portal.light-theme .selector-row label,
+body.portal.light-theme .form-group label {
+    color: #0f172a;
+}
 
 .oper-section-item {
     width: 100%;
@@ -137,6 +166,36 @@ body.portal {
     color: #fff;
     padding: 0 16px;
     font-size: 15px;
+}
+
+body.portal.light-theme .oper-section-item {
+    background: rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    color: #0f172a;
+}
+
+select.oper-section-item {
+    background-color: rgba(7, 15, 46, 0.9);
+    color: #f5f7ff;
+    border: 1px solid rgba(95, 134, 255, 0.35);
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+body.portal.light-theme select.oper-section-item {
+    background-color: rgba(15, 23, 42, 0.05);
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.12);
+}
+
+select.oper-section-item option {
+    background-color: #0b173d;
+    color: #f5f7ff;
+}
+
+body.portal.light-theme select.oper-section-item option {
+    background-color: #ffffff;
+    color: #0f172a;
 }
 
 .oper-section-item:focus {
@@ -165,8 +224,17 @@ body.portal {
     font-size: 15px;
 }
 
+body.portal.light-theme .input {
+    background: rgba(15, 23, 42, 0.05);
+    color: #0f172a;
+}
+
 .input::placeholder {
     color: rgba(245, 247, 255, 0.55);
+}
+
+body.portal.light-theme .input::placeholder {
+    color: rgba(15, 23, 42, 0.4);
 }
 
 .phone-wrapper,
@@ -299,41 +367,116 @@ body.portal {
     color: rgba(255, 255, 255, 0.7);
 }
 
+.inline-links {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.inline-links .link,
+.info-links .link {
+    border: none;
+    background: none;
+    color: #93c5fd;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+body.portal.light-theme .inline-links .link,
+body.portal.light-theme .info-links .link {
+    color: #2563eb;
+}
+
+.info-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.info-links small {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+body.portal.light-theme .info-links small {
+    color: rgba(15, 23, 42, 0.6);
+}
+
+body.portal.light-theme .welcome-card {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+}
+.inline-links .link,
+.info-links .link {
+    border: none;
+    background: none;
+    color: #93c5fd;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+
 .legal-popup {
     position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(560px, calc(100% - 32px));
-    background: rgba(5, 11, 39, 0.95);
-    border-radius: 18px;
-    padding: 18px 22px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #dfe6ff;
-    z-index: 30;
-}
-
-.legal-popup__content strong {
-    display: block;
-    margin-bottom: 6px;
-}
-
-.legal-popup__content p {
-    font-size: 14px;
-    line-height: 1.4;
-    margin-bottom: 12px;
-}
-
-.legal-popup__actions {
+    inset: 0;
+    background: rgba(5, 11, 39, 0.75);
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
 }
 
-.ghost-button.secondary {
+.legal-popup__content {
+    width: min(480px, calc(100% - 32px));
+    background: rgba(5, 11, 39, 0.95);
+    border-radius: 22px;
+    padding: 20px 24px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #dfe6ff;
+    text-align: left;
+}
+
+.portal.light-theme .legal-popup__content {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.legal-popup__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.legal-popup__content ul {
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+}
+
+.legal-popup__content button {
+    margin-top: 0.5rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.ghost-button.secondary,
+.legal-popup__header button {
     border-color: rgba(255, 255, 255, 0.15);
     color: rgba(255, 255, 255, 0.7);
+    padding: 0.25rem 0.75rem;
+}
+
+.portal.light-theme .legal-popup__header button {
+    border-color: rgba(15, 23, 42, 0.15);
+    color: rgba(15, 23, 42, 0.7);
 }
 
 .legal-note {
@@ -593,4 +736,19 @@ body.portal {
 
 #form-auth-outer.mobile #form-auth-submit {
   padding: 0;
+}
+.theme-toggle {
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.15);
+    color: inherit;
+    padding: 6px 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+body.portal.light-theme .theme-toggle {
+    border-color: rgba(15, 23, 42, 0.2);
+    background: rgba(15, 23, 42, 0.05);
+    color: #0f172a;
 }

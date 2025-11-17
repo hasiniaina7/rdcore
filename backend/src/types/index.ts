@@ -34,7 +34,7 @@ export interface DynamicDetailResponse {
 
 export interface OmadaPortalPayload {
   clientMac: string;
-  site: string;
+  site?: string;
   radioId: number;
   time: number;
   authType: number;

@@ -330,7 +330,7 @@ paths:
   /api/usage:
     get:
       tags: [usage, radiusdesk-proxy]
-      summary: Aggregate usage for a user and MAC address
+      summary: Aggregate usage for a user
       description: Combine RadiusDesk quota information with the most recent session list for the client.
         When the upstream usage API returns no stats (typical for fresh accounts), the service responds
         with zeroed counters and an empty sessions array.
@@ -403,7 +403,7 @@ paths:
                       depleted: false
                       sessions: []
         '400':
-          description: Missing username or mac
+          description: Missing username or password
           content:
             application/json:
               schema:

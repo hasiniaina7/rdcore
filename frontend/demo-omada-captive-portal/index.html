@@ -9,12 +9,13 @@
 <body class="portal">
     <div class="status-banner" id="status-banner">
         <span id="oper-hint">Prêt pour l'authentification.</span>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Basculer le thème">Mode sombre</button>
     </div>
     <div class="portal-shell">
         <div class="portal-card">
             <header class="card-header">
-                <p class="eyebrow">Hotspot sécurisé</p>
-                <h1>TECHZONE WIFI ZONE</h1>
+                <p class="eyebrow">Hotspot LOGIN</p>
+                <h1>TECHZONE WIFI - LOGIN</h1>
                 <p class="subtitle">Choisissez votre mode d’accès pour rejoindre le réseau Omada.</p>
             </header>
 
@@ -67,6 +68,10 @@
             <div id="button-area">
                 <button id="button-login" class="button oper-section-item" type="button">Connexion</button>
             </div>
+            <div class="inline-links">
+                <a class="link info-link" href="http://167.86.71.186:5173/success?key=test_dynamic_keys" target="_blank" rel="noopener noreferrer">Accès rapide info conso</a>
+                <button class="link terms-trigger" type="button">Conditions générales</button>
+            </div>
         </div>
         <footer class="portal-footer">LOGIN sur TECHZONE WiFi</footer>
     </div>
@@ -78,17 +83,17 @@
             <p class="timer-text">Fermeture dans <span id="welcome-timer">60</span> secondes…</p>
             <div class="info-links">
                 <small>Ouvrez impérativement dans Google Chrome pour éviter les blocages CORS.</small>
-                <a id="open-success-button" class="link" href="http://167.86.71.186:5173/success?key=test_dynamic_keys" target="_blank" rel="noopener noreferrer">Accès rapide info conso</a>
-                <button class="link" type="button" id="termsLink">Conditions générales</button>
+                <a id="open-success-button" class="link info-link" href="http://167.86.71.186:5173/success?key=test_dynamic_keys" target="_blank" rel="noopener noreferrer">Accès rapide info conso</a>
+                <button class="link terms-trigger" type="button">Conditions générales</button>
             </div>
         </div>
     </div>
 
-    <div class="legal-popup hidden" id="legal-popup">
+    <div class="legal-popup hidden" id="legal-popup" role="dialog" aria-modal="true">
         <div class="legal-popup__content">
             <div class="legal-popup__header">
                 <strong>Conditions générales — TECHZONE Wi-Fi</strong>
-                <button id="close-legal" class="ghost-button secondary" type="button">X</button>
+                <button id="close-legal" class="ghost-button secondary" type="button" aria-label="Fermer">×</button>
             </div>
             <p>En utilisant ce service, vous acceptez les conditions générales d’utilisation, l’usage raisonnable de la bande passante et le traitement de vos données de connexion conformément aux politiques TECHZONE.</p>
             <ul>
