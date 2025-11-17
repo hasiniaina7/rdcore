@@ -2,82 +2,194 @@ html, body {
     height: 100%;
 }
 
-/* Wrapper for page content to push down footer */
-#wrap {
-    min-height: 100%;
-    height: auto;
-    margin: 0 auto -60px;
-    padding: 0 0 60px;
+body.tz-portal {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Ubuntu", "Cantarell", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(circle at 15% 20%, #102251 0%, #020617 70%);
+    color: #f5f7ff;
+    transition: background 0.4s ease, color 0.4s ease;
 }
 
-/* Set the fixed height of the footer here */
-#footer {
-    height: 60px;
-    background-color: #f5f5f5;
+body.tz-portal.tz-light {
+    background: #f4f6fb;
+    color: #0f172a;
 }
 
-#wrap > .container {
-    padding: 15px 15px 0;
-}
-.container .text-muted {
-    margin: 20px 0;
-}
-
-#footer > .container {
-    padding-left: 15px;
-    padding-right: 15px;
+.tz-portal .navbar {
+    background: rgba(2, 6, 23, 0.8) !important;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.25);
+    backdrop-filter: blur(8px);
 }
 
-code {
-    font-size: 80%;
+.tz-portal.tz-light .navbar {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
+.tz-portal .navbar-brand,
+.tz-portal .nav-link {
+    font-weight: 600;
+}
 
-/* new customizing */
-#bottom-menu {
-    padding: 10px 0px;
-    height: 100px;
+.tz-portal .nav-link.active {
+    color: #93c5fd !important;
+}
+
+.tz-portal .modal-content {
+    border-radius: 26px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: 0 30px 80px rgba(3, 7, 18, 0.8);
+    background: rgba(6, 10, 27, 0.95);
+    color: #f5f7ff;
+}
+
+.tz-portal.tz-light .modal-content {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.1);
+}
+
+.tz-portal .modal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tz-portal.tz-light .modal-header {
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.tz-portal .modal-body {
+    background: transparent;
+}
+
+.tz-portal .alert {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(59, 130, 246, 0.08);
+    color: #dbeafe;
+}
+
+.tz-portal .alert-warning {
+    border-color: rgba(251, 191, 36, 0.35);
+    background: rgba(120, 53, 15, 0.35);
+    color: #fef3c7;
+}
+
+.tz-portal.tz-light .alert {
+    background: rgba(59, 130, 246, 0.15);
+    color: #1e3a8a;
+}
+
+.tz-portal.tz-light .alert-warning {
+    background: rgba(250, 204, 21, 0.2);
+    color: #92400e;
+}
+
+.tz-portal .btn-primary {
+    border: none;
+    border-radius: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #4f7dff, #933dff);
+    box-shadow: 0 18px 40px rgba(37, 99, 235, 0.35);
+}
+
+.tz-portal .btn-warning {
+    border-radius: 18px;
+}
+
+.tz-portal .btn-outline-light {
+    border-radius: 18px;
+    border-width: 2px;
+    font-weight: 600;
+}
+
+.tz-portal.tz-light .btn-outline-light {
+    color: #1d4ed8;
+    border-color: rgba(29, 78, 216, 0.4);
+}
+
+.tz-portal .form-control {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
     color: #fff;
 }
 
-.navbar-inverse {
-    background-color: #153E5D;
-    border-color: #2B78C5;
+.tz-portal.tz-light .form-control {
+    background: rgba(15, 23, 42, 0.03);
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    color: #0f172a;
 }
 
-.navbar {
-    padding-top: 10px;
-	background: #786d59;
-	border: 0;
-	-o-transition: all .3s; -moz-transition: all .3s; -webkit-transition: all .3s; -ms-transition: all .3s; transition: all .3s;
+.tz-portal input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
 }
 
-.navbar-inverse .navbar-nav > .active > a, .navbar-inverse .navbar-nav > .active > a:hover, .navbar-inverse .navbar-nav > .active > a:focus {
-    background-color: #786d59;
+.tz-portal.tz-light input::placeholder {
+    color: rgba(15, 23, 42, 0.5);
 }
 
-#footer {
-    background-color: #786d59;
+.tz-portal .list-group-item,
+.tz-portal .table {
+    background: transparent;
+    color: inherit;
 }
 
-.text-muted {
-    color: #B7B7B7;
+.tz-usage-card {
+    border-radius: 20px;
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    background: rgba(15, 23, 42, 0.45);
+    padding: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.textlogo h1 {
-    font-family: "Arial",Helvetica,sans-serif;
-    font-size: 2em;
-    color: #fff;
-    font-weight: bold;
-    text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.3);
+.tz-hint {
+    display: block;
+    margin-top: 0.5rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
 }
 
-#bottom-menu .mylogo {
-    width: 100px;
-    float: left;
+.tz-portal.tz-light .tz-hint {
+    color: rgba(15, 23, 42, 0.6);
 }
 
-#bottom-menu .textlogo {
-    width: 350px;
+.progress-bar {
+    background: linear-gradient(90deg, #3b82f6, #9333ea);
 }
 
+.tz-theme-toggle {
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+}
+
+.tz-portal.tz-light .tz-theme-toggle {
+    border-color: rgba(15, 23, 42, 0.2);
+    color: #0f172a;
+}
+
+.tz-portal .tz-close {
+    filter: invert(1);
+}
+
+.tz-portal.tz-light .tz-close {
+    filter: none;
+}
+
+#pnlLogin > * + * {
+    margin-top: 0.75rem;
+}
+
+.tz-modal-body .alert {
+    margin-bottom: 0.75rem;
+}
+
+@media (max-width: 576px) {
+    .tz-portal .modal-content {
+        border-radius: 18px;
+    }
+}

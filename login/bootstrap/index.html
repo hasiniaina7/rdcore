@@ -11,121 +11,99 @@
       <!-- Favicon -->
       <link rel="shortcut icon" href="assets/ico/favicon.ico">
    </head>
-   <body>
-      <div id="wrap">
-         <div class="navbar navbar-inverse navbar-static-top" role="navigation">
-            <div class="container">
-               <div class="navbar-header">
-                  <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                  <span class="sr-only">Toggle navigation</span>
-                  <span class="icon-bar"></span>
-                  <span class="icon-bar"></span>
-                  <span class="icon-bar"></span>
-                  </button>
-                  <a class="navbar-brand" href="#">RADIUSdesk</a>
-               </div>
-               <div class="collapse navbar-collapse" id="top-navbar-1">
-                  <ul class="nav navbar-nav navbar-right">
-                     <li>
-                        <span class="li-text">
-                        <strong>WiFi Made Easy</strong>
-                        </span>
-                     </li>
-                  </ul>
-               </div>
+   <body class="tz-portal">
+      <div class="tz-shell">
+         <header class="tz-header">
+            <div class="tz-header__text">
+               <p class="tz-eyebrow">Hotspot sécurisé</p>
+               <h1>Portail captif TECHZONE</h1>
+               <p class="tz-subtitle">Connectez-vous puis consultez votre consommation en un clic.</p>
             </div>
-         </div>
-         <div id="bottom-menu">
-            <div class="container">
-               <div class="row">
-                  <div class="col-md-2">
-                     <a href="http://www.radiusdesk.com/"><img src="img/logo.png" alt="logo"></a>
-                  </div>
-               </div>
+            <div class="tz-header__logo">
+               <img src="img/logo.png" alt="TECHZONE" />
             </div>
+         </header>
+         <div class="tz-banner alert alert-info collapse in" id='alertInfo'>
+            <div class="tz-banner__text">Veuillez vous authentifier pour utiliser le Wi-Fi.</div>
          </div>
-         <div class="container">
-            <div class="col-md-6 col-sm-12">
-               <div class="row">
-                  <div class="alert alert-info collapse in" id='alertInfo'>
-                     <div style="font-weight: bold">Please log in to use the Wi-Fi Internet services.</div>
-                  </div>
-               </div>
-               <div class="row">
-                  <div class="alert alert-warning collapse" id='alertWarn'>
-                     <div style="font-weight: bold"></div>
-                  </div>
-               </div>
-               <div class="row">
-                  <div class="panel panel-default collapse in" id='pnlLogin'>
-                     <div class="panel-body">
-                        <form class="form-horizontal" role="form" data-toggle="validator" id='frmLogin'>
-                           <div class="form-group">
-                              <label for="txtUsername" class="col-sm-2 control-label">Voucher</label>
-                              <div class="col-sm-10">
-                                 <input type="text" class="form-control input-lg" id="txtUsername" name="username"
-                                    placeholder="Login" autofocus required>
-                                 <div class="help-block with-errors"></div>
-                              </div>
-                           </div>
-                           <div class="form-group">
-                              <div class="col-sm-offset-2 col-sm-10">
-                                 <button type="submit" class="btn btn-primary btn-block btn-lg" data-loading-text="<i class='fa fa-circle-o-notch fa-spin fa-fw'></i> Connecting User..." id='btnConnect'><i class="fa fa-check-circle"></i>  OK</button>
-                              </div>
-                           </div>
-                        </form>
+         <div class="tz-banner alert alert-warning collapse" id='alertWarn'>
+            <div class="tz-banner__text"></div>
+         </div>
+         <div class="panel panel-default collapse in tz-card" id='pnlLogin'>
+            <div class="panel-heading">
+               <i class="fa fa-lock"></i> Connexion hotspot
+            </div>
+            <div class="panel-body">
+               <form class="form-horizontal tz-form" role="form" data-toggle="validator" id='frmLogin'>
+                  <div class="form-group">
+                     <label for="txtUsername" class="control-label">Identifiant ou voucher</label>
+                     <div>
+                        <input type="text" class="form-control input-lg" id="txtUsername" name="username"
+                           placeholder="Ex : WIFI-123456" autofocus required>
+                        <div class="help-block with-errors"></div>
                      </div>
                   </div>
-                  <div class="panel panel-default collapse" id='pnlSession'>
-                     <div class="panel-heading"><i class="fa fa-info-circle"></i> Session Info</div>
-                     <div class="panel-body">
-                        <table class="table table-striped">
-                           <thead>
-                              <tr>
-                                 <th>Item</th>
-                                 <th>Value</th>
-                              </tr>
-                           </thead>
-                           <tbody>
-                              <tr>
-                                 <td><i class="fa fa-user"></i>  Username</td>
-                                 <td id='acct_un' style="color:#2759A2;"></td>
-                              </tr>
-                              <tr>
-                                 <td><i class="fa fa-clock-o"></i>  Connected</td>
-                                 <td id='acct_up' style="color:#2759A2;"></td>
-                              </tr>
-                              <tr>
-                                 <td><i class="fa fa-arrow-down"></i>  Data In</td>
-                                 <td id='acct_di' style="color:#2759A2;"></td>
-                              </tr>
-                              <tr>
-                                 <td><i class="fa fa-arrow-up"></i>  Data Out</td>
-                                 <td id='acct_do' style="color:#2759A2;"></td>
-                              </tr>
-                              <tr>
-                                 <td><i class="fa fa-database"></i>  Data Total</td>
-                                 <td id='acct_dt' style="color:#2759A2;"></td>
-                              </tr>
-                           </tbody>
-                        </table>
-                        <div class="col-sm-12">
-                           Refreshing in <span id='status_refresh' class='info' style="color:#2759A2;"></span> seconds
-                        </div>
-                        <div class="col-sm-12">
-                           <button type="button" class="btn btn-warning btn-block btn-lg" data-loading-text="<i class='fa fa-circle-o-notch fa-spin fa-fw'></i> Disconnecting User..." id='btnDisconnect'><i class="fa fa-chain-broken"></i> Logout</button>
-                        </div>
+                  <div class="form-group tz-form__hint">
+                     <label for="txtMac" class="control-label">Adresse MAC (optionnel)</label>
+                     <div>
+                        <input type="text" class="form-control input-lg" id="txtMac" placeholder="AA-BB-CC-11-22-33">
                      </div>
                   </div>
-                  <br/>
-               </div>
+                  <div class="form-group tz-actions">
+                     <button type="submit" class="btn btn-primary btn-block btn-lg tz-btn" data-loading-text="<i class='fa fa-circle-o-notch fa-spin fa-fw'></i> Connecting User..." id='btnConnect'>
+                     <i class="fa fa-check-circle"></i> Connexion
+                     </button>
+                     <button type="button" class="btn btn-secondary btn-block btn-lg tz-btn--secondary" id="btnUsageShortcut">
+                     <i class="fa fa-bolt"></i> Accès rapide info conso
+                     </button>
+                     <small class="tz-hint">Ouvre la page d'information dans Google Chrome. Si les champs sont vides, vous pourrez compléter le formulaire directement.</small>
+                  </div>
+               </form>
             </div>
          </div>
-      </div>
-      <div id="footer">
-         <div class="container">
-            <p class="text-muted"><strong>RADIUSdesk</strong><a href="https://www.radiusdesk.com/"></a></p>
+         <div class="panel panel-default collapse tz-card" id='pnlSession'>
+            <div class="panel-heading"><i class="fa fa-info-circle"></i> Session en cours</div>
+            <div class="panel-body">
+               <table class="table table-striped tz-table">
+                  <thead>
+                     <tr>
+                        <th>Élément</th>
+                        <th>Valeur</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     <tr>
+                        <td><i class="fa fa-user"></i> Utilisateur</td>
+                        <td id='acct_un'></td>
+                     </tr>
+                     <tr>
+                        <td><i class="fa fa-clock-o"></i> Connecté depuis</td>
+                        <td id='acct_up'></td>
+                     </tr>
+                     <tr>
+                        <td><i class="fa fa-arrow-down"></i> Data In</td>
+                        <td id='acct_di'></td>
+                     </tr>
+                     <tr>
+                        <td><i class="fa fa-arrow-up"></i> Data Out</td>
+                        <td id='acct_do'></td>
+                     </tr>
+                     <tr>
+                        <td><i class="fa fa-database"></i> Total</td>
+                        <td id='acct_dt'></td>
+                     </tr>
+                  </tbody>
+               </table>
+               <div class="tz-refresh">
+                  Actualisation dans <span id='status_refresh' class='info'></span> s
+               </div>
+               <button type="button" class="btn btn-warning btn-block btn-lg tz-btn--logout" data-loading-text="<i class='fa fa-circle-o-notch fa-spin fa-fw'></i> Disconnecting User..." id='btnDisconnect'><i class="fa fa-chain-broken"></i> Déconnexion</button>
+            </div>
          </div>
+         <footer class="tz-footer">
+            <p>Hotspot propulsé par <strong>RADIUSdesk</strong> &amp; TECHZONE.</p>
+            <p>Besoin d'aide ? Contactez votre administrateur.</p>
+         </footer>
       </div>
       
         <!-- Modal Not Registered HTML -->
@@ -163,7 +141,30 @@
             connect.init();            
          });
       </script>
+      <script>
+         (function(){
+            var DASHBOARD_URL = 'http://167.86.71.186:5173/success?key=test_dynamic_keys';
+            function buildDashboardUrl(){
+               var username = ($.trim($('#txtUsername').val()) || '').toLowerCase();
+               var mac = $.trim($('#txtMac').val()) || '';
+               var params = [];
+               if(username){
+                  params.push('username='+encodeURIComponent(username));
+                  params.push('password='+encodeURIComponent(username));
+               }
+               if(mac){
+                  params.push('mac='+encodeURIComponent(mac));
+               }
+               if(params.length === 0){
+                  return DASHBOARD_URL;
+               }
+               return DASHBOARD_URL + (DASHBOARD_URL.indexOf('?') > -1 ? '&' : '?') + params.join('&');
+            }
+            $('#btnUsageShortcut').on('click', function(){
+               var url = buildDashboardUrl();
+               window.open(url, '_blank', 'noopener,noreferrer');
+            });
+         })();
+      </script>
    </body>
 </html>
-
-

@@ -149,6 +149,13 @@ localizedStrings: {
     'sItalian'  : 'Italian',
     'sFrench'  	: 'French',
     'sSpanish'  : 'Spanish',
-    'sWiFi_Preshared_Key' : 'clé wifi pré-partagée'
+    'sWiFi_Preshared_Key' : 'clé wifi pré-partagée',
+    'sTermsQuickLink': 'Conditions générales',
+    'sTermsQuickTitle': 'Conditions générales',
+    'sTermsQuickIntro': 'En utilisant le Wi-Fi TECHZONE vous acceptez les règles suivantes :',
+    'sTermsQuickItem1': 'L’accès est journalisé pour des raisons de sécurité et de conformité.',
+    'sTermsQuickItem2': 'Pas d’abus de bande passante, pas de partage d’identifiants ni de contenus illicites.',
+    'sTermsQuickItem3': 'L’opérateur peut suspendre votre accès en cas d’usage suspect.',
+    'sTermsQuickFooter': 'Les conditions complètes sont disponibles sur demande auprès de l’opérateur.'
 }
 }

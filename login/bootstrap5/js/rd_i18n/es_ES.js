@@ -119,6 +119,13 @@ localizedStrings: {
     'sItalian'  : 'Italian',
     'sFrench'  	: 'French',
     'sSpanish'  : 'Spanish',
-    'sWiFi_Preshared_Key' : 'clave wifi precompartida'
+    'sWiFi_Preshared_Key' : 'clave wifi precompartida',
+    'sTermsQuickLink': 'Condiciones generales',
+    'sTermsQuickTitle': 'Condiciones de uso',
+    'sTermsQuickIntro': 'Al usar el Wi-Fi de TECHZONE aceptas lo siguiente:',
+    'sTermsQuickItem1': 'El acceso se registra por motivos de seguridad y cumplimiento.',
+    'sTermsQuickItem2': 'Prohibido abusar del ancho de banda, compartir credenciales o acceder a contenido ilegal.',
+    'sTermsQuickItem3': 'El operador puede suspender el acceso si detecta un uso indebido.',
+    'sTermsQuickFooter': 'Las condiciones completas están disponibles bajo pedido.'
 }
 }

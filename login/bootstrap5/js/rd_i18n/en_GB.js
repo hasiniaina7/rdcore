@@ -117,6 +117,13 @@ localizedStrings: {
     'sItalian'  : 'Italian',
     'sFrench'  	: 'French',
     'sSpanish'  : 'Spanish',
-    'sWiFi_Preshared_Key' : 'WiFi Preshared Key'
+    'sWiFi_Preshared_Key' : 'WiFi Preshared Key',
+    'sTermsQuickLink': 'Terms & Conditions',
+    'sTermsQuickTitle': 'Terms & Conditions',
+    'sTermsQuickIntro': 'By using TECHZONE Wi-Fi you accept the following rules:',
+    'sTermsQuickItem1': 'Access logs are kept for security and regulatory purposes.',
+    'sTermsQuickItem2': 'Do not abuse bandwidth, share credentials or browse illegal content.',
+    'sTermsQuickItem3': 'The operator may suspend access when misuse is detected.',
+    'sTermsQuickFooter': 'Full terms are available on request from the operator.'
 }
 }
