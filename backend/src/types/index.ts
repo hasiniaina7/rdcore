@@ -79,6 +79,29 @@ export interface UsageStats {
   sessions: Array<Record<string, unknown>>;
 }
 
+export type UsagePeriodKey = 'hourly' | 'daily' | 'weekly' | 'monthly';
+
+export interface UsagePeriodSummary {
+  period: UsagePeriodKey;
+  totalBytes: number;
+  totalTimeSeconds: number;
+  sessionCount: number;
+}
+
+export interface UsageByUsernameSummary {
+  username: string;
+  historyLimit: number;
+  macs: string[];
+  periods: UsagePeriodSummary[];
+}
+
+export interface SessionListResult {
+  username: string;
+  totalCount: number;
+  radiusdeskTotal?: number;
+  sessions: Array<Record<string, unknown>>;
+}
+
 export interface HealthStatus {
   status: 'ok' | 'degraded' | 'down';
   details?: Record<string, unknown>;

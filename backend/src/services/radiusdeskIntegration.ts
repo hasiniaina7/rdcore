@@ -81,15 +81,24 @@ export async function getUsage(
   }, 'get-usage');
 }
 
-export async function getSessions(username: string, limit = 10) {
+type SessionsOptions = {
+  onlyConnected?: boolean;
+  page?: number;
+  start?: number;
+  extraParams?: Record<string, unknown>;
+};
+
+export async function getSessions(username: string, limit = 10, options?: SessionsOptions) {
+  const { onlyConnected = false, page = 1, start = 0, extraParams = {} } = options ?? {};
   return timedRequest(async () => {
     const { data } = await radiusClient.get('/radaccts/index.json', {
       params: withDefaults({
         username,
         limit,
-        only_connected: 'false',
-        page: 1,
-        start: 0,
+        only_connected: onlyConnected ? 'true' : 'false',
+        page,
+        start,
+        ...extraParams,
       }),
     });
     return data;

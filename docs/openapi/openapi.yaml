@@ -108,12 +108,51 @@ components:
       type: object
       properties:
         username: { type: string }
-        mac: { type: string }
+        mac: { type: string, nullable: true }
         dataUsed: { type: number }
         dataCap: { type: number, nullable: true }
         timeUsed: { type: number }
         timeCap: { type: number, nullable: true }
         depleted: { type: boolean }
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RadacctSession'
+    UsagePeriodSummary:
+      type: object
+      properties:
+        period:
+          type: string
+          enum: [hourly, daily, weekly, monthly]
+        totalBytes:
+          type: number
+          description: Aggregated input+output octets within the rolling window.
+        totalTimeSeconds:
+          type: number
+          description: Total session duration in seconds within the window.
+        sessionCount: { type: integer }
+    UsageByUsernameSummary:
+      type: object
+      properties:
+        username: { type: string }
+        historyLimit:
+          type: integer
+          description: Number of recent sessions inspected.
+        macs:
+          type: array
+          items: { type: string }
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsagePeriodSummary'
+    SessionList:
+      type: object
+      properties:
+        username: { type: string }
+        totalCount: { type: integer }
+        radiusdeskTotal:
+          type: integer
+          description: Total count returned by RadiusDesk prior to filtering.
         sessions:
           type: array
           items:
@@ -421,6 +460,110 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '500':
           description: RadiusDesk timeout or aggregation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/usage-by-username:
+    get:
+      tags: [usage, radiusdesk-proxy]
+      summary: Aggregate usage without requiring a MAC address
+      description: >
+        Inspect recent RadiusDesk accounting entries for the user and compute rolling totals for the last hour,
+        day, week, and month. Unlike `/api/usage`, this endpoint does not require the client MAC because the backend
+        derives it from session history.
+      operationId: getUsageByUsername
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema: { type: string }
+        - in: query
+          name: historyLimit
+          schema: { type: integer, default: 200 }
+          description: Number of recent sessions to inspect (50-500).
+      responses:
+        '200':
+          description: Aggregated usage windows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UsageByUsernameSummary'
+        '400':
+          description: Missing username
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/active-sessions:
+    get:
+      tags: [usage, radiusdesk-proxy]
+      summary: List active sessions for a user
+      description: Wrapper around RadiusDesk `radaccts/index.json` with `only_connected=true`.
+      operationId: getActiveSessions
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+          description: Maximum number of active sessions to return (1-200).
+      responses:
+        '200':
+          description: Active session list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SessionList'
+        '400':
+          description: Missing username
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/inactive-sessions:
+    get:
+      tags: [usage, radiusdesk-proxy]
+      summary: List recently closed sessions for a user
+      description: >
+        Fetch recent RadiusDesk accounting entries and filter the results to sessions that already have an
+        `acctstoptime`. Use this to show historical activity alongside the active session list.
+      operationId: getInactiveSessions
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+          description: Maximum number of inactive sessions to return (1-200).
+      responses:
+        '200':
+          description: Inactive session list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SessionList'
+        '400':
+          description: Missing username
           content:
             application/json:
               schema:
