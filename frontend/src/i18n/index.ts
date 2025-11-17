@@ -348,7 +348,7 @@ const resources = {
         timeUsed: '{{used}} utilisés / {{cap}} limite',
         depleted: 'Quota épuisé',
         supportTitle: 'Support',
-        supportSubtitle: 'Besoin d’un opérateur ?',
+        supportSubtitle: 'Besoin d’un assistant ?',
         phoneLabel: 'Téléphone',
         supportFallback: "Contactez l'exploitant pour obtenir de l’aide.",
         sessionsTitle: 'Sessions récentes',

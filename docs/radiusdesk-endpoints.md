@@ -2,6 +2,31 @@
 
 Toutes les routes exposées par CakePHP se trouvent sous `https://<rd-host>/cake4/rd_cake`. Les contrôleurs `PermanentUsers`, `Vouchers` et `Radaccts` exigent un `token` (UUID Access Provider) et un `cloud_id`. Le helper `_ap_right_check()` (cf. `AppController`) vérifie le jeton, charge les droits via `AaComponent` (`checkRbaAccess`) et bloque l’appel si l’action n’est pas listée dans `config/Rba*.php`. Les paramètres `token`, `cloud_id`, `language` et les payloads JSON peuvent être passés en query string ou en corps (Cake fusionne query/data). La locale (ex: `language=fr_FR`) impacte les textes générés (emails, pays/langue d’un utilisateur).
 
+## Vue d’ensemble exhaustive
+
+| Contrôleur | Méthode | Endpoint Cake | But principal |
+| --- | --- | --- | --- |
+| PermanentUsers | `GET` | `/permanent-users/index.json` | Lister les comptes permanents (filtres, pagination, `last_seen`). |
+| PermanentUsers | `POST` | `/permanent-users/add.json` | Créer un compte permanent (realm, profil, langue, dates). |
+| PermanentUsers | `GET` | `/permanent-users/view-basic-info.json` | Fiche détaillée (dates, quotas, attributs personnels). |
+| PermanentUsers | `GET` | `/permanent-users/view-password.json` | Récupérer le `Cleartext-Password` + métadonnées d’expiration. |
+| PermanentUsers | `POST` | `/permanent-users/change-password.json` | Mettre à jour le mot de passe / fenêtre de validité. |
+| PermanentUsers | `POST` | `/permanent-users/enable-disable.json` | Activer/désactiver un compte et déclencher le disconnect. |
+| Vouchers | `GET` | `/vouchers/index.json` | Lister les vouchers (état online/offline, expirations). |
+| Vouchers | `POST` | `/vouchers/add.json` | Générer un voucher (profil, durée, realm, single field). |
+| Vouchers | `GET` | `/vouchers/view-basic-info.json` | Détails complets d’un voucher spécifique. |
+| Vouchers | `POST` | `/vouchers/change-password.json` | Régénérer un mot de passe / champ unique. |
+| Vouchers | `POST` | `/vouchers/email-voucher-details.json` | Envoyer les identifiants par e-mail via la config SMTP cloud. |
+| Radaccts | `GET` | `/radaccts/index.json` | Sessions actives/historiques avec totaux octets, status online. |
+| Radaccts | `GET` | `/radaccts/get-usage.json` | Quotas (data/time used/cap, depleted) pour un username/MAC. |
+| Radaccts | `GET` | `/radaccts/kick-active-username.json` | Envoyer un CoA (Disconnect) sur toutes les sessions d’un user. |
+| Radaccts | `GET` | `/radaccts/kick-active.json` | Déconnecter des `radacctid` précis (`123=1&456=1`). |
+| Radaccts | `GET` | `/radaccts/close-open.json` | Forcer `acctstoptime` à `now` pour clôturer une session orpheline. |
+| DynamicDetails | `GET` | `/dynamic-details/info-for.json` | Payload dynamique complet pour construire la page captive. |
+| DynamicDetails | `GET` | `/dynamic-details/id-me.json` | Détection device/user-agent (utilisé par les templates dynamiques). |
+
+Les sections ci-dessous détaillent chaque route : paramètres, structure de réponse et exemples `curl`. Aucune autre route JSON publique n’est exposée par rdcore côté portail captif, ce qui garantit que cette cartographie couvre **100 %** des endpoints utiles mentionnés dans l’app.
+
 ## Permanent Users (`PermanentUsersController`)
 
 | Action | Méthode & URI | Auth & paramètres | Réponse & champs clés | Notes |

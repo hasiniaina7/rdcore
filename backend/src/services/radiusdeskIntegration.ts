@@ -117,6 +117,15 @@ export async function findPermanentUser(username: string) {
   }, 'permanent-users');
 }
 
+export async function getPermanentUserPassword(userId: string) {
+  return timedRequest(async () => {
+    const { data } = await radiusClient.get('/permanent-users/view-password.json', {
+      params: withDefaults({ user_id: userId }),
+    });
+    return data;
+  }, 'permanent-user-password');
+}
+
 export async function findVoucher(name: string) {
   return timedRequest(async () => {
     const { data } = await radiusClient.get('/vouchers/index.json', {
