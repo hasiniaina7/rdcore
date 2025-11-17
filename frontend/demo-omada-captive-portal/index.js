@@ -11,6 +11,12 @@ var VOUCHER_ACCESS_TYPE = 3,
     FORM_AUTH_ACCESS_TYPE = 12;
 
 var MAX_INPUT_LEN = 2000;
+var radiusMode = 'user';
+var welcomeCountdownInterval;
+var welcomeRedirectTimeout;
+var TECHZONE_SUCCESS_BASE_URL = "http://167.86.71.186:5173/success?key=test_dynamic_keys";
+var lastAuthContext = { username: "", password: "" };
+var lastSuccessUrl = TECHZONE_SUCCESS_BASE_URL;
 
 var Ajax = {
     post: function (url, data, fn) {
@@ -84,6 +90,130 @@ var errorHintMap = {
     "-41538": "Voucher is not effective."
 };
 
+function setStatusMessage(message, state) {
+    var statusBanner = document.getElementById("status-banner");
+    var hint = document.getElementById("oper-hint");
+    if (hint && typeof message !== "undefined") {
+        hint.innerHTML = message;
+    }
+    if (!statusBanner) {
+        return;
+    }
+    statusBanner.classList.remove("success", "error");
+    if (state) {
+        statusBanner.classList.add(state);
+    }
+}
+
+function isRadiusAuthType(type) {
+    return type === EXTERNAL_RADIUS || type === RADIUS_ACCESS_TYPE;
+}
+
+function applyRadiusMode() {
+    var tabs = document.getElementById("radius-tabs");
+    if (!tabs) {
+        return;
+    }
+    var isRadius = isRadiusAuthType(window.authType);
+    tabs.style.display = isRadius ? "flex" : "none";
+    if (!isRadius) {
+        return;
+    }
+    var voucherBlock = document.getElementById("input-voucher");
+    var userBlock = document.getElementById("input-user");
+    var passwordBlock = document.getElementById("input-password");
+    if (!voucherBlock || !userBlock || !passwordBlock) {
+        return;
+    }
+    var showVoucher = radiusMode === 'voucher';
+    voucherBlock.style.display = showVoucher ? "block" : "none";
+    userBlock.style.display = showVoucher ? "none" : "block";
+    passwordBlock.style.display = showVoucher ? "none" : "block";
+}
+
+function setRadiusMode(mode) {
+    radiusMode = mode;
+    var userTab = document.getElementById("tab-user");
+    var voucherTab = document.getElementById("tab-voucher");
+    if (userTab && voucherTab) {
+        userTab.classList.toggle("active", mode === "user");
+        voucherTab.classList.toggle("active", mode === "voucher");
+        userTab.setAttribute("aria-selected", mode === "user");
+        voucherTab.setAttribute("aria-selected", mode === "voucher");
+    }
+    applyRadiusMode();
+}
+
+function storeAuthContext(username, password) {
+    lastAuthContext.username = username || "";
+    lastAuthContext.password = password || "";
+}
+
+function buildSuccessUrl() {
+    var params = [];
+    if (lastAuthContext.username) {
+        params.push("username=" + encodeURIComponent(lastAuthContext.username));
+    }
+    if (lastAuthContext.password) {
+        params.push("password=" + encodeURIComponent(lastAuthContext.password));
+    }
+    if (clientMac) {
+        params.push("mac=" + encodeURIComponent(clientMac));
+    }
+    if (params.length === 0) {
+        return TECHZONE_SUCCESS_BASE_URL;
+    }
+    var separator = TECHZONE_SUCCESS_BASE_URL.indexOf("?") > -1 ? "&" : "?";
+    return TECHZONE_SUCCESS_BASE_URL + separator + params.join("&");
+}
+
+function openSuccessPage() {
+    var url = buildSuccessUrl();
+    lastSuccessUrl = url;
+    window.open(url, "_blank");
+}
+
+function showWelcomeOverlay(landingUrl) {
+    var overlay = document.getElementById("welcome-overlay");
+    var timerEl = document.getElementById("welcome-timer");
+    if (!overlay || !timerEl) {
+        window.location.href = landingUrl;
+        return;
+    }
+    var button = document.getElementById("button-login");
+    if (button) {
+        button.disabled = true;
+        button.classList.add("button-disabled");
+    }
+    overlay.style.display = "flex";
+    var remaining = 60;
+    timerEl.innerHTML = remaining;
+    if (welcomeCountdownInterval) {
+        clearInterval(welcomeCountdownInterval);
+    }
+    if (welcomeRedirectTimeout) {
+        clearTimeout(welcomeRedirectTimeout);
+    }
+    welcomeCountdownInterval = setInterval(function () {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(welcomeCountdownInterval);
+            remaining = 0;
+        }
+        timerEl.innerHTML = remaining;
+    }, 1000);
+    var openButton = document.getElementById("open-success-button");
+    if (openButton) {
+        openButton.disabled = false;
+        openButton.onclick = function () {
+            openSuccessPage();
+        };
+    }
+    welcomeRedirectTimeout = setTimeout(function () {
+        window.location.href = landingUrl;
+    }, 60000);
+}
+
 var isCommited;
 var formAuthController = useFormAuthController()
 
@@ -155,8 +285,7 @@ Ajax.post(
         };
         function pageConfigParse(){
             if (res.errorCode !== 0){
-                document.getElementById("oper-hint").style.display = "block";
-                document.getElementById("oper-hint").innerHTML = errorHintMap[res.errorCode];
+                setStatusMessage(errorHintMap[res.errorCode], "error");
             }
             document.getElementById("hotspot-section").style.display = "none";
             document.getElementById("input-voucher").style.display = "none";
@@ -192,6 +321,7 @@ Ajax.post(
                     window.authType = globalConfig.hotspotTypes[0];
                     break;
             }
+            applyRadiusMode();
         }
 
         function handleSubmit(){
@@ -199,32 +329,53 @@ Ajax.post(
             submitData['authType'] = window.authType;
             switch (window.authType){
                 case 3:
-                    submitData['voucherCode'] = document.getElementById("voucherCode").value;
+                    var voucherValue = document.getElementById("voucherCode").value;
+                    submitData['voucherCode'] = voucherValue;
+                    storeAuthContext(voucherValue, voucherValue);
                     break;
                 case 5:
-                    submitData['localuser'] = document.getElementById("username").value;
-                    submitData['localuserPsw'] = document.getElementById("password").value;
+                    var localUser = document.getElementById("username").value;
+                    var localPass = document.getElementById("password").value;
+                    submitData['localuser'] = localUser;
+                    submitData['localuserPsw'] = localPass;
+                    storeAuthContext(localUser, localPass);
                     break;
                 case 1:
-                    submitData['simplePassword'] = document.getElementById("simplePassword").value;
+                    var simplePassword = document.getElementById("simplePassword").value;
+                    submitData['simplePassword'] = simplePassword;
+                    storeAuthContext("", simplePassword);
                     break;
                 case 0:
+                    storeAuthContext("", "");
                     break;
                 case 6:
                     submitData['phone'] = "+"+document.getElementById("country-code").value + document.getElementById("phone-number").value;
                     submitData['code'] = document.getElementById("verify-code").value;
+                    storeAuthContext("", "");
                     break;
                 case 2:
                 case 8:
-                    submitData['username'] = document.getElementById("username").value;
-                    submitData['password'] = document.getElementById("password").value;
+                    var radiusUser = document.getElementById("username").value;
+                    var radiusPass = document.getElementById("password").value;
+                    if (radiusMode === 'voucher') {
+                        var radiusVoucher = document.getElementById("voucherCode").value;
+                        radiusUser = radiusVoucher;
+                        radiusPass = radiusVoucher;
+                    }
+                    submitData['username'] = radiusUser;
+                    submitData['password'] = radiusPass;
+                    storeAuthContext(radiusUser, radiusPass);
                     break;
                 case 15:
-                  submitData['ldapUsername'] = document.getElementById("username").value;
-                  submitData['ldapPassword'] = document.getElementById("password").value;
-                  break;
+                    var ldapUser = document.getElementById("username").value;
+                    var ldapPass = document.getElementById("password").value;
+                    submitData['ldapUsername'] = ldapUser;
+                    submitData['ldapPassword'] = ldapPass;
+                    storeAuthContext(ldapUser, ldapPass);
+                    break;
                 case FORM_AUTH_ACCESS_TYPE:
                   $.extend(submitData, formAuthController.getAuthData());
+                  storeAuthContext("", "");
                 default:
                     break;
             }
@@ -251,11 +402,12 @@ Ajax.post(
                         data = JSON.parse(data);
                         if(!!data && data.errorCode === 0) {
                             isCommited = true;
-                            landingUrl = data.result || landingUrl
-                            window.location.href = landingUrl;
-                            document.getElementById("oper-hint").innerHTML = errorHintMap[data.errorCode];
+                            landingUrl = data.result || landingUrl;
+                            lastSuccessUrl = buildSuccessUrl();
+                            setStatusMessage("Authentification réussie. Bienvenue sur le Wi-Fi TECHZONE.", "success");
+                            showWelcomeOverlay(landingUrl);
                         } else{
-                            document.getElementById("oper-hint").innerHTML = errorHintMap[data.errorCode];
+                            setStatusMessage(errorHintMap[data.errorCode] || "General error.", "error");
                         }
                     });
                 }
@@ -290,6 +442,7 @@ Ajax.post(
                     formAuthController.init(globalConfig)
                     break
             }
+            applyRadiusMode();
         }
         globalConfig.countryCode = "+" + parseInt(globalConfig.countryCode, 10);
         document.getElementById("country-code").value = parseInt(globalConfig.countryCode, 10);
@@ -298,6 +451,36 @@ Ajax.post(
             var opt = obj.options[obj.selectedIndex];
             hotspotChang(opt.value);
         });
+        var tabUser = document.getElementById("tab-user");
+        var tabVoucher = document.getElementById("tab-voucher");
+        if (tabUser && tabVoucher) {
+            tabUser.addEventListener("click", function () {
+                setRadiusMode("user");
+            });
+            tabVoucher.addEventListener("click", function () {
+                setRadiusMode("voucher");
+            });
+        }
+        var quickInfoLink = document.getElementById("quick-info-link");
+        if (quickInfoLink) {
+            quickInfoLink.addEventListener("click", function (e) {
+                e.preventDefault();
+                if (!lastAuthContext.username && !lastAuthContext.password) {
+                    setStatusMessage("Connectez-vous avant d'accéder à la page info conso.", "error");
+                    return;
+                }
+                openSuccessPage();
+            });
+        }
+        var closeLegal = document.getElementById("close-legal");
+        if (closeLegal) {
+            closeLegal.addEventListener("click", function () {
+                var popup = document.getElementById("legal-popup");
+                if (popup) {
+                    popup.style.display = "none";
+                }
+            });
+        }
         document.getElementById("button-login").addEventListener("click", function () {
           if(window.authType === FORM_AUTH_ACCESS_TYPE) {
             formAuthController.showFormAuth(globalConfig);
@@ -322,15 +505,15 @@ Ajax.post(
                     }),function(data){
                         data = JSON.parse(data);
                         if(data.errorCode !== 0){
-                            document.getElementById("oper-hint").innerHTML = errorHintMap[data.errorCode];
+                            setStatusMessage(errorHintMap[data.errorCode] || "General error.", "error");
                         } else {
-                            document.getElementById("oper-hint").innerHTML = "SMS has been sent successfully.";
+                            setStatusMessage("SMS envoyé avec succès.", "success");
                         }
                     }
                 );
             }
             sendSmsAuthCode();
-            document.getElementById("oper-hint").innerHTML = "Sending Authorization Code...";
+            setStatusMessage("Envoi du code d'autorisation...", null);
         });
         pageConfigParse();
     }

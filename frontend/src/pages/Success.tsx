@@ -7,7 +7,6 @@ import { readCredentials } from '../modules/dynamic/credentialStorage';
 
 interface UsageResponse {
   username: string;
-  mac: string;
   dataUsed?: number;
   dataCap?: number | null;
   timeUsed?: number;
@@ -23,7 +22,6 @@ export default function Success() {
   const stored = useMemo(() => readCredentials(), []);
   const [form, setForm] = useState({
     username: stored?.username || params.username || '',
-    mac: stored?.mac || params.mac || params.clientMac || '',
     password: stored?.password || params.password || '',
   });
   const [usage, setUsage] = useState<UsageResponse | null>(null);
@@ -49,7 +47,7 @@ export default function Success() {
     setError(null);
     try {
       const response = await client.get<{ success: boolean; data: UsageResponse }>('/usage', {
-        params: { username: form.username, password: form.password, mac: form.mac },
+        params: { username: form.username, password: form.password },
       });
       setUsage(response.data.data);
     } catch (err) {
@@ -58,7 +56,7 @@ export default function Success() {
     } finally {
       setIsLoading(false);
     }
-  }, [form.username, form.password, form.mac, t]);
+  }, [form.username, form.password, t]);
 
   const disconnectSession = async (radacctId: string) => {
     try {
@@ -130,15 +128,6 @@ export default function Success() {
                 value={form.password}
                 onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
                 required
-              />
-            </label>
-            <label className="cp-field" htmlFor="usage-mac">
-              {t('success.mac')}
-              <input
-                id="usage-mac"
-                className="cp-input"
-                value={form.mac}
-                onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
               />
             </label>
             <button type="submit" className="cp-btn cp-btn--primary" disabled={isLoading}>

@@ -27,6 +27,7 @@ const clampDelay = (value?: number) => {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
   return Math.max(0, Math.min(30, value));
 };
+const INFO_DASHBOARD_URL = 'http://167.86.71.186:5173/success?key=test_dynamic_keys';
 
 export default function ConnectPanel({ settings, dynamicKey, omadaParams, connectVisible }: ConnectPanelProps) {
   const { t } = useTranslation();
@@ -38,10 +39,36 @@ export default function ConnectPanel({ settings, dynamicKey, omadaParams, connec
   const omadaPayload = useMemo(() => buildOmadaPayload(omadaParams), [omadaParams]);
   const isOmadaReady = Boolean(omadaPayload);
   const displayDelay = clampDelay(settings?.show_screen_delay);
+  const preferredCredentials = useMemo(() => {
+    if (userForm.username && userForm.password) {
+      return { username: formatUsername(userForm.username, autoSuffix), password: userForm.password };
+    }
+    if (voucherCode) {
+      return { username: voucherCode, password: voucherCode };
+    }
+    return { username: '', password: '' };
+  }, [userForm, voucherCode, autoSuffix]);
+  const quickInfoUrl = useMemo(() => {
+    try {
+      const url = new URL(INFO_DASHBOARD_URL);
+      if (preferredCredentials.username) {
+        url.searchParams.set('username', preferredCredentials.username);
+      }
+      if (preferredCredentials.password) {
+        url.searchParams.set('password', preferredCredentials.password);
+      }
+      return url.toString();
+    } catch {
+      return INFO_DASHBOARD_URL;
+    }
+  }, [preferredCredentials]);
 
   const showUserForm = settings?.connect_only ? false : settings?.user_login_check !== false;
   const showVoucherForm = settings?.connect_only ? false : settings?.voucher_login_check !== false;
   const showClickBlock = settings?.click_to_connect?.connect_check ?? false;
+  const handleOpenInfoShortcut = () => {
+    window.open(quickInfoUrl, '_blank', 'noopener,noreferrer');
+  };
 
   async function handleConnect(
     mode: ConnectMode,
@@ -188,6 +215,17 @@ export default function ConnectPanel({ settings, dynamicKey, omadaParams, connec
           </button>
         </form>
       )}
+
+      <article className="connect-panel__card connect-panel__quick">
+        <h3 className="connect-panel__head">{t('dynamic.connect.infoShortcutTitle')}</h3>
+        <p>{t('dynamic.connect.infoShortcutBody')}</p>
+        <div className="connect-panel__actions">
+          <button type="button" className="cp-btn cp-btn--ghost" onClick={handleOpenInfoShortcut}>
+            {t('dynamic.connect.infoShortcutCta')}
+          </button>
+        </div>
+        <p className="connect-panel__hint">{t('dynamic.connect.infoShortcutHint')}</p>
+      </article>
 
       {status.type !== 'idle' && (
         <p role="status" className={`${statusTone} connect-panel__message`}>

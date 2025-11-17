@@ -99,7 +99,12 @@ const resources = {
           password: 'Password',
           submit: 'Connect',
           voucherTitle: 'Voucher',
-          voucherCode: 'Voucher code'
+          voucherCode: 'Voucher code',
+          infoShortcutTitle: 'Usage shortcut',
+          infoShortcutBody: 'Open the TECHZONE usage dashboard immediately with the credentials you entered.',
+          infoShortcutCta: 'Open usage dashboard',
+          infoShortcutHint: 'Opens in a new tab. If the fields are empty you can fill them on the dashboard.',
+          legalLink: 'Terms & Conditions'
         },
         social: {
           title: 'Social login',
@@ -132,10 +137,9 @@ const resources = {
         subtitle: 'Monitor your connection status and usage.',
         username: 'Username',
         password: 'Password',
-        mac: 'MAC address',
         refresh: 'Refresh',
         loading: 'Loading…',
-        missingParams: 'Specify the username and MAC to load usage.',
+        missingParams: 'Specify the username to load usage.',
         fetchError: 'Unable to fetch usage.',
         disconnectError: 'Unable to disconnect the session.',
         statusTitle: 'Status',
@@ -203,7 +207,7 @@ const resources = {
         privacy: 'Confidentialité'
       },
       layout: {
-        eyebrow: 'Portail Omada',
+        eyebrow: 'TECHZONE WIFI',
         title: 'Connexion dynamique',
         language: 'Changer de langue',
         navLabel: 'Navigation principale'
@@ -290,7 +294,12 @@ const resources = {
           password: 'Mot de passe',
           submit: 'Se connecter',
           voucherTitle: 'Bon',
-          voucherCode: 'Code bon'
+          voucherCode: 'Code bon',
+          infoShortcutTitle: 'Accès rapide info conso',
+          infoShortcutBody: 'Accédez instantanément au tableau de consommation TECHZONE avec les identifiants saisis.',
+          infoShortcutCta: 'Ouvrir la page info conso',
+          infoShortcutHint: 'S’ouvre dans un nouvel onglet. Si les champs sont vides, vous pourrez les renseigner sur le tableau.',
+          legalLink: 'Conditions générales'
         },
         social: {
           title: 'Connexion sociale',
@@ -323,10 +332,9 @@ const resources = {
         subtitle: 'Surveillez le statut de votre connexion et vos consommations.',
         username: "Nom d'utilisateur",
         password: 'Mot de passe',
-        mac: 'Adresse MAC',
         refresh: 'Actualiser',
         loading: 'Chargement…',
-        missingParams: "Indiquez le nom d'utilisateur et la MAC pour charger les usages.",
+        missingParams: "Indiquez le nom d'utilisateur pour charger les usages.",
         fetchError: 'Impossible de récupérer les usages.',
         disconnectError: 'Impossible de déconnecter la session.',
         statusTitle: 'Statut',
@@ -351,7 +359,7 @@ const resources = {
         sessionIp: 'Adresse IP',
         sessionOngoing: 'En cours',
         disconnect: 'Déconnecter',
-        omadaBridgeHint: 'Vous venez de vous authentifier via le portail Omada local. L’usage se charge automatiquement, inutile de ressaisir vos identifiants.'
+        omadaBridgeHint: 'Vous venez de vous authentifier via le portail TECHZONE local. L’usage se charge automatiquement, inutile de ressaisir vos identifiants.'
       },
       support: {
         eyebrow: 'Besoin d’aide ?',
@@ -367,7 +375,7 @@ const resources = {
       terms: {
         eyebrow: 'Politique d’usage',
         scopeTitle: 'Champ',
-        scopeBody: 'Ces conditions régissent l’accès au portail captif et au hotspot Omada opéré par Techzone.',
+        scopeBody: 'Ces conditions régissent l’accès au portail captif et au hotspot opéré par Techzone.',
         usageTitle: 'Bon usage',
         usageBody: 'Vous vous engagez à ne pas perturber le réseau, partager vos identifiants ni saturer la bande passante.',
         responsibilityTitle: 'Responsabilité opérateur',
@@ -481,7 +489,12 @@ const resources = {
           password: 'Contraseña',
           submit: 'Conectar',
           voucherTitle: 'Voucher',
-          voucherCode: 'Código de voucher'
+          voucherCode: 'Código de voucher',
+          infoShortcutTitle: 'Acceso rápido al consumo',
+          infoShortcutBody: 'Abre al instante el panel de consumo de TECHZONE con las credenciales ingresadas.',
+          infoShortcutCta: 'Abrir información de consumo ',
+          infoShortcutHint: 'Se abre en una nueva pestaña. Si los campos están vacíos, podrás completarlos en el panel.',
+          legalLink: 'Condiciones de uso'
         },
         social: {
           title: 'Inicio de sesión social',
@@ -514,10 +527,9 @@ const resources = {
         subtitle: 'Revisa el estado y consumo de tu conexión.',
         username: 'Usuario',
         password: 'Contraseña',
-        mac: 'Dirección MAC',
         refresh: 'Actualizar',
         loading: 'Cargando…',
-        missingParams: 'Indica el usuario y la MAC para cargar el uso.',
+        missingParams: 'Indica el usuario para cargar el uso.',
         fetchError: 'No se pudieron obtener los datos.',
         disconnectError: 'No se pudo desconectar la sesión.',
         statusTitle: 'Estado',

@@ -280,6 +280,11 @@
   background: var(--cp-surface-muted);
 }
 
+.connect-panel__quick {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(2, 6, 23, 0.02));
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
 .connect-panel__input-group {
   position: relative;
 }
@@ -301,6 +306,19 @@
   margin: 0 0 0.35rem;
   font-size: 1rem;
   font-weight: 600;
+}
+
+.connect-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.connect-panel__hint {
+  font-size: 0.8rem;
+  color: var(--cp-text-muted);
+  margin-top: 0.5rem;
 }
 
 .connect-panel__message {

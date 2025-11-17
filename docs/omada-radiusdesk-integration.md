@@ -58,23 +58,21 @@ Dans les deux modes, dès que `Authentication Type = RADIUS Server` est configur
 #### 3.0.1 Bundle `frontend/omada-captive-portail-exemple`
 
 - **Entrée / fichiers clés** :
-  - `index.html` : deux onglets “Utilisateur” / “Voucher” totalement statiques. `assets/js/main.js` nettoie les champs à chaque changement d’onglet et poste les identifiants directement vers `/portal/radius/browserauth`.
-  - `success.html` : page “Attente Info Conso” qui lit `username/password/clientMac` transmis par `main.js`. Elle effectue un compte à rebours de 15 s puis affiche un bouton + un lien vers `https://hotspot.techzone.lat/portal/success?fromOmada=1&username=...`, ce qui évite les erreurs CORS / certificats self-signés côté Omada.
-  - `assets/js/portal-utils.js` : dictionnaire FR/EN et parsing de la query string (`clientMac`, `ssidName`, `infoUrl`, etc.).
+  - `index.html` : copie modernisée du portail TP-Link officiel (`frontend/demo-omada-captive-portal`). Aucun appel RadiusDesk n’est effectué ; la page consomme `/portal/getPortalPageSetting`, gère les différents modes Hotspot (voucher, SMS, local user, etc.) et poste vers `/portal/radius/auth` comme le ferait Omada par défaut.
+  - `assets/js/main.js` : script original TP-Link, juste enrichi d’un switch “Utilisateur / Voucher” pour les modes `authType = 2` ou `8` (username = password) et d’un bouton de thème clair/sombre.
+  - `assets/js/jquery.min.js`, `assets/css/style.css`, `assets/img/*` : assets statiques issus de la démo Omada.
   - `package.sh` : génère `omada-captive-portail-exemple.zip` (bundle importable dans l’UI Omada).
 - **Flux** :
-  1. L’appareil est redirigé vers `index.html?...` avec tous les paramètres Omada.
-  2. `main.js` n’effectue plus aucun appel HTTP externe (pas de `dynamic-details`, donc aucun warning “Failed to fetch”). Seul le POST vers Omada est réalisé et `authType` est forcé à `2 = EXTERNAL_RADIUS` (ou `8 = RADIUS_ACCESS_TYPE` si `?authType=8` est passé dans l’URL du contrôleur) afin d’éviter l’erreur “invalid authentication type”.
-  3. Après Accept, `main.js` transmet `username/password/clientMac/infoUrl` à `success.html`.
-  4. `success.js` affiche un compte à rebours de 15 s (pour laisser Omada finaliser l’ouverture) puis propose un bouton + un lien qui ouvrent l’Espace Info Conso (React) déjà présent dans ce dépôt. L’URL contient `fromOmada=1`, ce qui supprime la demande de re-saisie des identifiants sur `/success`.
+  1. L’appareil est redirigé vers `index.html?...` avec tous les paramètres Omada. `main.js` affiche automatiquement le formulaire adapté selon `authType`.
+  2. Pour `authType = 2/8`, l’opérateur peut choisir “Utilisateur” ou “Voucher” : en mode Voucher, le mot de passe prend la même valeur que l’identifiant (comme demandé) et le formulaire est posté vers `/portal/radius/auth`.
+  3. Les codes d’erreur Radius (`errorCode`) sont relayés tels quels par `main.js` (affichage dans `#oper-hint`), ce qui permet de voir les messages FreeRADIUS/Omada originaux (“Invalid authentication type”, “Incorrect password”, etc.).
 - **Pré-requis infra** :
   - Omada configuré en `Authentication Type = RADIUS Server` + `Accounting` vers FreeRADIUS/RadiusDesk (ports 1812/1813).
   - `Portal Customization = Local Web Portal`, import du ZIP via l’UI Omada, mode HTTPS recommandé.
-  - Aucun appel AJAX n’étant effectué avant auth, seule l’URL finale de l’Espace Info Conso (`https://hotspot.techzone.lat/portal`) doit être ajoutée au walled garden si l’on souhaite autoriser l’ouverture avant levée captive.
-  - Optionnel : passer `infoUrl=https://<domaine>/portal` dans la query string pour surcharger la cible de l’Espace Info Conso.
+  - Aucun appel AJAX externe n’est effectué avant auth (tous les fetch restent internes à Omada), donc pas de configuration CORS particulière.
 - **Validation rapide** :
-  - Localement : `npx serve frontend/omada-captive-portail-exemple` puis `http://localhost:4173/index.html?clientMac=AA...&link_login_only=https://controller:8843/portal/radius/browserauth`.
-  - En prod : importer `omada-captive-portail-exemple.zip`, associer au SSID, puis vérifier que les Access-Request/Accounting partent vers FreeRADIUS et qu’après 15 s la page “Info Conso” ouvre `https://hotspot.techzone.lat/portal/success?fromOmada=1&username=...`.
+  - Localement : `npx serve frontend/omada-captive-portail-exemple` puis `http://localhost:4173/index.html?clientMac=AA...`.
+  - En prod : importer `omada-captive-portail-exemple.zip`, associer au SSID, puis vérifier que les erreurs/acceptations Radius remontent correctement dans `#oper-hint`.
 
 ### 3.1 Nouveaux services côté RadiusDesk (PHP)
 
