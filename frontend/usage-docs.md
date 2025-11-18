@@ -52,3 +52,16 @@ VITE_API_BASE_URL="http://localhost:4000/api" npm run dev
 ```
 
 Then browse to `/success?username=glaringboy&password=<pass>` or `/success?username=nolimit&password=<pass>` to verify that the charts, tables and filters react to real data. The responsive layout has been verified for both 360px and 1440px viewports; keep those breakpoints in mind when adding new widgets.
+
+## Admin console
+
+- The `/admin` route exposes a secured workspace for operators. It consumes the new `/api/admin/*` endpoints which require a token.
+- Authentication modes:
+  - Static operator: set `ADMIN_STATIC_USER` / `ADMIN_STATIC_PASSWORD` and leave `ADMIN_AUTH_MODE=static` (default).
+  - RadiusDesk MySQL: set `RADIUS_MYSQL_USER` / `RADIUS_MYSQL_PASSWORD` and optionally `ADMIN_AUTH_MODE=radiusmysql` to make it the default.
+- Additional environment knobs live in the backend `.env` file:
+  - `ADMIN_TOKEN_TTL_MINUTES` controls token lifetime (default 240 minutes).
+- Once authenticated, admins can search any username to obtain:
+  - Aggregated periods (hour/day/week/month), routers, MAC list.
+  - Recent active and inactive sessions (no password required).
+- Tokens are stored in `localStorage` on the frontend and can be revoked via the logout button.

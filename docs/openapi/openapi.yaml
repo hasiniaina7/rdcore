@@ -17,6 +17,7 @@ tags:
   - name: social
   - name: omada
   - name: radiusdesk-proxy
+  - name: admin
 security:
   - RadiusToken: []
 components:
@@ -31,6 +32,11 @@ components:
       in: cookie
       name: JSESSIONID
       description: Omada controller session cookie used after `/hotspot/login`.
+    AdminToken:
+      type: http
+      scheme: bearer
+      bearerFormat: uuid
+      description: Operator session token issued by `/api/admin/login`.
   schemas:
     DynamicGalleryItem:
       type: object
@@ -157,6 +163,74 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RadacctSession'
+    AdminAuthModes:
+      type: object
+      properties:
+        availableModes:
+          type: array
+          items:
+            type: string
+            enum: [static, radiusmysql]
+        defaultMode:
+          type: string
+          nullable: true
+          enum: [static, radiusmysql, null]
+    AdminLoginResult:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+        expiresAt:
+          type: integer
+          format: int64
+          description: Epoch milliseconds when the token expires.
+        mode:
+          type: string
+          enum: [static, radiusmysql]
+    AdminSession:
+      type: object
+      properties:
+        username: { type: string }
+        mode:
+          type: string
+          enum: [static, radiusmysql]
+    RouterUsageStat:
+      type: object
+      properties:
+        label: { type: string }
+        totalBytes: { type: number }
+        totalTimeSeconds: { type: number }
+        sessionCount: { type: integer }
+    AdminUserInsights:
+      type: object
+      properties:
+        username: { type: string }
+        macs:
+          type: array
+          items: { type: string }
+        historyLimit: { type: integer }
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsagePeriodSummary'
+        activeSessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RadacctSession'
+        inactiveSessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RadacctSession'
+        activeCount: { type: integer }
+        inactiveCount: { type: integer }
+        routerStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/RouterUsageStat'
+        lastUpdated:
+          type: string
+          format: date-time
     OmadaAuthPayload:
       type: object
       properties:
@@ -446,14 +520,160 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-        '404':
-          description: Unable to determine MAC address for the requested user
+  /api/admin/auth-modes:
+    get:
+      tags: [admin]
+      summary: List operator authentication modes
+      description: Returns the configured admin authentication sources (static credentials or RadiusDesk MySQL user).
+      operationId: listAdminAuthModes
+      responses:
+        '200':
+          description: Available modes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminAuthModes'
+        '503':
+          description: Admin authentication not configured
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /api/admin/login:
+    post:
+      tags: [admin]
+      summary: Authenticate an operator and issue a bearer token
+      operationId: loginAdmin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+                mode:
+                  type: string
+                  enum: [static, radiusmysql]
+            examples:
+              static:
+                value:
+                  username: admin
+                  password: secret
+                  mode: static
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminLoginResult'
         '401':
-          description: RadiusDesk authentication failure
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Mode not available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/admin/me:
+    get:
+      tags: [admin]
+      summary: Retrieve the active admin session
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminSession'
+        '401':
+          description: Missing or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/admin/logout:
+    post:
+      tags: [admin]
+      summary: Revoke the admin token
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: Token removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccess'
+        '401':
+          description: Missing or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/admin/users/{username}/insights:
+    get:
+      tags: [admin, usage]
+      summary: Operator-only usage insights for a username
+      description: Aggregates usage summaries, router stats and recent sessions without requiring the user password.
+      operationId: getAdminUserInsights
+      security:
+        - AdminToken: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema: { type: string }
+        - in: query
+          name: historyLimit
+          schema:
+            type: integer
+            minimum: 50
+            maximum: 500
+          description: Optional override for the amount of historical sessions inspected.
+      responses:
+        '200':
+          description: Usage insights
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminUserInsights'
+        '401':
+          description: Missing token or RadiusDesk authentication failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Username not found or unable to determine MAC address
           content:
             application/json:
               schema:

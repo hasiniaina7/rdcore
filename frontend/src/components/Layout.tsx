@@ -10,6 +10,7 @@ const navItems = [
   { to: '/support', label: 'nav.support' },
   { to: '/terms', label: 'nav.terms' },
   { to: '/privacy', label: 'nav.privacy' },
+  { to: '/admin', label: 'nav.admin' },
 ];
 
 export default function Layout({ children }: PropsWithChildren) {

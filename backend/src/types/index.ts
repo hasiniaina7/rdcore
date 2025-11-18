@@ -106,3 +106,30 @@ export interface HealthStatus {
   status: 'ok' | 'degraded' | 'down';
   details?: Record<string, unknown>;
 }
+
+export type AdminAuthMode = 'static' | 'radiusmysql';
+
+export interface AdminSession {
+  username: string;
+  mode: AdminAuthMode;
+}
+
+export interface RouterUsageStat {
+  label: string;
+  totalBytes: number;
+  totalTimeSeconds: number;
+  sessionCount: number;
+}
+
+export interface AdminUserInsights {
+  username: string;
+  macs: string[];
+  historyLimit: number;
+  periods: UsagePeriodSummary[];
+  activeSessions: Array<Record<string, unknown>>;
+  inactiveSessions: Array<Record<string, unknown>>;
+  activeCount: number;
+  inactiveCount: number;
+  routerStats: RouterUsageStat[];
+  lastUpdated: string;
+}

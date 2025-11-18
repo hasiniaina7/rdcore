@@ -8,6 +8,7 @@ import usageRoutes from './routes/usage';
 import socialRoutes from './routes/social';
 import docsRoutes from './routes/docs';
 import healthRoutes from './routes/health';
+import adminRoutes from './routes/admin';
 import errorHandler from './middleware/errorHandler';
 
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api', dynamicRoutes);
 app.use('/api', connectRoutes);
 app.use('/api', usageRoutes);
 app.use('/api', socialRoutes);
+app.use('/api', adminRoutes);
 app.use('/', healthRoutes);
 
 app.use(errorHandler);

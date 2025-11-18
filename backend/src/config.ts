@@ -26,6 +26,12 @@ const envSchema = z.object({
     .optional()
     .default('false')
     .transform((value) => value === 'true'),
+  ADMIN_AUTH_MODE: z.enum(['static', 'radiusmysql']).default('static'),
+  ADMIN_STATIC_USER: z.string().optional().default('admin'),
+  ADMIN_STATIC_PASSWORD: z.string().optional().default('change-me'),
+  RADIUS_MYSQL_USER: z.string().optional().default(''),
+  RADIUS_MYSQL_PASSWORD: z.string().optional().default(''),
+  ADMIN_TOKEN_TTL_MINUTES: z.coerce.number().default(240),
 });
 
 const parsed = envSchema.safeParse(process.env);
