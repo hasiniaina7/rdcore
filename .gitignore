@@ -12,6 +12,12 @@ coverage
 .env.*
 !.env.example
 !.env.frontend.example
+!frontend/.env.frontend.example
+!frontend/.env.example
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
 .DS_Store
 .idea
 .vscode
