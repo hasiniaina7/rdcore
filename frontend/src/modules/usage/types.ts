@@ -1,11 +1,5 @@
 export type UsagePeriodKey = 'hourly' | 'daily' | 'weekly' | 'monthly';
 
-export interface UsageCredentials {
-  username: string;
-  password: string;
-  mac?: string;
-}
-
 export interface UsageSessionsOptions {
   limit?: number;
 }

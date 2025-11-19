@@ -14,3 +14,12 @@ Cette liste recense les fichiers `.env` qui contiennent des secrets opérationne
 - Ajouter tout nouveau fichier `.env*` au `.gitignore` par défaut.
 - Chiffrer les archives contenant des `.env` avant de les partager.
 - Régénérer régulièrement les identifiants stockés dans ces fichiers.
+
+## Sessions d'usage (frontend sécurisé)
+
+Le backend stocke désormais les identifiants usage côté serveur et émet un jeton temporaire pour les appels `/api/usage`. Deux variables contrôlent ce comportement dans `.env.example` :
+
+- `USAGE_SESSION_TTL_MINUTES` : durée de vie (minutes) d’un jeton usage (par défaut 30 min).
+- `USAGE_SESSION_CACHE_SIZE` : capacité maximale du cache LRU côté serveur.
+
+Ajustez ces valeurs selon vos contraintes de charge (ex: hotspots très fréquentés) et redémarrez PM2 pour appliquer les modifications.

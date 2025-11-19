@@ -1,10 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import useDynamicDetail from '../modules/dynamic/useDynamicDetail';
 
 export default function Support() {
   const { t } = useTranslation();
-  const { data, isLoading } = useDynamicDetail();
-  const detail = data?.detail as Record<string, unknown> | undefined;
 
   return (
     <article className="cp-card">
@@ -16,35 +13,40 @@ export default function Support() {
         <span className="cp-badge cp-badge--info">{t('support.response')}</span>
       </div>
       <p>{t('support.subtitle')}</p>
-      {isLoading ? (
-        <p>{t('loading')}</p>
-      ) : (
-        <dl className="cp-description-list">
-          <div>
-            <dt>{t('support.email')}</dt>
-            <dd>{readText(detail?.email, t('support.fallback'))}</dd>
-          </div>
-          <div>
-            <dt>{t('support.phone')}</dt>
-            <dd>{readText(detail?.phone, t('support.fallback'))}</dd>
-          </div>
-          <div>
-            <dt>{t('support.hours')}</dt>
-            <dd>{t('support.hoursValue')}</dd>
-          </div>
-          <div>
-            <dt>{t('support.address')}</dt>
-            <dd>{readText(detail?.address, t('support.fallback'))}</dd>
-          </div>
-        </dl>
-      )}
+      <dl className="cp-description-list">
+        <div>
+          <dt>{t('support.address')}</dt>
+          <dd>Anjoma CENTER BOX 12</dd>
+        </div>
+        <div>
+          <dt>Informaticien</dt>
+          <dd>038 66 707 66</dd>
+        </div>
+        <div>
+          <dt>Techniciens</dt>
+          <dd>038 63 707 66</dd>
+        </div>
+        <div>
+          <dt>Commercial 1</dt>
+          <dd>038 64 707 66</dd>
+        </div>
+        <div>
+          <dt>Commercial 2</dt>
+          <dd>034 73 777 66</dd>
+        </div>
+        <div>
+          <dt>Mobile Money</dt>
+          <dd>034 73 777 66 – 033 78 609 66 – 032 79 203 48</dd>
+        </div>
+        <div>
+          <dt>{t('support.hours')}</dt>
+          <dd>08h00–12h00 · 14h00–17h30</dd>
+        </div>
+        <div>
+          <dt>{t('support.email')}</dt>
+          <dd>contact@techzone.lat</dd>
+        </div>
+      </dl>
     </article>
   );
-}
-
-function readText(value: unknown, fallback: string) {
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value;
-  }
-  return fallback;
 }

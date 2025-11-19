@@ -2,6 +2,7 @@ import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
 import path from 'path';
+import YAML from 'yaml';
 
 const router = Router();
 const openapiPath = path.resolve(process.cwd(), '../docs/openapi/openapi.yaml');
@@ -20,13 +21,8 @@ router.get('/docs/openapi.yaml', (_req, res, next) => {
   }
 });
 
-const swaggerUiHandler = swaggerUi.setup(undefined, {
-  explorer: true,
-  swaggerOptions: {
-    url: '/docs/openapi.yaml',
-  },
-});
-
-router.use('/docs', swaggerUi.serve, swaggerUiHandler);
+// Preload and parse the OpenAPI spec to avoid client-side parsing issues
+const openapiObject = YAML.parse(fs.readFileSync(openapiPath, 'utf8'));
+router.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiObject, { explorer: true }));
 
 export default router;

@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Bar,
@@ -14,7 +14,6 @@ import {
 } from 'recharts';
 import useOmadaParams from '../hooks/useOmadaParams';
 import useDynamicDetail from '../modules/dynamic/useDynamicDetail';
-import { readCredentials } from '../modules/dynamic/credentialStorage';
 import { useUsageData } from '../modules/usage/useUsageData';
 import {
   aggregateByDay,
@@ -24,14 +23,14 @@ import {
   combineSessions,
   filterSessions,
   getMacOptions,
-  getRouterOptions,
   secondsToDuration,
   summarizePeriod,
 } from '../modules/usage/utils';
 import UsageFilterBar from '../modules/usage/components/UsageFilterBar';
 import SessionTable from '../modules/usage/components/SessionTable';
-import type { UsageCredentials, UsageFilters } from '../modules/usage/types';
+import type { UsageFilters } from '../modules/usage/types';
 import { disconnectUsageSessions } from '../modules/usage/api';
+import { useAuth } from '../modules/auth/AuthProvider';
 
 const MB = 1024 * 1024;
 
@@ -39,32 +38,27 @@ export default function Success() {
   const { t } = useTranslation();
   const params = useOmadaParams();
   const { data: dynamicDetail } = useDynamicDetail();
-  const stored = useMemo(() => readCredentials(), []);
-  const initialUsername = stored?.username || params.username || '';
-  const initialPassword = stored?.password || params.password || '';
-  const initialMac = stored?.mac || params.mac || '';
-  const [form, setForm] = useState({
-    username: initialUsername,
-    password: initialPassword,
-    mac: initialMac,
-  });
+  const { session } = useAuth();
+  const [macInput, setMacInput] = useState(session?.profile?.mac || params.mac || '');
+  const [macOverride, setMacOverride] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<UsageFilters>({ status: 'all' });
-  const [localError, setLocalError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
   const [pendingDisconnectId, setPendingDisconnectId] = useState<string | null>(null);
 
-  const [credentials, setCredentials] = useState<UsageCredentials | null>(() => {
-    if (initialUsername && initialPassword) {
-      return { username: initialUsername, password: initialPassword, mac: initialMac || undefined };
-    }
-    return null;
-  });
+  useEffect(() => {
+    setMacInput(session?.profile?.mac || '');
+    setMacOverride(undefined);
+  }, [session?.profile?.mac]);
 
-  const { usage, summary, activeSessions, inactiveSessions, errors, isLoading, lastUpdated, refresh } = useUsageData(credentials);
+  const activeMac = macOverride ?? session?.profile?.mac ?? undefined;
+
+  const { usage, summary, activeSessions, inactiveSessions, errors, isLoading, lastUpdated, refresh } = useUsageData({
+    enabled: Boolean(session),
+    mac: activeMac,
+  });
 
   const sessions = useMemo(() => combineSessions(activeSessions?.sessions, inactiveSessions?.sessions), [activeSessions, inactiveSessions]);
   const filteredSessions = useMemo(() => filterSessions(sessions, filters), [sessions, filters]);
-  const routerOptions = useMemo(() => getRouterOptions(sessions), [sessions]);
   const macOptions = useMemo(() => getMacOptions(sessions), [sessions]);
   const dailySeries = useMemo(() => aggregateByDay(filteredSessions), [filteredSessions]);
   const routerStats = useMemo(() => aggregateByRouter(filteredSessions).slice(0, 5), [filteredSessions]);
@@ -96,18 +90,14 @@ export default function Success() {
   const lastUpdatedLabel = lastUpdated ? new Date(lastUpdated).toLocaleString() : '—';
   const isOmadaBridge = params.fromOmada === '1' || params.mode === 'omada';
 
-  const handleSubmit = useCallback(
+  const handleMacSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!form.username || !form.password) {
-        setLocalError(t('success.missingParams'));
-        return;
-      }
-      setLocalError(null);
       setBanner(null);
-      setCredentials({ username: form.username, password: form.password, mac: form.mac || undefined });
+      setMacOverride(macInput.trim() || undefined);
+      void refresh();
     },
-    [form, t]
+    [macInput, refresh]
   );
 
   const handleDisconnect = useCallback(
@@ -132,46 +122,23 @@ export default function Success() {
 
   return (
     <div className="cp-dashboard">
-      <article className="cp-card">
+      <article className="cp-card cp-card--hero">
         <div className="cp-card__header">
           <div>
             <p className="cp-eyebrow">{t('success.eyebrow')}</p>
             <h1 className="cp-title">{t('nav.success')}</h1>
           </div>
-          <span className={`cp-badge ${isOnline ? 'cp-badge--success' : 'cp-badge--warning'}`}>
-            {t(isOnline ? 'success.statusOnline' : 'success.statusOffline')}
-          </span>
+          <span className="cp-badge cp-badge--success">{t('success.sessionReady')}</span>
         </div>
-        <p>{t('success.subtitle')}</p>
-        <form className="cp-form cp-form--grid" onSubmit={handleSubmit} data-testid="usage-form">
-          <label className="cp-field" htmlFor="usage-username">
-            {t('success.username')}
-            <input
-              id="usage-username"
-              className="cp-input"
-              value={form.username}
-              onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-              required
-            />
-          </label>
-          <label className="cp-field" htmlFor="usage-password">
-            {t('success.password')}
-            <input
-              id="usage-password"
-              className="cp-input"
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-              required
-            />
-          </label>
+        <p>{t('success.authenticatedAs', { username: session?.profile?.username ?? '—' })}</p>
+        <form className="cp-form cp-form--grid" onSubmit={handleMacSubmit}>
           <label className="cp-field" htmlFor="usage-mac">
             {t('success.mac')}
             <input
               id="usage-mac"
               className="cp-input"
-              value={form.mac}
-              onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
+              value={macInput}
+              onChange={(event) => setMacInput(event.target.value)}
             />
           </label>
           <div className="cp-form__actions">
@@ -185,12 +152,6 @@ export default function Success() {
         </form>
         {isOmadaBridge && <p className="cp-card__meta">{t('success.omadaBridgeHint')}</p>}
       </article>
-
-      {localError && (
-        <p role="alert" className="cp-alert cp-alert--danger">
-          {localError}
-        </p>
-      )}
 
       {banner && (
         <p role="alert" className={`cp-alert ${banner.type === 'success' ? 'cp-alert--success' : 'cp-alert--danger'}`}>
@@ -206,7 +167,7 @@ export default function Success() {
 
       {usage ? (
         <>
-          <section className="cp-grid cp-grid--summary">
+          <section className="cp-grid cp-grid--2">
             <article className="cp-card">
               <div className="cp-card__header">
                 <div>
@@ -280,10 +241,10 @@ export default function Success() {
                 </button>
               </div>
             </div>
-            <UsageFilterBar filters={filters} onChange={setFilters} routerOptions={routerOptions} macOptions={macOptions} />
+            <UsageFilterBar filters={filters} onChange={setFilters} macOptions={macOptions} />
           </article>
 
-          <section className="cp-grid cp-grid--charts">
+          <section className="cp-grid cp-grid--2">
             <article className="cp-card">
               <div className="cp-card__header">
                 <div>

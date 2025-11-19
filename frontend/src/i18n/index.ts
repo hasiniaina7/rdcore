@@ -5,18 +5,30 @@ const resources = {
   en: {
     translation: {
       nav: {
-        home: 'Portal',
+        login: 'Login',
         success: 'Success',
         support: 'Support',
         terms: 'Terms',
-        privacy: 'Privacy',
-        admin: 'Admin'
+        privacy: 'Privacy'
       },
       layout: {
         eyebrow: 'Omada hotspot',
         title: 'Dynamic login',
         language: 'Choose language',
-        navLabel: 'Primary navigation'
+        navLabel: 'Primary navigation',
+        logout: 'Logout'
+      },
+      login: {
+        eyebrow: 'Secure dashboard',
+        title: 'Usage login',
+        subtitle: 'Enter your captive portal credentials to view consumption.',
+        username: 'Username',
+        password: 'Password',
+        mac: 'Device MAC (optional)',
+        submit: 'Sign in',
+        loading: 'Signing in…',
+        help: 'Credentials are provided by your hotspot operator.',
+        error: 'Unable to sign in with these credentials.'
       },
       loading: 'Loading dynamic settings…',
       error: 'Unable to load the captive portal configuration.',
@@ -136,6 +148,8 @@ const resources = {
       success: {
         eyebrow: 'Connection summary',
         subtitle: 'Monitor your connection status and usage.',
+        sessionReady: 'Session ready',
+        authenticatedAs: 'Authenticated as {{username}}',
         username: 'Username',
         password: 'Password',
         mac: 'Device MAC (optional)',
@@ -272,7 +286,7 @@ const resources = {
       support: {
         eyebrow: 'Need help?',
         subtitle: 'Reach the operator team for vouchers, credentials or device support.',
-        response: 'Avg. response <10min',
+        response: 'Avg. response <2h',
         email: 'Email',
         phone: 'Phone',
         hours: 'Hours',
@@ -303,18 +317,30 @@ const resources = {
   fr: {
     translation: {
       nav: {
-        home: 'Portail',
+        login: 'Connexion',
         success: 'Succès',
         support: 'Support',
         terms: 'Conditions',
-        privacy: 'Confidentialité',
-        admin: 'Admin'
+        privacy: 'Confidentialité'
       },
       layout: {
         eyebrow: 'TECHZONE WIFI',
         title: 'Connexion dynamique',
         language: 'Changer de langue',
-        navLabel: 'Navigation principale'
+        navLabel: 'Navigation principale',
+        logout: 'Se déconnecter'
+      },
+      login: {
+        eyebrow: 'Tableau sécurisé',
+        title: 'Connexion usage',
+        subtitle: 'Saisissez vos identifiants du portail pour afficher la consommation.',
+        username: "Nom d'utilisateur",
+        password: 'Mot de passe',
+        mac: 'MAC du terminal (optionnel)',
+        submit: 'Se connecter',
+        loading: 'Connexion…',
+        help: 'Les identifiants sont fournis par votre opérateur hotspot.',
+        error: 'Échec de la connexion avec ces identifiants.'
       },
       loading: 'Chargement de la configuration dynamique…',
       error: 'Impossible de charger la configuration du portail.',
@@ -434,6 +460,8 @@ const resources = {
       success: {
         eyebrow: 'Résumé de connexion',
         subtitle: 'Surveillez le statut de votre connexion et vos consommations.',
+        sessionReady: 'Session prête',
+        authenticatedAs: 'Connecté en tant que {{username}}',
         username: "Nom d'utilisateur",
         password: 'Mot de passe',
         mac: 'MAC de l’appareil (optionnel)',
@@ -570,7 +598,7 @@ const resources = {
       support: {
         eyebrow: 'Besoin d’aide ?',
         subtitle: 'Contactez l’équipe opérateur pour les identifiants ou tout souci de connexion.',
-        response: 'Réponse <10 min',
+        response: 'Réponse <2h',
         email: 'Email',
         phone: 'Téléphone',
         hours: 'Horaires',
@@ -601,18 +629,30 @@ const resources = {
   es: {
     translation: {
       nav: {
-        home: 'Portal',
+        login: 'Inicio de sesión',
         success: 'Éxito',
         support: 'Soporte',
         terms: 'Términos',
-        privacy: 'Privacidad',
-        admin: 'Admin'
+        privacy: 'Privacidad'
       },
       layout: {
         eyebrow: 'Portal Omada',
         title: 'Inicio dinámico',
         language: 'Cambiar idioma',
-        navLabel: 'Navegación principal'
+        navLabel: 'Navegación principal',
+        logout: 'Cerrar sesión'
+      },
+      login: {
+        eyebrow: 'Panel seguro',
+        title: 'Acceso a consumo',
+        subtitle: 'Introduce tus credenciales del portal cautivo para ver tu consumo.',
+        username: 'Usuario',
+        password: 'Contraseña',
+        mac: 'MAC del dispositivo (opcional)',
+        submit: 'Iniciar sesión',
+        loading: 'Ingresando…',
+        help: 'Las credenciales las entrega el operador del hotspot.',
+        error: 'No es posible iniciar sesión con estas credenciales.'
       },
       loading: 'Cargando configuración dinámica…',
       error: 'No se pudo cargar la configuración del portal.',
@@ -732,6 +772,8 @@ const resources = {
       success: {
         eyebrow: 'Resumen de conexión',
         subtitle: 'Revisa el estado y consumo de tu conexión.',
+        sessionReady: 'Sesión lista',
+        authenticatedAs: 'Autenticado como {{username}}',
         username: 'Usuario',
         password: 'Contraseña',
         mac: 'MAC del dispositivo (opcional)',

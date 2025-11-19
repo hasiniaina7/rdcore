@@ -2,8 +2,8 @@
 
 | Frontend route | Backend endpoint | RadiusDesk/Omada dependency | Notes |
 | --- | --- | --- | --- |
-| `/` Dynamic Login | `GET /api/dynamic/details` | `GET /cake4/rd_cake/dynamic-details/info-for.json` | Propagates full query string `clientMac`, `key`, `lang`. Cached 15s, emits `x-cache-status`. |
-| `/success` | `GET /api/usage`, `POST /api/usage/disconnect` | `GET /radaccts/get-usage.json`, `GET /radaccts/index.json`, `GET /radaccts/kick-active.json` | Aggregates quota + recent sessions; disconnect uses `kickActive`. |
+| `/` Usage Login | `POST /api/login` | `GET /radaccts/get-usage.json` | Validates RadiusDesk credentials and issues a short-lived bearer token stored server-side (TTL configurable). |
+| `/success` | `GET /api/usage`, `GET /api/usage-by-username`, `GET /api/{active,inactive}-sessions`, `POST /api/usage/disconnect` | `GET /radaccts/get-usage.json`, `GET /radaccts/index.json`, `GET /radaccts/kick-active.json` | Aggregates quota + recent sessions; all endpoints now require the usage session token from `/api/login`. |
 | Connect actions | `POST /api/connect/{permanent|voucher|click|social}` | `GET /permanent-users/index.json`, `GET /vouchers/index.json`, `POST /api/v2/hotspot/extPortal/auth` | Validates credentials against RadiusDesk before pushing to Omada. |
 | Social buttons | `GET /api/social/{provider}/start`, `/callback` | TBD (OAuth providers) | Stubs return state/redirect and feed `POST /connect/social`. |
 | Health & Ops | `/healthz`, `/readyz`, `/metrics` | `GET /api/v2/hotspot/login`, `GET /dynamic-details/...` | `/readyz` ensures Omada CSRF + RadiusDesk cache; `/metrics` exposes prom-client counters. |

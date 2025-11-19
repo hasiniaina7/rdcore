@@ -32,6 +32,8 @@ const envSchema = z.object({
   RADIUS_MYSQL_USER: z.string().optional().default(''),
   RADIUS_MYSQL_PASSWORD: z.string().optional().default(''),
   ADMIN_TOKEN_TTL_MINUTES: z.coerce.number().default(240),
+  USAGE_SESSION_TTL_MINUTES: z.coerce.number().default(30),
+  USAGE_SESSION_CACHE_SIZE: z.coerce.number().default(1000),
 });
 
 const parsed = envSchema.safeParse(process.env);

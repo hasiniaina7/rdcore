@@ -5,11 +5,10 @@ import type { UsageFilters } from '../types';
 interface Props {
   filters: UsageFilters;
   onChange: (next: UsageFilters) => void;
-  routerOptions: string[];
   macOptions: string[];
 }
 
-export default function UsageFilterBar({ filters, onChange, routerOptions, macOptions }: Props) {
+export default function UsageFilterBar({ filters, onChange, macOptions }: Props) {
   const { t } = useTranslation();
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
@@ -31,17 +30,6 @@ export default function UsageFilterBar({ filters, onChange, routerOptions, macOp
       <div className="cp-filter">
         <label htmlFor="filter-end">{t('success.filters.end')}</label>
         <input id="filter-end" type="date" name="endDate" value={filters.endDate ?? ''} onChange={handleChange} />
-      </div>
-      <div className="cp-filter">
-        <label htmlFor="filter-router">{t('success.filters.router')}</label>
-        <select id="filter-router" name="router" value={filters.router ?? ''} onChange={handleChange}>
-          <option value="">{t('success.filters.routerAll')}</option>
-          {routerOptions.map((router) => (
-            <option key={router} value={router}>
-              {router}
-            </option>
-          ))}
-        </select>
       </div>
       <div className="cp-filter">
         <label htmlFor="filter-device">{t('success.filters.device')}</label>

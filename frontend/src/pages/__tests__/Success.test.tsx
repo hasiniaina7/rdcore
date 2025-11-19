@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Success from '../Success';
 import { useUsageData } from '../../modules/usage/useUsageData';
-import { readCredentials } from '../../modules/dynamic/credentialStorage';
+import { useAuth } from '../../modules/auth/AuthProvider';
 
 vi.mock('recharts', async () => {
   const actual = await vi.importActual<typeof import('recharts')>('recharts');
@@ -28,13 +28,13 @@ vi.mock('../../modules/usage/useUsageData', () => ({
   useUsageData: vi.fn(),
 }));
 
-vi.mock('../../modules/dynamic/credentialStorage', () => ({
+vi.mock('../../modules/auth/AuthProvider', () => ({
   __esModule: true,
-  readCredentials: vi.fn(),
+  useAuth: vi.fn(),
 }));
 
 const mockedUseUsageData = vi.mocked(useUsageData);
-const mockedReadCredentials = vi.mocked(readCredentials);
+const mockedUseAuth = vi.mocked(useAuth);
 
 const baseHookValue = {
   usage: null,
@@ -50,17 +50,26 @@ const baseHookValue = {
 describe('Success page', () => {
   beforeEach(() => {
     mockedUseUsageData.mockReturnValue(baseHookValue);
-    mockedReadCredentials.mockReturnValue(null);
+    mockedUseAuth.mockReturnValue({
+      session: { token: 'abc', profile: { username: 'demo', mac: 'AA:BB' } },
+      login: vi.fn(),
+      logout: vi.fn(),
+    });
   });
 
-  it('shows form and error when fields missing', async () => {
+  it('renders mac override form and refreshes on submit', () => {
+    const refresh = vi.fn();
+    mockedUseUsageData.mockReturnValue({ ...baseHookValue, refresh });
+
     render(<Success />);
-    fireEvent.submit(screen.getByTestId('usage-form'));
-    expect(await screen.findByText('success.missingParams')).toBeInTheDocument();
+    const macInput = screen.getByLabelText('success.mac');
+    fireEvent.change(macInput, { target: { value: '11:22' } });
+    fireEvent.submit(macInput.closest('form') as HTMLFormElement);
+
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('renders dashboard data when usage is available', () => {
-    mockedReadCredentials.mockReturnValue({ username: 'demo', password: 'pass' });
     mockedUseUsageData.mockReturnValue({
       usage: {
         username: 'demo',

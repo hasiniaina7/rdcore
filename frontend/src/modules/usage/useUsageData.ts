@@ -1,11 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  fetchActiveSessions,
-  fetchInactiveSessions,
-  fetchUsageStats,
-  fetchUsageSummary,
-} from './api';
-import type { SessionListResult, UsageByUsernameSummary, UsageCredentials, UsageStats } from './types';
+import { useCallback, useEffect, useState } from 'react';
+import { fetchActiveSessions, fetchInactiveSessions, fetchUsageStats, fetchUsageSummary } from './api';
+import type { SessionListResult, UsageByUsernameSummary, UsageStats } from './types';
 
 const DEFAULT_ACTIVE_LIMIT = 25;
 const DEFAULT_INACTIVE_LIMIT = 80;
@@ -21,7 +16,12 @@ const toErrorMessage = (error: unknown): string => {
   return 'Unknown error';
 };
 
-export function useUsageData(credentials: UsageCredentials | null) {
+type UsageHookOptions = {
+  mac?: string;
+  enabled?: boolean;
+};
+
+export function useUsageData(options: UsageHookOptions = {}) {
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [summary, setSummary] = useState<UsageByUsernameSummary | null>(null);
   const [activeSessions, setActiveSessions] = useState<SessionListResult | null>(null);
@@ -30,19 +30,11 @@ export function useUsageData(credentials: UsageCredentials | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
-  const normalizedCredentials = useMemo(() => {
-    if (!credentials?.username?.trim() || !credentials?.password?.trim()) {
-      return null;
-    }
-    return {
-      username: credentials.username.trim(),
-      password: credentials.password.trim(),
-      mac: credentials.mac?.trim() || undefined,
-    } satisfies UsageCredentials;
-  }, [credentials]);
+  const normalizedMac = options.mac?.trim() || undefined;
+  const isEnabled = options.enabled ?? true;
 
   const refresh = useCallback(async () => {
-    if (!normalizedCredentials) {
+    if (!isEnabled) {
       setUsage(null);
       setSummary(null);
       setActiveSessions(null);
@@ -54,10 +46,10 @@ export function useUsageData(credentials: UsageCredentials | null) {
     const newErrors: string[] = [];
     try {
       const [usageResult, summaryResult, activeResult, inactiveResult] = await Promise.allSettled([
-        fetchUsageStats(normalizedCredentials, { sessionLimit: DEFAULT_ACTIVE_LIMIT, withSessions: false }),
-        fetchUsageSummary(normalizedCredentials.username, DEFAULT_INACTIVE_LIMIT),
-        fetchActiveSessions(normalizedCredentials.username, { limit: DEFAULT_ACTIVE_LIMIT }),
-        fetchInactiveSessions(normalizedCredentials.username, { limit: DEFAULT_INACTIVE_LIMIT }),
+        fetchUsageStats({ sessionLimit: DEFAULT_ACTIVE_LIMIT, withSessions: false, mac: normalizedMac }),
+        fetchUsageSummary(DEFAULT_INACTIVE_LIMIT),
+        fetchActiveSessions({ limit: DEFAULT_ACTIVE_LIMIT }),
+        fetchInactiveSessions({ limit: DEFAULT_INACTIVE_LIMIT }),
       ]);
 
       if (usageResult.status === 'fulfilled') {
@@ -89,7 +81,7 @@ export function useUsageData(credentials: UsageCredentials | null) {
     } finally {
       setIsLoading(false);
     }
-  }, [normalizedCredentials]);
+  }, [isEnabled, normalizedMac]);
 
   useEffect(() => {
     void refresh();
@@ -104,6 +96,5 @@ export function useUsageData(credentials: UsageCredentials | null) {
     isLoading,
     lastUpdated,
     refresh,
-    credentials: normalizedCredentials,
   } as const;
 }

@@ -1,0 +1,90 @@
+﻿CONDITIONS GÉNÉRALES D’UTILISATION (CGU)
+Dernière mise à jour : 01 Aout 2024
+Service Wi-Fi – Techzone IT Solution
+1. Objet
+Les présentes Conditions Générales d’Utilisation définissent les modalités d’accès et d’utilisation des services Internet Wi-Fi proposés par Techzone IT Solution (« Techzone »), couvrant les offres illimitées (famille) et les offres classiques (par volume de données).
+
+2. Offres, limitations et débit
+2.1. Offres illimitées famille
+    • Offre « Économique » : 49 000 Ar/mois, 3 appareils max sous le même toit, débit total allant jusqu’à 12 Mbps.
+    • Offre « Premium » : 65 000 Ar/mois, 8 appareils max sous le même toit, débit total jusqu’à 15 et/ou 20 Mbps.
+    • Destinée exclusivement à une famille ou à des personnes vivant sous le même toit (même maison, même foyer).
+    • Revente, partage ou redistribution à des tiers strictement interdite.
+    • Usage professionnel, commercial, cybercafé, écoles, entreprises, ou pour tout bâtiment entier : interdit avec ces offres.
+2.2. Offres classiques (par volume de données)
+    • Offres prépayées par giga-octets, sans limitation du nombre d’appareils connectés.
+    • Usage professionnel, commercial, cybercafé : autorisé.
+    • Lorsque le quota de données est atteint, la connexion est suspendue ou ralentie jusqu’à nouvel achat.
+    • Le débit peut être réduit lors de forte utilisation du réseau, en fin de quota, ou en cas de surcharge.
+2.3.  Débit Intelligent selon l'Usage
+    • Nous optimisons le débit en période de forte demande pour offrir une expérience stable à tous les clients. Notre système assure que chaque utilisateur bénéficie d’un service de qualité.
+    • Pour l'offre Économique : Après 120 Go de navigation à débit maximal (jusqu’à 12 Mbps), votre connexion reste fluide (entre 2 et 8 Mbps) pour garantir une expérience équitable à tous les utilisateurs, tout en s’adaptant aux conditions réseau.
+    • Pour l'offre Premium : Profitez de 220 Go à débit optimal (jusqu’à 15 Mbps). Au-delà, votre connexion reste performante (entre 5 et 10 Mbps) pour assurer stabilité et équité sur le réseau, ajustée en temps réel.
+    • La navigation reste possible après le seuil, avec un débit adapté aux besoins essentiels (mails, réseaux sociaux, streaming léger et téléchargement).
+    • Votre compteur se remet à zéro automatiquement chaque mois, une notification sera affichée par notre système ou par email si le « Débit Intelligent selon l'Usage » va être activer sur votre compte, cette démarche nécessite souvent notre intervention (en ligne sans se déplacer sur place).
+    • Tout utilisateur de l’offre Économique à 49 000 Ar dépassant 260 Go sera contacté par téléphone pour clarifier son utilisation, si le nombre d’utilisateurs connectés reste inférieur à trois. Après évaluation, il pourra être invité à migrer vers une offre supérieure ou une offre classique, selon ses besoins.
+    • L’offre illimitée reste active du premier à la fin du mois, sauf en cas de force majeure. Toutefois, TECHZONE encourage vivement ses utilisateurs à respecter la limite de trois utilisateurs et à privilégier un usage domestique raisonnable, afin de garantir un service de qualité pour tous. Les téléchargements volumineux doivent être effectués avec nos offres classiques, spécialement prévues à cet effet.
+3. Fonctionnement de la connexion – Spécificités Starlink & réseau
+    • Les connexions Techzone sont basées sur la technologie Starlink : réseau de satellites basse orbite offrant Internet haut débit, fiable et adapté aux zones mal couvertes par le réseau terrestre classique.
+    • Qualité de service : Starlink offre une connexion stable et performante, mais la vitesse effective dépend du nombre d’utilisateurs globale (c.-à-d. à Fianaratsoa, et même à Madagascar) , du positionnement de la parabole, et de la météo.
+    • Week-ends et météo : En raison d’une utilisation accrue locale/nationale/internationale, la connexion peut être ralentie le week-end ou lors de fortes intempéries (pluie, orage, vents forts, ciel très nuageux).
+    • Techzone ne saurait être tenue responsable d’une dégradation de service provenant de limitations ou perturbations du réseau Starlink, ou d’une panne de réseau globale.
+    • Le client est responsable de l’état de son équipement : une panne de câble, routeur ou capteur chez le client ne relève pas de Techzone.
+
+4. Durée, engagement et renouvellement
+    • Le service Techzone est sans engagement : le client peut souscrire, arrêter ou reprendre l’abonnement à tout moment, sans frais de résiliation ni préavis.
+    • Sans engagement signifie liberté d’arrêt ou de reprise de l’abonnement ; cela n’exonère pas le client du respect des règles d’utilisation et des CGU.
+    • Offre Illimitée : valable dès le paiement jusqu’à la fin du mois en cours, peu importe la date d’achat. Toute modification demandée prendra effet le 1er du mois suivant. 
+    • Offre Classique : valable 30 jours à partir de la date d’achat (ou jusqu’à épuisement du volume). À la fin de la période ou du quota, la connexion est automatiquement coupée ou ralentie, sauf renouvellement.
+    • Le client peut renouveler sa connexion à l’avance pour éviter toute coupure.
+5. Utilisation normale, sécurité, et restrictions
+    • L’usage de la connexion illimitée doit rester conforme à une utilisation domestique normale (navigation, vidéos, travail scolaire, messagerie).
+    • Toute utilisation anormale (partage massif, relais vers des tiers, usage à des fins illicites ou commerciales, connexion de plus d’appareils que prévu, piratage…) pourra entraîner une limitation, suspension temporaire ou résiliation immédiate après avertissement.
+    • Techzone se réserve le droit d’effectuer des vérifications ou interventions techniques dans les locaux du client pour maintenance, configuration ou contrôle du respect des CGU.
+    • Activités interdites : piratage, fraude, diffusion de virus ou de contenus illégaux, atteinte à la sécurité d’autrui, attaques réseau, revente sans autorisation.
+    • Toute infraction peut entraîner la coupure immédiate du service et signalement aux autorités compétentes.
+    • Pour garantir la sécurité de vos données lors de votre connexion à un hotspot public, nous vous conseillons vivement d’éviter les sites web non sécurisés (HTTP) et de privilégier les sites en HTTPS, reconnaissables à l’icône de cadenas dans la barre d’adresse.
+    • Pour une protection supplémentaire, pensez à utiliser un VPN ou à activer la navigation privée sur votre appareil.
+6. Maintenance, assistance et responsabilité
+    • L’équipe Techzone assure gratuitement la maintenance de l’infrastructure ou du réseau fourni, avec deux modes d’intervention : à distance (par Facebook, Anydesk, WhatsApp, SMS, appel, etc.) ou sur place si nécessaire. Toute intervention commence systématiquement à distance afin de garantir une résolution rapide et efficace.
+    • Toute panne liée au matériel du client (routeur, câble, capteur…) reste à sa charge, sauf disposition contraire ou achat du matériel chez Techzone sous garantie.
+    • Techzone ne garantit pas la compatibilité des équipements non fournis par ses soins.
+    • En cas de défaillance généralisée du réseau (Starlink ou infrastructure Techzone), Techzone s’efforcera d’informer et d’assister les clients dans les meilleurs délais.
+
+7. Force majeure
+Aucune des parties ne pourra être tenue responsable en cas de survenance d’un événement de force majeure (catastrophes naturelles, guerre, grève, coupure majeure d’électricité, etc.) empêchant l’exécution des obligations prévues.
+8. Modification des CGU
+Techzone se réserve le droit de modifier à tout moment les présentes CGU.
+Les clients seront informés de toute modification importante par SMS, email ou notification sur le portail client.
+L’utilisation continue du service après modification vaut acceptation des nouvelles conditions.
+
+9. Acceptation
+L’activation de la connexion Wi-Fi par le client vaut acceptation pleine et entière des présentes Conditions Générales d’Utilisation.
+
+10. Tableau comparatif des offres
+Type d’offre
+Limite d’appareils
+Volume de données
+Usage pro/cyber autorisé
+Engagement
+Condition de baisse de débit
+Illimitée (famille)
+Oui (3 ou 8 max)
+Illimité
+Non
+Non
+Oui (week-end, météo, Starlink)
+Classique (par giga)
+Non
+Limité
+Oui
+Non
+Oui (fin de quota, surcharge réseau)
+
+Techzone IT Solution
+Contact : 034 52 797 25 | contact@techzone.lat
+
+Remarque :
+Ces CGU sont applicables à toutes les offres Techzone à compter du 01 Aout 2025
+Pour toute question, contactez notre équipe par téléphone, email ou via notre page Facebook.
+

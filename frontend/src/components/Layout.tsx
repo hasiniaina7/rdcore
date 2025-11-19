@@ -1,34 +1,47 @@
-import type { PropsWithChildren } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../modules/auth/AuthProvider';
 
 const langs = ['fr', 'en', 'es'] as const;
 
 const navItems = [
-  { to: '/', label: 'nav.home' },
   { to: '/success', label: 'nav.success' },
   { to: '/support', label: 'nav.support' },
   { to: '/terms', label: 'nav.terms' },
   { to: '/privacy', label: 'nav.privacy' },
-  { to: '/admin', label: 'nav.admin' },
 ];
 
-export default function Layout({ children }: PropsWithChildren) {
+export default function Layout() {
   const { t, i18n } = useTranslation();
+  const { session, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const onLogout = () => {
+    logout();
+    navigate('/', { replace: true });
+  };
+
   return (
-    <div className="cp-app">
-      <div className="cp-frame">
-        <header className="cp-frame__header">
-          <div className="cp-frame__brand">
-            <span className="cp-frame__eyebrow">{t('layout.eyebrow')}</span>
-            <p className="cp-frame__title">{t('layout.title')}</p>
+    <>
+      <header className="cp-shell" role="navigation" aria-label={t('layout.navLabel')}>
+        <div className="cp-shell__brand" onClick={() => navigate('/success')}>
+          <span className="cp-shell__logo">TZ</span>
+          <div>
+            <p className="cp-shell__eyebrow">{t('layout.eyebrow')}</p>
+            <p className="cp-shell__title">{t('layout.title')}</p>
           </div>
-          <label htmlFor="layout-language" className="sr-only">
-            {t('layout.language')}
-          </label>
+        </div>
+        <nav className="cp-shell__nav">
+          {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to}>
+              {t(item.label)}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="cp-shell__actions">
           <select
-            id="layout-language"
-            className="cp-frame__language"
+            aria-label={t('layout.language')}
+            className="cp-shell__language"
             value={i18n.language}
             onChange={(event) => i18n.changeLanguage(event.target.value)}
           >
@@ -38,18 +51,24 @@ export default function Layout({ children }: PropsWithChildren) {
               </option>
             ))}
           </select>
-        </header>
-        <main className="cp-frame__main">{children}</main>
-        <div className="cp-frame__nav">
-          <nav className="cp-nav" aria-label={t('layout.navLabel')}>
-            {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'active' : undefined)}>
-                {t(item.label)}
-              </NavLink>
-            ))}
-          </nav>
+          {session ? (
+            <button type="button" className="cp-btn cp-btn--ghost" onClick={onLogout}>
+              {t('layout.logout')}
+            </button>
+          ) : (
+            <NavLink to="/" className="cp-btn cp-btn--outline">
+              {t('nav.login')}
+            </NavLink>
+          )}
+        </div>
+      </header>
+      <div className="cp-app">
+        <div className="cp-frame">
+          <main className="cp-frame__main">
+            <Outlet />
+          </main>
         </div>
       </div>
-    </div>
+    </>
   );
 }
