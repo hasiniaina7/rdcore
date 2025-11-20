@@ -244,15 +244,23 @@ const resources = {
           megabytes: 'Megabytes',
           sessions: 'Sessions'
         },
+        autoRefresh: {
+          label: 'Auto-refresh',
+          default: 'Manual (default)',
+          fast: 'Every 15 seconds',
+          slow: 'Every 60 seconds'
+        },
+        show: 'Show',
+        hide: 'Hide',
         table: {
           status: 'Status',
           start: 'Start',
           duration: 'Duration',
           data: 'Data',
-          router: 'Router',
           device: 'Device',
           ip: 'IP address',
-          actions: 'Actions'
+          actions: 'Actions',
+          page: 'Page {{page}} / {{total}}'
         }
       },
       admin: {
@@ -572,15 +580,23 @@ const resources = {
           megabytes: 'Mégaoctets',
           sessions: 'Sessions'
         },
+        autoRefresh: {
+          label: 'Rafraîchissement auto',
+          default: 'Manuel (défaut)',
+          fast: 'Toutes les 15s',
+          slow: 'Toutes les 60s'
+        },
+        show: 'Afficher',
+        hide: 'Masquer',
         table: {
           status: 'Statut',
           start: 'Début',
           duration: 'Durée',
           data: 'Données',
-          router: 'Routeur',
           device: 'Appareil',
           ip: 'IP',
-          actions: 'Actions'
+          actions: 'Actions',
+          page: 'Page {{page}} / {{total}}'
         }
       },
       admin: {
@@ -900,15 +916,23 @@ const resources = {
           megabytes: 'Megabytes',
           sessions: 'Sesiones'
         },
+        autoRefresh: {
+          label: 'Auto-refresco',
+          default: 'Manual (por defecto)',
+          fast: 'Cada 15 segundos',
+          slow: 'Cada 60 segundos'
+        },
+        show: 'Mostrar',
+        hide: 'Ocultar',
         table: {
           status: 'Estado',
           start: 'Inicio',
           duration: 'Duración',
           data: 'Datos',
-          router: 'Router',
           device: 'Dispositivo',
           ip: 'IP',
-          actions: 'Acciones'
+          actions: 'Acciones',
+          page: 'Página {{page}} / {{total}}'
         }
       },
       admin: {

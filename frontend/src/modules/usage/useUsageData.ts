@@ -1,18 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  fetchActiveSessions,
-  fetchInactiveSessions,
-  fetchUsageStats,
-  fetchUsageSummary,
-  fetchUsageTimeseries,
-} from './api';
-import type {
-  SessionListResult,
-  UsageByUsernameSummary,
-  UsageStats,
-  UsageTimeseries,
-  UsageTimeseriesGranularity,
-} from './types';
+import { fetchActiveSessions, fetchInactiveSessions, fetchUsageStats, fetchUsageSummary } from './api';
+import type { SessionListResult, UsageByUsernameSummary, UsageStats, UsageTimeseriesGranularity } from './types';
 
 const DEFAULT_ACTIVE_LIMIT = 25;
 const DEFAULT_INACTIVE_LIMIT = 80;
@@ -46,7 +34,6 @@ export function useUsageData(options: UsageHookOptions = {}) {
   const [summary, setSummary] = useState<UsageByUsernameSummary | null>(null);
   const [activeSessions, setActiveSessions] = useState<SessionListResult | null>(null);
   const [inactiveSessions, setInactiveSessions] = useState<SessionListResult | null>(null);
-  const [timeseries, setTimeseries] = useState<UsageTimeseries | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
@@ -62,14 +49,13 @@ export function useUsageData(options: UsageHookOptions = {}) {
       setSummary(null);
       setActiveSessions(null);
       setInactiveSessions(null);
-      setTimeseries(null);
       setErrors([]);
       return;
     }
     setIsLoading(true);
     const newErrors: string[] = [];
     try {
-      const [usageResult, summaryResult, activeResult, inactiveResult, timeseriesResult] = await Promise.allSettled([
+      const [usageResult, summaryResult, activeResult, inactiveResult] = await Promise.allSettled([
         fetchUsageStats({ sessionLimit: DEFAULT_ACTIVE_LIMIT, withSessions: false, mac: normalizedMac }),
         fetchUsageSummary({
           historyLimit: DEFAULT_INACTIVE_LIMIT,
@@ -88,12 +74,6 @@ export function useUsageData(options: UsageHookOptions = {}) {
           startDate: appliedFilters.startDate,
           endDate: appliedFilters.endDate,
           status: appliedFilters.status,
-        }),
-        fetchUsageTimeseries({
-          historyLimit: DEFAULT_INACTIVE_LIMIT,
-          startDate: appliedFilters.startDate,
-          endDate: appliedFilters.endDate,
-          granularity,
         }),
       ]);
 
@@ -121,12 +101,6 @@ export function useUsageData(options: UsageHookOptions = {}) {
         newErrors.push(toErrorMessage(inactiveResult.reason));
       }
 
-      if (timeseriesResult.status === 'fulfilled') {
-        setTimeseries(timeseriesResult.value);
-      } else {
-        newErrors.push(toErrorMessage(timeseriesResult.reason));
-      }
-
       setErrors(newErrors);
       setLastUpdated(Date.now());
     } finally {
@@ -150,7 +124,6 @@ export function useUsageData(options: UsageHookOptions = {}) {
     summary,
     activeSessions,
     inactiveSessions,
-    timeseries,
     errors,
     isLoading,
     lastUpdated,

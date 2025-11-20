@@ -12,23 +12,24 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Link } from 'react-router-dom';
 import useOmadaParams from '../hooks/useOmadaParams';
 import useDynamicDetail from '../modules/dynamic/useDynamicDetail';
 import { useUsageData } from '../modules/usage/useUsageData';
 import {
   aggregateByDay,
-  aggregateByRouter,
   bytesToHuman,
   calculateProgress,
   combineSessions,
   filterSessions,
   getMacOptions,
+  getSessionBytes,
   secondsToDuration,
   summarizePeriod,
 } from '../modules/usage/utils';
 import UsageFilterBar from '../modules/usage/components/UsageFilterBar';
 import SessionTable from '../modules/usage/components/SessionTable';
-import type { UsageFilters, UsageTimeseriesGranularity } from '../modules/usage/types';
+import type { DashboardSession, UsageFilters, UsageTimeseriesGranularity } from '../modules/usage/types';
 import { disconnectUsageSessions } from '../modules/usage/api';
 import { useAuth } from '../modules/auth/AuthProvider';
 
@@ -42,9 +43,12 @@ export default function Success() {
   const [macInput, setMacInput] = useState(session?.profile?.mac || params.mac || '');
   const [macOverride, setMacOverride] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<UsageFilters>({ status: 'all' });
+  const [draftFilters, setDraftFilters] = useState<UsageFilters>({ status: 'all' });
   const [serverFilters, setServerFilters] = useState<{ startDate?: string; endDate?: string; status?: UsageFilters['status'] }>({
     status: 'all',
   });
+  const [hasApplied, setHasApplied] = useState(false);
+  const [refreshRate, setRefreshRate] = useState<'off' | '15' | '60'>('off');
   const [timeseriesMode, setTimeseriesMode] = useState<UsageTimeseriesGranularity>('day');
   const [banner, setBanner] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
   const [pendingDisconnectId, setPendingDisconnectId] = useState<string | null>(null);
@@ -56,8 +60,8 @@ export default function Success() {
 
   const activeMac = macOverride ?? session?.profile?.mac ?? undefined;
 
-  const { usage, summary, activeSessions, inactiveSessions, timeseries, errors, isLoading, lastUpdated, refresh } = useUsageData({
-    enabled: Boolean(session),
+  const { usage, summary, activeSessions, inactiveSessions, errors, isLoading, lastUpdated, refresh } = useUsageData({
+    enabled: Boolean(session) && hasApplied,
     mac: activeMac,
     filters: {
       startDate: serverFilters.startDate,
@@ -71,7 +75,6 @@ export default function Success() {
   const filteredSessions = useMemo(() => filterSessions(sessions, filters), [sessions, filters]);
   const macOptions = useMemo(() => getMacOptions(sessions), [sessions]);
   const dailySeries = useMemo(() => aggregateByDay(filteredSessions), [filteredSessions]);
-  const routerStats = useMemo(() => aggregateByRouter(filteredSessions).slice(0, 5), [filteredSessions]);
   const dailySummary = useMemo(() => summarizePeriod(summary?.periods, 'daily'), [summary]);
   const weeklySummary = useMemo(() => summarizePeriod(summary?.periods, 'weekly'), [summary]);
   const monthlySummary = useMemo(() => summarizePeriod(summary?.periods, 'monthly'), [summary]);
@@ -92,17 +95,12 @@ export default function Success() {
     [monthlySummary, t, weeklySummary]
   );
   const clusterData = useMemo(
-    () =>
-      timeseries?.buckets.map((bucket) => ({
-        label: bucket.label,
-        mb: Number((bucket.totalBytes / MB).toFixed(2)),
-        sessions: bucket.sessionCount,
-      })) ?? [],
-    [timeseries]
+    () => buildClusterData(filteredSessions, timeseriesMode, filters.startDate, filters.endDate),
+    [filteredSessions, filters.endDate, filters.startDate, timeseriesMode]
   );
   const selectedRangeLabel = useMemo(
-    () => formatRangeLabel(serverFilters.startDate, serverFilters.endDate),
-    [serverFilters.endDate, serverFilters.startDate]
+    () => formatRangeLabel(filters.startDate, filters.endDate),
+    [filters.endDate, filters.startDate]
   );
 
   const onlineCount = activeSessions?.sessions.length ?? 0;
@@ -118,9 +116,11 @@ export default function Success() {
       event.preventDefault();
       setBanner(null);
       setMacOverride(macInput.trim() || undefined);
-      void refresh();
+      if (hasApplied) {
+        void refresh();
+      }
     },
-    [macInput, refresh]
+    [hasApplied, macInput, refresh]
   );
 
   const handleDisconnect = useCallback(
@@ -142,30 +142,85 @@ export default function Success() {
   );
 
   const handleApplyFilters = useCallback(() => {
-    const nextRange = buildRangeForMode(timeseriesMode, filters.startDate);
-    setFilters((prev) => ({
-      ...prev,
-      startDate: nextRange.uiStart,
-      endDate: nextRange.uiEnd,
-    }));
+    setFilters(draftFilters);
     setServerFilters({
-      startDate: nextRange.serverStart,
-      endDate: nextRange.serverEnd,
-      status: filters.status ?? 'all',
+      startDate: draftFilters.startDate,
+      endDate: draftFilters.endDate,
+      status: draftFilters.status ?? 'all',
     });
-  }, [filters.startDate, filters.status, timeseriesMode]);
+    void refresh();
+  }, [draftFilters, refresh]);
 
   const resetFilters = useCallback(() => {
-    setFilters({
+    const base: UsageFilters = {
       status: 'all',
       startDate: undefined,
       endDate: undefined,
       router: undefined,
       deviceMac: undefined,
       minMegabytes: undefined,
-    });
+    };
+    setFilters(base);
+    setDraftFilters(base);
     setServerFilters({ status: 'all' });
+    setHasApplied(false);
   }, []);
+
+  const autoRefreshLabel = (value: typeof refreshRate) => {
+    switch (value) {
+      case '15':
+        return t('success.autoRefresh.fast');
+      case '60':
+        return t('success.autoRefresh.slow');
+      default:
+        return t('success.autoRefresh.default');
+    }
+  };
+
+  const chartsVisible = hasApplied && usage;
+
+  useEffect(() => {
+    if (!session || hasApplied) {
+      return;
+    }
+    const defaultRange = buildRangeForMode(timeseriesMode);
+    const base: UsageFilters = {
+      status: 'all',
+      startDate: defaultRange.uiStart,
+      endDate: defaultRange.uiEnd,
+    };
+    setFilters(base);
+    setDraftFilters(base);
+    setServerFilters({
+      startDate: defaultRange.serverStart,
+      endDate: defaultRange.serverEnd,
+      status: 'all',
+    });
+    setHasApplied(true);
+  }, [session, hasApplied, timeseriesMode]);
+
+  useEffect(() => {
+    if (!hasApplied) {
+      return;
+    }
+    void refresh();
+  }, [hasApplied, serverFilters, timeseriesMode, refresh]);
+
+  useEffect(() => {
+    if (!hasApplied) {
+      return;
+    }
+    const intervalMs = refreshRate === '15' ? 15_000 : refreshRate === '60' ? 60_000 : 0;
+    if (!intervalMs) {
+      return;
+    }
+    const id = window.setInterval(() => {
+      void refresh();
+    }, intervalMs);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [hasApplied, refreshRate, refresh]);
 
   return (
     <div className="cp-dashboard">
@@ -212,90 +267,107 @@ export default function Success() {
         </p>
       ))}
 
-      {usage ? (
-        <>
-          <section className="cp-grid cp-grid--2">
-            <article className="cp-card">
-              <div className="cp-card__header">
-                <div>
-                  <p className="cp-eyebrow">{t('success.statusTitle')}</p>
-                  <h2 className="cp-title">{t('success.deviceInfo', { site: params.site || 'N/A', ssid: params.ssidName || 'N/A' })}</h2>
-                </div>
-                <span className={`cp-badge ${isOnline ? 'cp-badge--success' : 'cp-badge--warning'}`}>
-                  {t(isOnline ? 'success.statusOnline' : 'success.statusOffline')}
-                </span>
-              </div>
-              <p>{t('success.sessionsSummary', { active: onlineCount, inactive: inactiveCount })}</p>
-              <p className="cp-card__meta">{t('success.lastUpdated', { value: lastUpdatedLabel })}</p>
-            </article>
-            <article className="cp-card">
-              <div className="cp-card__header">
-                <div>
-                  <p className="cp-eyebrow">{t('success.quotaTitle')}</p>
-                  <h2 className="cp-title">{t('success.quotaSubtitle')}</h2>
-                </div>
-              </div>
-              <p>{t('success.dataUsed', { used: bytesToHuman(usage.dataUsed), cap: bytesToHuman(usage.dataCap ?? undefined) })}</p>
-              <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={dataProgress ?? 0} role="progressbar">
-                <div className="cp-progress__bar" style={{ width: `${dataProgress ?? 0}%` }} />
-              </div>
-            </article>
-            <article className="cp-card">
-              <div className="cp-card__header">
-                <div>
-                  <p className="cp-eyebrow">{t('success.timeTitle')}</p>
-                  <h2 className="cp-title">{t('success.timeSubtitle')}</h2>
-                </div>
-              </div>
-              <p>{t('success.timeUsed', { used: secondsToDuration(usage.timeUsed), cap: secondsToDuration(usage.timeCap) })}</p>
-              <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={timeProgress ?? 0} role="progressbar">
-                <div className="cp-progress__bar" style={{ width: `${timeProgress ?? 0}%` }} />
-              </div>
-            </article>
-            <article className="cp-card">
-              <div className="cp-card__header">
-                <div>
-                  <p className="cp-eyebrow">{t('success.aggregatesTitle')}</p>
-                  <h2 className="cp-title">{t('success.aggregatesSubtitle')}</h2>
-                </div>
-              </div>
-              <ul className="cp-router-list">
-                <li className="cp-router-row">
-                  <span>{t('success.dailyAggregate')}</span>
-                  <strong>{bytesToHuman(dailySummary.totalBytes)}</strong>
-                </li>
-                <li className="cp-router-row">
-                  <span>{t('success.weeklyAggregate')}</span>
-                  <strong>{bytesToHuman(weeklySummary.totalBytes)}</strong>
-                </li>
-                <li className="cp-router-row">
-                  <span>{t('success.monthlyAggregate')}</span>
-                  <strong>{bytesToHuman(monthlySummary.totalBytes)}</strong>
-                </li>
-              </ul>
-            </article>
-          </section>
-
-          <article className="cp-card">
-            <div className="cp-card__header">
-              <div>
-                <p className="cp-eyebrow">{t('success.filters.title')}</p>
-                <h2 className="cp-title">{t('success.filters.subtitle')}</h2>
-              </div>
-              <div className="cp-card__actions">
-                <button type="button" className="cp-btn cp-btn--ghost" onClick={resetFilters}>
-                  {t('success.filters.reset')}
-                </button>
-              </div>
+      <section className="cp-grid cp-grid--2">
+        <article className="cp-card">
+          <div className="cp-card__header">
+            <div>
+              <p className="cp-eyebrow">{t('success.statusTitle')}</p>
+              <h2 className="cp-title">{t('success.deviceInfo', { site: params.site || 'N/A', ssid: params.ssidName || 'N/A' })}</h2>
             </div>
-            <UsageFilterBar
-              filters={filters}
-              onChange={setFilters}
-              macOptions={macOptions}
-              onApply={handleApplyFilters}
-              isApplying={isLoading}
-            />
-          </article>
+            <span className={`cp-badge ${isOnline ? 'cp-badge--success' : 'cp-badge--warning'}`}>
+              {t(isOnline ? 'success.statusOnline' : 'success.statusOffline')}
+            </span>
+          </div>
+          <p>{t('success.sessionsSummary', { active: onlineCount, inactive: inactiveCount })}</p>
+          <p className="cp-card__meta">{t('success.lastUpdated', { value: lastUpdatedLabel })}</p>
+        </article>
+        <article className="cp-card">
+          <div className="cp-card__header">
+            <div>
+              <p className="cp-eyebrow">{t('success.quotaTitle')}</p>
+              <h2 className="cp-title">{t('success.quotaSubtitle')}</h2>
+            </div>
+          </div>
+          <p>{t('success.dataUsed', { used: bytesToHuman(usage?.dataUsed), cap: bytesToHuman(usage?.dataCap ?? undefined) })}</p>
+          <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={dataProgress ?? 0} role="progressbar">
+            <div className="cp-progress__bar" style={{ width: `${dataProgress ?? 0}%` }} />
+          </div>
+        </article>
+        <article className="cp-card">
+          <div className="cp-card__header">
+            <div>
+              <p className="cp-eyebrow">{t('success.timeTitle')}</p>
+              <h2 className="cp-title">{t('success.timeSubtitle')}</h2>
+            </div>
+          </div>
+          <p>{t('success.timeUsed', { used: secondsToDuration(usage?.timeUsed), cap: secondsToDuration(usage?.timeCap) })}</p>
+          <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={timeProgress ?? 0} role="progressbar">
+            <div className="cp-progress__bar" style={{ width: `${timeProgress ?? 0}%` }} />
+          </div>
+        </article>
+        <article className="cp-card">
+          <div className="cp-card__header">
+            <div>
+              <p className="cp-eyebrow">{t('success.aggregatesTitle')}</p>
+              <h2 className="cp-title">{t('success.aggregatesSubtitle')}</h2>
+            </div>
+          </div>
+          <ul className="cp-router-list">
+            <li className="cp-router-row">
+              <span>{t('success.dailyAggregate')}</span>
+              <strong>{bytesToHuman(dailySummary.totalBytes)}</strong>
+            </li>
+            <li className="cp-router-row">
+              <span>{t('success.weeklyAggregate')}</span>
+              <strong>{bytesToHuman(weeklySummary.totalBytes)}</strong>
+            </li>
+            <li className="cp-router-row">
+              <span>{t('success.monthlyAggregate')}</span>
+              <strong>{bytesToHuman(monthlySummary.totalBytes)}</strong>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <article className="cp-card">
+        <div className="cp-card__header">
+          <div>
+            <p className="cp-eyebrow">{t('success.filters.title')}</p>
+            <h2 className="cp-title">{t('success.filters.subtitle')}</h2>
+          </div>
+          <div className="cp-card__actions">
+            <label htmlFor="refresh-rate" className="sr-only">
+              {t('success.autoRefresh.label')}
+            </label>
+            <select
+              id="refresh-rate"
+              className="cp-shell__language"
+              value={refreshRate}
+              onChange={(event) => setRefreshRate(event.target.value as typeof refreshRate)}
+              disabled={!hasApplied}
+            >
+              {(['off', '15', '60'] as const).map((value) => (
+                <option key={value} value={value}>
+                  {autoRefreshLabel(value)}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="cp-btn cp-btn--ghost" onClick={resetFilters}>
+              {t('success.filters.reset')}
+            </button>
+          </div>
+        </div>
+        <UsageFilterBar
+          filters={draftFilters}
+          onChange={setDraftFilters}
+          macOptions={macOptions}
+          onApply={handleApplyFilters}
+          isApplying={isLoading}
+        />
+      </article>
+
+      {hasApplied && usage ? (
+        <>
 
           <section className="cp-grid cp-grid--2">
             <article className="cp-card">
@@ -304,7 +376,9 @@ export default function Success() {
                   <p className="cp-eyebrow">{t('success.chart.dailyEyebrow')}</p>
                   <h2 className="cp-title">{t('success.chart.dailyTitle')}</h2>
                 </div>
-                <span className="cp-card__meta">{t('success.chart.dailyMeta', { days: dailySeries.length })}</span>
+                <span className="cp-card__meta">
+                  {t('success.chart.dailyMeta', { days: dailySeries.length })} {selectedRangeLabel}
+                </span>
               </div>
               <div className="cp-chart">
                 {dailyChartData.length ? (
@@ -318,7 +392,9 @@ export default function Success() {
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <p>{t('success.chart.noData')}</p>
+                  <p>
+                    {t('success.chart.noData')} {selectedRangeLabel}
+                  </p>
                 )}
               </div>
             </article>
@@ -415,29 +491,6 @@ export default function Success() {
             </div>
           </article>
 
-          <article className="cp-card">
-            <div className="cp-card__header">
-              <div>
-                <p className="cp-eyebrow">{t('success.routerStatsTitle')}</p>
-                <h2 className="cp-title">{t('success.routerStatsSubtitle')}</h2>
-              </div>
-            </div>
-            {routerStats.length ? (
-              <ul className="cp-router-list">
-                {routerStats.map((stat) => (
-                  <li key={stat.label} className="cp-router-row">
-                    <span>{stat.label}</span>
-                    <strong>
-                      {bytesToHuman(stat.totalBytes)} · {t('success.sessionsCount', { count: stat.sessionCount })}
-                    </strong>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>{t('success.routerStatsEmpty')}</p>
-            )}
-          </article>
-
           <SessionTable
             title={t('success.sessionsTitle')}
             caption={t('success.sessionsCaption', { count: filteredSessions.length })}
@@ -465,11 +518,15 @@ export default function Success() {
                 <dd>{formatText(dynamicDetail?.detail?.phone, t('success.supportFallback'))}</dd>
               </div>
             </dl>
+            <Link to="/support" className="cp-btn cp-btn--primary" style={{ marginTop: '1rem', display: 'inline-block' }}>
+              {t('support.eyebrow')}
+            </Link>
           </article>
         </>
       ) : (
         <article className="cp-card">
-          <p>{t('success.prompt')}</p>
+          <p>{t('success.filters.subtitle')}</p>
+          <p className="cp-card__meta">{t('success.chart.rangeEmpty')}</p>
         </article>
       )}
     </div>
@@ -487,28 +544,6 @@ function formatText(value: unknown, fallback = '—') {
 }
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-function formatRangeLabel(start?: string, end?: string) {
-  if (!start && !end) {
-    return '';
-  }
-  const format = (value?: string) => {
-    if (!value) {
-      return null;
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-    return date.toLocaleDateString();
-  };
-  const startLabel = format(start);
-  const endLabel = format(end);
-  if (startLabel && endLabel) {
-    return `${startLabel} → ${endLabel}`;
-  }
-  return startLabel || endLabel || '';
-}
 
 function buildRangeForMode(mode: UsageTimeseriesGranularity, startValue?: string) {
   const reference = startValue ? new Date(startValue) : new Date();
@@ -541,6 +576,28 @@ function formatRange(start: Date, end: Date) {
 
 function formatDateInput(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function formatRangeLabel(start?: string, end?: string) {
+  if (!start && !end) {
+    return '';
+  }
+  const format = (value?: string) => {
+    if (!value) {
+      return null;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toLocaleDateString();
+  };
+  const startLabel = format(start);
+  const endLabel = format(end);
+  if (startLabel && endLabel) {
+    return `${startLabel} → ${endLabel}`;
+  }
+  return startLabel || endLabel || '';
 }
 
 function startOfDay(date: Date) {
@@ -582,4 +639,76 @@ function endOfMonth(date: Date) {
   clone.setDate(0);
   clone.setHours(23, 59, 59, 999);
   return clone;
+}
+
+function buildClusterData(
+  sessions: DashboardSession[],
+  mode: UsageTimeseriesGranularity,
+  startDate?: string,
+  endDate?: string
+) {
+  const start = startDate ? new Date(startDate) : new Date();
+  const end = endDate ? new Date(endDate) : undefined;
+  const buckets: Array<{ label: string; totalBytes: number; sessionCount: number }> = [];
+
+  const inRange = (date: Date) => {
+    if (Number.isNaN(date.getTime())) return false;
+    if (startDate && date < start) return false;
+    if (end && date > end) return false;
+    return true;
+  };
+
+  if (mode === 'hour') {
+    const dayStart = startOfDay(start);
+    for (let h = 0; h < 24; h++) {
+      const label = `${String(h).padStart(2, '0')}h`;
+      buckets.push({ label, totalBytes: 0, sessionCount: 0 });
+    }
+    sessions.forEach((session) => {
+      const started = new Date(String(session.acctstarttime ?? session.acctstoptime ?? Date.now()));
+      if (!inRange(started) || started.toDateString() !== dayStart.toDateString()) return;
+      const hour = started.getHours();
+      buckets[hour].totalBytes += getSessionBytes(session);
+      buckets[hour].sessionCount += 1;
+    });
+    return buckets;
+  }
+
+  if (mode === 'day') {
+    const weekStart = startOfWeek(start);
+    for (let d = 0; d < 7; d++) {
+      const current = addDays(weekStart, d);
+      const label = current.toLocaleDateString(undefined, { weekday: 'short' });
+      buckets.push({ label, totalBytes: 0, sessionCount: 0 });
+    }
+    sessions.forEach((session) => {
+      const started = new Date(String(session.acctstarttime ?? session.acctstoptime ?? Date.now()));
+      if (!inRange(started)) return;
+      const dayDiff = Math.floor((startOfDay(started).getTime() - weekStart.getTime()) / DAY_IN_MS);
+      if (dayDiff >= 0 && dayDiff < 7) {
+        buckets[dayDiff].totalBytes += getSessionBytes(session);
+        buckets[dayDiff].sessionCount += 1;
+      }
+    });
+    return buckets;
+  }
+
+  const monthStart = startOfMonth(start);
+  const monthEnd = endOfMonth(start);
+  const daysInMonth = monthEnd.getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    buckets.push({ label: `${String(d).padStart(2, '0')}`, totalBytes: 0, sessionCount: 0 });
+  }
+  sessions.forEach((session) => {
+    const started = new Date(String(session.acctstarttime ?? session.acctstoptime ?? Date.now()));
+    if (!inRange(started)) return;
+    if (started.getMonth() === monthStart.getMonth() && started.getFullYear() === monthStart.getFullYear()) {
+      const dayIndex = started.getDate() - 1;
+      if (dayIndex >= 0 && dayIndex < buckets.length) {
+        buckets[dayIndex].totalBytes += getSessionBytes(session);
+        buckets[dayIndex].sessionCount += 1;
+      }
+    }
+  });
+  return buckets;
 }

@@ -49,15 +49,13 @@ export async function fetchUsageSummary(options: UsageSummaryRequestOptions = {}
 }
 
 export async function fetchUsageTimeseries(options: UsageSummaryRequestOptions = {}): Promise<UsageTimeseries> {
-  const response = await client.get<ApiResponse<UsageTimeseries>>('/usage/timeseries', {
-    params: {
-      historyLimit: options.historyLimit,
-      startDate: options.startDate,
-      endDate: options.endDate,
-      granularity: options.granularity,
-    },
+  // Endpoint not available yet; return empty buckets to avoid breaking charts.
+  return Promise.resolve({
+    startDate: options.startDate || '',
+    endDate: options.endDate || '',
+    granularity: options.granularity || 'day',
+    buckets: [],
   });
-  return response.data.data;
 }
 
 async function fetchSessions(

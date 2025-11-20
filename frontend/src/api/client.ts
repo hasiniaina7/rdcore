@@ -12,13 +12,28 @@ export function setApiAuthToken(token: string | null) {
 }
 
 client.interceptors.request.use((config) => {
-  const headers = config.headers ?? {};
+  const headers = (config.headers ?? {}) as Record<string, unknown>;
   if (authToken) {
-    (headers as Record<string, unknown>).Authorization = `Bearer ${authToken}`;
-  } else if ((headers as Record<string, unknown>).Authorization) {
-    delete (headers as Record<string, unknown>).Authorization;
+    headers.Authorization = `Bearer ${authToken}`;
+    headers.authorization = headers.Authorization;
+  } else {
+    delete headers.Authorization;
+    delete headers.authorization;
   }
+  headers['Cache-Control'] = 'no-cache';
+  headers.Pragma = 'no-cache';
+  headers['If-Modified-Since'] = '0';
   config.headers = headers;
+  if (config.method?.toLowerCase() === 'get') {
+    if (config.params instanceof URLSearchParams) {
+      config.params.set('_ts', Date.now().toString());
+    } else {
+      config.params = {
+        ...(config.params as Record<string, unknown> | undefined),
+        _ts: Date.now(),
+      };
+    }
+  }
   return config;
 });
 
