@@ -34,6 +34,7 @@ const envSchema = z.object({
   ADMIN_TOKEN_TTL_MINUTES: z.coerce.number().default(240),
   USAGE_SESSION_TTL_MINUTES: z.coerce.number().default(30),
   USAGE_SESSION_CACHE_SIZE: z.coerce.number().default(1000),
+  CORS_ALLOWED_ORIGINS: z.string().optional().default('http://localhost:5173,https://hotspot.techzone.lat'),
 });
 
 const parsed = envSchema.safeParse(process.env);
