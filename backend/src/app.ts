@@ -18,7 +18,16 @@ const app = express();
 
 const allowedOrigins = config.CORS_ALLOWED_ORIGINS.split(',').map((value) => value.trim()).filter(Boolean);
 const allowAllOrigins = allowedOrigins.length === 0 || allowedOrigins.includes('*');
-const allowedHeaders = ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires'];
+const allowedHeaders = [
+  'Content-Type',
+  'Authorization',
+  'Accept',
+  'Cache-Control',
+  'Pragma',
+  'Expires',
+  'If-Modified-Since',
+  'If-None-Match',
+];
 
 const corsOptions: CorsOptions = {
   origin: allowAllOrigins ? true : allowedOrigins,
