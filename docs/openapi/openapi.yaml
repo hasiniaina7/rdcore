@@ -8,8 +8,8 @@ info:
 servers:
   - url: http://localhost:4000
     description: Local dev
-  - url: https://hotspot.techzone.lat/api
-    description: Lab environment
+  - url: https://hotspot.techzone.lat
+    description: Production
 tags:
   - name: dynamic
   - name: auth
