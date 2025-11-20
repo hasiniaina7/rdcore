@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../modules/auth/AuthProvider';
+import { useTheme } from '../modules/theme/ThemeProvider';
 
 const langs = ['fr', 'en', 'es'] as const;
 
@@ -14,6 +15,7 @@ const navItems = [
 export default function Layout() {
   const { t, i18n } = useTranslation();
   const { session, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const onLogout = () => {
@@ -39,6 +41,9 @@ export default function Layout() {
           ))}
         </nav>
         <div className="cp-shell__actions">
+          <button type="button" className="cp-shell__theme" onClick={toggleTheme} aria-label={t('layout.themeToggle')}>
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
           <select
             aria-label={t('layout.language')}
             className="cp-shell__language"

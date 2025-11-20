@@ -2,6 +2,9 @@ export type UsagePeriodKey = 'hourly' | 'daily' | 'weekly' | 'monthly';
 
 export interface UsageSessionsOptions {
   limit?: number;
+  startDate?: string;
+  endDate?: string;
+  status?: 'all' | 'active' | 'inactive';
 }
 
 export interface UsageStats {
@@ -27,6 +30,7 @@ export interface UsageByUsernameSummary {
   historyLimit: number;
   macs: string[];
   periods: UsagePeriodSummary[];
+  series: UsageTimeseries;
 }
 
 export interface SessionListResult {
@@ -75,4 +79,23 @@ export interface DailyUsagePoint {
   totalBytes: number;
   totalTimeSeconds: number;
   sessionCount: number;
+}
+
+export type UsageTimeseriesGranularity = 'hour' | 'day' | 'month';
+
+export interface UsageTimeseriesBucket {
+  index: number;
+  label: string;
+  start: string;
+  end: string;
+  totalBytes: number;
+  totalTimeSeconds: number;
+  sessionCount: number;
+}
+
+export interface UsageTimeseries {
+  startDate: string;
+  endDate: string;
+  granularity: UsageTimeseriesGranularity;
+  buckets: UsageTimeseriesBucket[];
 }

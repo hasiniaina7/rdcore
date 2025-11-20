@@ -2,6 +2,30 @@
   font-family: 'Inter', 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  --cp-body: #f5f7fb;
+  --cp-panel: rgba(255, 255, 255, 0.9);
+  --cp-panel-light: #ffffff;
+  --cp-primary: #2563eb;
+  --cp-primary-dark: #1d4ed8;
+  --cp-accent: #f97316;
+  --cp-success: #16a34a;
+  --cp-danger: #dc2626;
+  --cp-muted: #94a3b8;
+  --cp-border: rgba(15, 23, 42, 0.12);
+  --cp-card: #ffffff;
+  --cp-card-light: #f1f5f9;
+  --cp-gradient: radial-gradient(circle at 20% 30%, rgba(37, 99, 235, 0.2), rgba(255, 255, 255, 0.9));
+  --cp-text: #0f172a;
+  --cp-text-muted: #64748b;
+  --cp-text-inverse: #ffffff;
+  --cp-shadow: 0 25px 70px rgba(15, 23, 42, 0.08);
+  color: var(--cp-text);
+  background-color: var(--cp-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-theme='dark'] {
   --cp-body: #050b18;
   --cp-panel: rgba(9, 15, 32, 0.85);
   --cp-panel-light: #0f172a;
@@ -12,13 +36,13 @@
   --cp-danger: #f87171;
   --cp-muted: rgba(255, 255, 255, 0.65);
   --cp-border: rgba(255, 255, 255, 0.12);
-  --cp-card: rgba(15, 23, 42, 0.75);
-  --cp-card-light: rgba(255, 255, 255, 0.92);
-  --cp-gradient: radial-gradient(circle at 10% 20%, rgba(90, 108, 234, 0.55), rgba(12, 20, 44, 0.95));
-  color: #f8fbff;
-  background-color: var(--cp-body);
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+  --cp-card: rgba(15, 23, 42, 0.82);
+  --cp-card-light: rgba(255, 255, 255, 0.08);
+  --cp-gradient: radial-gradient(circle at 10% 20%, rgba(90, 108, 234, 0.45), rgba(12, 20, 44, 0.95));
+  --cp-text: #f8fbff;
+  --cp-text-muted: rgba(255, 255, 255, 0.65);
+  --cp-text-inverse: #0f172a;
+  --cp-shadow: 0 35px 80px rgba(2, 6, 23, 0.65);
 }
 
 *,
@@ -30,8 +54,8 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, rgba(90, 108, 234, 0.45), transparent 35%), var(--cp-body);
-  color: #e2e8ff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), var(--cp-body));
+  color: var(--cp-text);
 }
 
 #root {
@@ -51,9 +75,11 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 0.85rem 2rem;
-  background: rgba(5, 10, 22, 0.9);
+  background: var(--cp-panel);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--cp-border);
+  color: var(--cp-text);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
 .cp-shell__brand {
@@ -104,8 +130,8 @@ a {
 
 .cp-shell__nav a.active,
 .cp-shell__nav a:hover {
-  background: rgba(90, 108, 234, 0.18);
-  color: #fff;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--cp-primary);
 }
 
 .cp-shell__actions {
@@ -116,10 +142,34 @@ a {
 
 .cp-shell__language {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--cp-border);
   border-radius: 999px;
-  color: #fff;
+  color: var(--cp-text);
   padding: 0.35rem 0.9rem;
+}
+
+.cp-shell__theme {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-card-light);
+  color: var(--cp-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.cp-shell__theme:hover {
+  background: rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.cp-shell__theme:focus-visible {
+  outline: 2px solid var(--cp-accent);
+  outline-offset: 2px;
 }
 
 .cp-app {
@@ -131,10 +181,10 @@ a {
 
 .cp-frame {
   width: min(1200px, 100%);
-  background: rgba(10, 15, 32, 0.82);
+  background: var(--cp-panel-light);
   border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 50px 120px rgba(2, 6, 23, 0.85);
+  border: 1px solid var(--cp-border);
+  box-shadow: var(--cp-shadow);
   padding: 2.5rem;
 }
 
@@ -143,11 +193,12 @@ a {
 }
 
 .cp-card {
-  background: rgba(15, 25, 56, 0.8);
+  background: var(--cp-card);
   border-radius: 24px;
   padding: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 25px 60px rgba(2, 6, 23, 0.45);
+  border: 1px solid var(--cp-border);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  color: var(--cp-text);
 }
 
 .cp-card + .cp-card {
@@ -155,8 +206,8 @@ a {
 }
 
 .cp-card--hero {
-  background: linear-gradient(135deg, rgba(90, 108, 234, 0.35), rgba(12, 20, 44, 0.85));
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(255, 255, 255, 0.95));
+  border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .cp-card__header {
@@ -217,18 +268,19 @@ a {
 .cp-btn--primary {
   background: linear-gradient(120deg, var(--cp-primary), var(--cp-primary-dark));
   color: #fff;
-  box-shadow: 0 15px 30px rgba(90, 108, 234, 0.4);
+  box-shadow: 0 15px 30px rgba(37, 99, 235, 0.3);
 }
 
 .cp-btn--ghost {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--cp-card-light);
+  color: var(--cp-text);
+  border: 1px solid transparent;
 }
 
 .cp-btn--outline {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: #fff;
+  border: 1px solid var(--cp-border);
+  color: var(--cp-text);
 }
 
 .cp-form {
@@ -261,15 +313,15 @@ a {
 .cp-input {
   width: 100%;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--cp-border);
   padding: 0.85rem 1rem;
   font-size: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: var(--cp-card-light);
+  color: var(--cp-text);
 }
 
 .cp-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--cp-text-muted);
 }
 
 .cp-alert {
@@ -306,6 +358,16 @@ a {
   height: 320px;
 }
 
+.cp-chart--cluster {
+  height: 360px;
+}
+
+.cp-chart-range {
+  color: var(--cp-text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
 .cp-table-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -321,7 +383,7 @@ a {
 .cp-table-wrapper td {
   padding: 0.75rem 0.5rem;
   text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--cp-border);
 }
 
 .cp-table-wrapper th {
@@ -334,7 +396,7 @@ a {
 .cp-progress {
   width: 100%;
   height: 10px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--cp-card-light);
   border-radius: 999px;
   overflow: hidden;
   margin-top: 0.35rem;
@@ -363,7 +425,7 @@ a {
 .cp-description-list dd {
   margin: 0.15rem 0 0;
   font-weight: 600;
-  color: #fff;
+  color: var(--cp-text);
 }
 
 .cp-auth {
@@ -375,10 +437,10 @@ a {
 
 .cp-auth__intro {
   padding: 2rem;
-  background: linear-gradient(135deg, rgba(90, 108, 234, 0.35), rgba(12, 20, 44, 0.9));
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(255, 255, 255, 0.95));
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--cp-text);
 }
 
 .cp-auth__intro h1 {
@@ -409,19 +471,19 @@ a {
 }
 
 .cp-auth__card {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--cp-card);
   border-radius: 28px;
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--cp-border);
   padding: 2rem;
-  color: #fff;
+  color: var(--cp-text);
 }
 
 .cp-stat-card {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--cp-card);
   border-radius: 24px;
   padding: 1rem 1.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--cp-border);
+  color: var(--cp-text);
 }
 
 .cp-stat-card strong {
@@ -440,10 +502,19 @@ a {
 .cp-filter select {
   width: 100%;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--cp-border);
   padding: 0.6rem 0.85rem;
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: var(--cp-card-light);
+  color: var(--cp-text);
+}
+
+.cp-filter--actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.cp-filter--actions .cp-btn {
+  width: 100%;
 }
 
 .cp-router-list {
@@ -460,6 +531,31 @@ a {
   justify-content: space-between;
   font-size: 0.95rem;
   padding: 0.35rem 0;
+}
+
+.cp-pill-switch {
+  display: inline-flex;
+  gap: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-card-light);
+  padding: 0.2rem;
+}
+
+.cp-pill-switch__btn {
+  border: none;
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-weight: 600;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.cp-pill-switch__btn.is-active {
+  background: var(--cp-primary);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
 }
 
 .cp-alert + .cp-alert {

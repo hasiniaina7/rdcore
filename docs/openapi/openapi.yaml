@@ -142,6 +142,40 @@ components:
           type: number
           description: Total session duration in seconds within the window.
         sessionCount: { type: integer }
+    UsageTimeseriesBucket:
+      type: object
+      properties:
+        index:
+          type: integer
+          description: Zero-based position in the returned array.
+        label:
+          type: string
+          description: Short label for the bucket (hour, weekday or day-of-month).
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        totalBytes: { type: number }
+        totalTimeSeconds: { type: number }
+        sessionCount: { type: integer }
+    UsageTimeseries:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        granularity:
+          type: string
+          enum: [hour, day, month]
+        buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageTimeseriesBucket'
     UsageByUsernameSummary:
       type: object
       properties:
@@ -156,6 +190,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UsagePeriodSummary'
+        series:
+          $ref: '#/components/schemas/UsageTimeseries'
     SessionList:
       type: object
       properties:
@@ -236,6 +272,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UsagePeriodSummary'
+        series:
+          $ref: '#/components/schemas/UsageTimeseries'
         activeSessions:
           type: array
           items:
@@ -790,6 +828,26 @@ paths:
           name: historyLimit
           schema: { type: integer, default: 200 }
           description: Number of recent sessions to inspect (50-500).
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive start of the aggregation window (defaults to the last 7 days).
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive end of the aggregation window.
+        - in: query
+          name: granularity
+          schema:
+            type: string
+            enum: [hour, day, month]
+          description: |
+            Controls the aggregation buckets: hourly for a single day, day-of-week for a week window,
+            or day-of-month for the month view.
       responses:
         '200':
           description: Aggregated usage windows
@@ -802,6 +860,57 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/UsageByUsernameSummary'
+        '401':
+          description: Missing or invalid usage session token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/usage/timeseries:
+    get:
+      tags: [usage, radiusdesk-proxy]
+      summary: Aggregated usage buckets for charts
+      description: >
+        Returns the aggregated usage buckets for the requested window (hour/day/month) so the client can
+        render the cluster column chart without doing heavy computations locally.
+      operationId: getUsageTimeseries
+      security:
+        - UsageSession: []
+      parameters:
+        - in: query
+          name: historyLimit
+          schema: { type: integer, default: 200 }
+          description: Number of recent sessions to inspect while building the timeseries.
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive start of the aggregation window.
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+          description: Inclusive end of the aggregation window.
+        - in: query
+          name: granularity
+          schema:
+            type: string
+            enum: [hour, day, month]
+          description: Aggregation preset (hourly, weekday, or day-of-month buckets).
+      responses:
+        '200':
+          description: Usage timeseries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UsageTimeseries'
         '401':
           description: Missing or invalid usage session token
           content:
@@ -821,6 +930,24 @@ paths:
           name: limit
           schema: { type: integer, default: 20 }
           description: Maximum number of active sessions to return (1-200).
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+          description: Only include sessions that started on or after this timestamp.
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+          description: Only include sessions that started on or before this timestamp.
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [all, active, inactive]
+          description: Override the status filter (default is `active` for this endpoint).
       responses:
         '200':
           description: Active session list
@@ -854,6 +981,24 @@ paths:
           name: limit
           schema: { type: integer, default: 50 }
           description: Maximum number of inactive sessions to return (1-200).
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+          description: Only include sessions that started on or after this timestamp.
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+          description: Only include sessions that started on or before this timestamp.
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [all, active, inactive]
+          description: Override the status filter (default is `inactive` for this endpoint).
       responses:
         '200':
           description: Inactive session list

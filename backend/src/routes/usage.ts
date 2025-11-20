@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { fetchUsage, disconnectSessions } from '../services/usageService';
 import { listActiveSessions, listInactiveSessions } from '../services/sessionService';
-import { fetchUsageByUsername } from '../services/usageInsightsService';
+import { fetchUsageByUsername, fetchUsageTimeseries } from '../services/usageInsightsService';
 import { z } from 'zod';
 import { extractUsageSession, requireUsageSession } from '../middleware/usageSession';
 
@@ -24,6 +24,10 @@ const booleanFromQuery = z
     }
     return Boolean(normalized);
   });
+
+const dateFromQuery = z.coerce.date().optional();
+const granularityParam = z.enum(['hour', 'day', 'month']).optional();
+const sessionStatusParam = z.enum(['all', 'active', 'inactive']).optional();
 
 router.get('/usage', async (req, res, next) => {
   try {
@@ -76,9 +80,39 @@ router.get('/usage-by-username', async (req, res, next) => {
     const session = requireUsageSession(req);
     const schema = z.object({
       historyLimit: z.coerce.number().optional(),
+      startDate: dateFromQuery,
+      endDate: dateFromQuery,
+      granularity: granularityParam,
     });
     const params = schema.parse(req.query);
-    const data = await fetchUsageByUsername(session.username, params.historyLimit);
+    const data = await fetchUsageByUsername(session.username, {
+      historyLimit: params.historyLimit,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      granularity: params.granularity,
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/usage/timeseries', async (req, res, next) => {
+  try {
+    const session = requireUsageSession(req);
+    const schema = z.object({
+      historyLimit: z.coerce.number().optional(),
+      startDate: dateFromQuery,
+      endDate: dateFromQuery,
+      granularity: granularityParam,
+    });
+    const params = schema.parse(req.query);
+    const data = await fetchUsageTimeseries(session.username, {
+      historyLimit: params.historyLimit,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      granularity: params.granularity,
+    });
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -90,9 +124,17 @@ router.get('/active-sessions', async (req, res, next) => {
     const session = requireUsageSession(req);
     const schema = z.object({
       limit: z.coerce.number().optional(),
+      startDate: dateFromQuery,
+      endDate: dateFromQuery,
+      status: sessionStatusParam,
     });
     const params = schema.parse(req.query);
-    const data = await listActiveSessions(session.username, params.limit);
+    const data = await listActiveSessions(session.username, {
+      limit: params.limit,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      status: params.status,
+    });
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -104,9 +146,17 @@ router.get('/inactive-sessions', async (req, res, next) => {
     const session = requireUsageSession(req);
     const schema = z.object({
       limit: z.coerce.number().optional(),
+      startDate: dateFromQuery,
+      endDate: dateFromQuery,
+      status: sessionStatusParam,
     });
     const params = schema.parse(req.query);
-    const data = await listInactiveSessions(session.username, params.limit);
+    const data = await listInactiveSessions(session.username, {
+      limit: params.limit,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      status: params.status,
+    });
     res.json({ success: true, data });
   } catch (error) {
     next(error);

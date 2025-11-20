@@ -16,7 +16,8 @@ const resources = {
         title: 'Dynamic login',
         language: 'Choose language',
         navLabel: 'Primary navigation',
-        logout: 'Logout'
+        logout: 'Logout',
+        themeToggle: 'Toggle theme'
       },
       login: {
         eyebrow: 'Secure dashboard',
@@ -215,7 +216,8 @@ const resources = {
           status: 'Status',
           statusAll: 'All sessions',
           statusActive: 'Active only',
-          statusInactive: 'Inactive only'
+          statusInactive: 'Inactive only',
+          apply: 'Apply'
         },
         chart: {
           dailyEyebrow: 'Daily usage',
@@ -226,7 +228,21 @@ const resources = {
           weeklyEyebrow: 'Weekly & monthly',
           weeklyTitle: 'Aggregated usage',
           weeklyBar: 'Weekly',
-          monthlyBar: 'Monthly'
+          monthlyBar: 'Monthly',
+          clusterEyebrow: 'Cluster column',
+          clusterTitle: 'Hourly / weekly / monthly view',
+          modeSelector: 'Aggregation mode',
+          modes: {
+            hour: 'Per hour',
+            day: 'Per day',
+            month: 'Per month'
+          },
+          rangeSummary: 'Range: {{range}}',
+          rangeEmpty: 'Select a range and apply filters',
+          noDataRange: 'No data for {{range}}',
+          bucketLabel: 'Bucket',
+          megabytes: 'Megabytes',
+          sessions: 'Sessions'
         },
         table: {
           status: 'Status',
@@ -328,7 +344,8 @@ const resources = {
         title: 'Connexion dynamique',
         language: 'Changer de langue',
         navLabel: 'Navigation principale',
-        logout: 'Se déconnecter'
+        logout: 'Se déconnecter',
+        themeToggle: 'Changer le thème'
       },
       login: {
         eyebrow: 'Tableau sécurisé',
@@ -527,7 +544,8 @@ const resources = {
           status: 'Statut',
           statusAll: 'Toutes les sessions',
           statusActive: 'Actives uniquement',
-          statusInactive: 'Inactives uniquement'
+          statusInactive: 'Inactives uniquement',
+          apply: 'Appliquer'
         },
         chart: {
           dailyEyebrow: 'Usage quotidien',
@@ -538,7 +556,21 @@ const resources = {
           weeklyEyebrow: 'Hebdo & mensuel',
           weeklyTitle: 'Usage agrégé',
           weeklyBar: 'Hebdo',
-          monthlyBar: 'Mensuel'
+          monthlyBar: 'Mensuel',
+          clusterEyebrow: 'Histogramme',
+          clusterTitle: 'Vue heure / semaine / mois',
+          modeSelector: 'Mode d’agrégation',
+          modes: {
+            hour: 'Par heure',
+            day: 'Par jour',
+            month: 'Par mois'
+          },
+          rangeSummary: 'Plage : {{range}}',
+          rangeEmpty: 'Choisissez une date et appliquez les filtres',
+          noDataRange: 'Aucune donnée pour {{range}}',
+          bucketLabel: 'Intervalle',
+          megabytes: 'Mégaoctets',
+          sessions: 'Sessions'
         },
         table: {
           status: 'Statut',
@@ -640,7 +672,8 @@ const resources = {
         title: 'Inicio dinámico',
         language: 'Cambiar idioma',
         navLabel: 'Navegación principal',
-        logout: 'Cerrar sesión'
+        logout: 'Cerrar sesión',
+        themeToggle: 'Cambiar tema'
       },
       login: {
         eyebrow: 'Panel seguro',
@@ -839,7 +872,8 @@ const resources = {
           status: 'Estado',
           statusAll: 'Todas las sesiones',
           statusActive: 'Solo activas',
-          statusInactive: 'Solo inactivas'
+          statusInactive: 'Solo inactivas',
+          apply: 'Aplicar'
         },
         chart: {
           dailyEyebrow: 'Uso diario',
@@ -850,7 +884,21 @@ const resources = {
           weeklyEyebrow: 'Semanal y mensual',
           weeklyTitle: 'Uso agregado',
           weeklyBar: 'Semanal',
-          monthlyBar: 'Mensual'
+          monthlyBar: 'Mensual',
+          clusterEyebrow: 'Histograma',
+          clusterTitle: 'Vista por hora / semana / mes',
+          modeSelector: 'Modo de agregación',
+          modes: {
+            hour: 'Por hora',
+            day: 'Por día',
+            month: 'Por mes'
+          },
+          rangeSummary: 'Rango: {{range}}',
+          rangeEmpty: 'Selecciona una fecha y aplica los filtros',
+          noDataRange: 'Sin datos para {{range}}',
+          bucketLabel: 'Intervalo',
+          megabytes: 'Megabytes',
+          sessions: 'Sesiones'
         },
         table: {
           status: 'Estado',

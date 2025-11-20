@@ -30,8 +30,8 @@ const getSessionBytes = (record: Record<string, unknown>) => {
 export async function fetchAdminUserInsights(username: string, historyLimit?: number): Promise<AdminUserInsights> {
   const [usageSummary, activeSessions, inactiveSessions] = await Promise.all([
     fetchUsageByUsername(username, historyLimit),
-    listActiveSessions(username, 50),
-    listInactiveSessions(username, 120),
+    listActiveSessions(username, { limit: 50 }),
+    listInactiveSessions(username, { limit: 120 }),
   ]);
 
   const routerMap = new Map<string, RouterUsageStat>();
@@ -56,6 +56,7 @@ export async function fetchAdminUserInsights(username: string, historyLimit?: nu
     macs: usageSummary.macs,
     historyLimit: usageSummary.historyLimit,
     periods: usageSummary.periods,
+    series: usageSummary.series,
     activeSessions: activeSessions.sessions,
     inactiveSessions: inactiveSessions.sessions,
     activeCount: activeSessions.totalCount,

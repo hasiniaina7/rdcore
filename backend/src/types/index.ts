@@ -88,11 +88,31 @@ export interface UsagePeriodSummary {
   sessionCount: number;
 }
 
+export type UsageTimeseriesGranularity = 'hour' | 'day' | 'month';
+
+export interface UsageTimeseriesBucket {
+  index: number;
+  label: string;
+  start: string;
+  end: string;
+  totalBytes: number;
+  totalTimeSeconds: number;
+  sessionCount: number;
+}
+
+export interface UsageTimeseries {
+  startDate: string;
+  endDate: string;
+  granularity: UsageTimeseriesGranularity;
+  buckets: UsageTimeseriesBucket[];
+}
+
 export interface UsageByUsernameSummary {
   username: string;
   historyLimit: number;
   macs: string[];
   periods: UsagePeriodSummary[];
+  series: UsageTimeseries;
 }
 
 export interface SessionListResult {
@@ -126,6 +146,7 @@ export interface AdminUserInsights {
   macs: string[];
   historyLimit: number;
   periods: UsagePeriodSummary[];
+  series: UsageTimeseries;
   activeSessions: Array<Record<string, unknown>>;
   inactiveSessions: Array<Record<string, unknown>>;
   activeCount: number;

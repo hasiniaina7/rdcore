@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchUsageByUsername } from './usageInsightsService';
+import { fetchUsageByUsername, fetchUsageTimeseries } from './usageInsightsService';
 import { getSessions } from './radiusdeskIntegration';
 
 vi.mock('./radiusdeskIntegration', () => ({
@@ -8,7 +8,7 @@ vi.mock('./radiusdeskIntegration', () => ({
 
 const mockedGetSessions = vi.mocked(getSessions);
 
-describe('fetchUsageByUsername', () => {
+describe('usageInsightsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const now = Date.now();
@@ -40,7 +40,7 @@ describe('fetchUsageByUsername', () => {
   });
 
   it('aggregates sessions across default periods', async () => {
-    const result = await fetchUsageByUsername('demo@example.com', 100);
+    const result = await fetchUsageByUsername('demo@example.com', { historyLimit: 100 });
 
     expect(mockedGetSessions).toHaveBeenCalledWith('demo@example.com', 100, { onlyConnected: false });
     expect(result.username).toBe('demo@example.com');
@@ -54,9 +54,26 @@ describe('fetchUsageByUsername', () => {
     expect(weekly?.sessionCount).toBeGreaterThanOrEqual(2);
     const monthly = result.periods.find((p) => p.period === 'monthly');
     expect(monthly?.sessionCount).toBe(3);
+    expect(result.series.buckets.length).toBeGreaterThan(0);
+    expect(result.series.granularity).toBe('day');
   });
 
   it('throws when username is missing', async () => {
-    await expect(fetchUsageByUsername('', 100)).rejects.toThrow('username is required');
+    await expect(fetchUsageByUsername('', { historyLimit: 100 })).rejects.toThrow('username is required');
+  });
+
+  it('builds timeseries with selected granularity', async () => {
+    const start = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const end = new Date();
+    const series = await fetchUsageTimeseries('demo@example.com', {
+      historyLimit: 120,
+      granularity: 'hour',
+      startDate: start,
+      endDate: end,
+    });
+
+    expect(mockedGetSessions).toHaveBeenCalledWith('demo@example.com', 120, { onlyConnected: false });
+    expect(series.granularity).toBe('hour');
+    expect(series.buckets.length).toBeGreaterThan(0);
   });
 });

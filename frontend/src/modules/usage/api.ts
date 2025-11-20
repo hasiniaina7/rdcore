@@ -1,5 +1,12 @@
 import client from '../../api/client';
-import type { SessionListResult, UsageByUsernameSummary, UsageSessionsOptions, UsageStats } from './types';
+import type {
+  SessionListResult,
+  UsageByUsernameSummary,
+  UsageSessionsOptions,
+  UsageStats,
+  UsageTimeseries,
+  UsageTimeseriesGranularity,
+} from './types';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -12,6 +19,13 @@ interface UsageRequestOptions {
   mac?: string;
 }
 
+interface UsageSummaryRequestOptions {
+  historyLimit?: number;
+  startDate?: string;
+  endDate?: string;
+  granularity?: UsageTimeseriesGranularity;
+}
+
 export async function fetchUsageStats(options: UsageRequestOptions = {}): Promise<UsageStats> {
   const params = {
     mac: options.mac?.trim() || undefined,
@@ -22,9 +36,26 @@ export async function fetchUsageStats(options: UsageRequestOptions = {}): Promis
   return response.data.data;
 }
 
-export async function fetchUsageSummary(historyLimit?: number): Promise<UsageByUsernameSummary> {
+export async function fetchUsageSummary(options: UsageSummaryRequestOptions = {}): Promise<UsageByUsernameSummary> {
   const response = await client.get<ApiResponse<UsageByUsernameSummary>>('/usage-by-username', {
-    params: { historyLimit },
+    params: {
+      historyLimit: options.historyLimit,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      granularity: options.granularity,
+    },
+  });
+  return response.data.data;
+}
+
+export async function fetchUsageTimeseries(options: UsageSummaryRequestOptions = {}): Promise<UsageTimeseries> {
+  const response = await client.get<ApiResponse<UsageTimeseries>>('/usage/timeseries', {
+    params: {
+      historyLimit: options.historyLimit,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      granularity: options.granularity,
+    },
   });
   return response.data.data;
 }
@@ -34,7 +65,12 @@ async function fetchSessions(
   options: UsageSessionsOptions = {}
 ): Promise<SessionListResult> {
   const response = await client.get<ApiResponse<SessionListResult>>(endpoint, {
-    params: { limit: options.limit },
+    params: {
+      limit: options.limit,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      status: options.status,
+    },
   });
   return response.data.data;
 }

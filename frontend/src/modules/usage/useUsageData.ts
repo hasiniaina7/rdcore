@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchActiveSessions, fetchInactiveSessions, fetchUsageStats, fetchUsageSummary } from './api';
-import type { SessionListResult, UsageByUsernameSummary, UsageStats } from './types';
+import {
+  fetchActiveSessions,
+  fetchInactiveSessions,
+  fetchUsageStats,
+  fetchUsageSummary,
+  fetchUsageTimeseries,
+} from './api';
+import type {
+  SessionListResult,
+  UsageByUsernameSummary,
+  UsageStats,
+  UsageTimeseries,
+  UsageTimeseriesGranularity,
+} from './types';
 
 const DEFAULT_ACTIVE_LIMIT = 25;
 const DEFAULT_INACTIVE_LIMIT = 80;
@@ -16,9 +28,17 @@ const toErrorMessage = (error: unknown): string => {
   return 'Unknown error';
 };
 
+type UsageHookFilters = {
+  startDate?: string;
+  endDate?: string;
+  status?: 'all' | 'active' | 'inactive';
+  granularity?: UsageTimeseriesGranularity;
+};
+
 type UsageHookOptions = {
   mac?: string;
   enabled?: boolean;
+  filters?: UsageHookFilters;
 };
 
 export function useUsageData(options: UsageHookOptions = {}) {
@@ -26,12 +46,15 @@ export function useUsageData(options: UsageHookOptions = {}) {
   const [summary, setSummary] = useState<UsageByUsernameSummary | null>(null);
   const [activeSessions, setActiveSessions] = useState<SessionListResult | null>(null);
   const [inactiveSessions, setInactiveSessions] = useState<SessionListResult | null>(null);
+  const [timeseries, setTimeseries] = useState<UsageTimeseries | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   const normalizedMac = options.mac?.trim() || undefined;
   const isEnabled = options.enabled ?? true;
+  const appliedFilters = options.filters ?? {};
+  const granularity = appliedFilters.granularity ?? 'day';
 
   const refresh = useCallback(async () => {
     if (!isEnabled) {
@@ -39,17 +62,39 @@ export function useUsageData(options: UsageHookOptions = {}) {
       setSummary(null);
       setActiveSessions(null);
       setInactiveSessions(null);
+      setTimeseries(null);
       setErrors([]);
       return;
     }
     setIsLoading(true);
     const newErrors: string[] = [];
     try {
-      const [usageResult, summaryResult, activeResult, inactiveResult] = await Promise.allSettled([
+      const [usageResult, summaryResult, activeResult, inactiveResult, timeseriesResult] = await Promise.allSettled([
         fetchUsageStats({ sessionLimit: DEFAULT_ACTIVE_LIMIT, withSessions: false, mac: normalizedMac }),
-        fetchUsageSummary(DEFAULT_INACTIVE_LIMIT),
-        fetchActiveSessions({ limit: DEFAULT_ACTIVE_LIMIT }),
-        fetchInactiveSessions({ limit: DEFAULT_INACTIVE_LIMIT }),
+        fetchUsageSummary({
+          historyLimit: DEFAULT_INACTIVE_LIMIT,
+          startDate: appliedFilters.startDate,
+          endDate: appliedFilters.endDate,
+          granularity,
+        }),
+        fetchActiveSessions({
+          limit: DEFAULT_ACTIVE_LIMIT,
+          startDate: appliedFilters.startDate,
+          endDate: appliedFilters.endDate,
+          status: appliedFilters.status,
+        }),
+        fetchInactiveSessions({
+          limit: DEFAULT_INACTIVE_LIMIT,
+          startDate: appliedFilters.startDate,
+          endDate: appliedFilters.endDate,
+          status: appliedFilters.status,
+        }),
+        fetchUsageTimeseries({
+          historyLimit: DEFAULT_INACTIVE_LIMIT,
+          startDate: appliedFilters.startDate,
+          endDate: appliedFilters.endDate,
+          granularity,
+        }),
       ]);
 
       if (usageResult.status === 'fulfilled') {
@@ -76,12 +121,25 @@ export function useUsageData(options: UsageHookOptions = {}) {
         newErrors.push(toErrorMessage(inactiveResult.reason));
       }
 
+      if (timeseriesResult.status === 'fulfilled') {
+        setTimeseries(timeseriesResult.value);
+      } else {
+        newErrors.push(toErrorMessage(timeseriesResult.reason));
+      }
+
       setErrors(newErrors);
       setLastUpdated(Date.now());
     } finally {
       setIsLoading(false);
     }
-  }, [isEnabled, normalizedMac]);
+  }, [
+    appliedFilters.endDate,
+    appliedFilters.startDate,
+    appliedFilters.status,
+    granularity,
+    isEnabled,
+    normalizedMac,
+  ]);
 
   useEffect(() => {
     void refresh();
@@ -92,6 +150,7 @@ export function useUsageData(options: UsageHookOptions = {}) {
     summary,
     activeSessions,
     inactiveSessions,
+    timeseries,
     errors,
     isLoading,
     lastUpdated,

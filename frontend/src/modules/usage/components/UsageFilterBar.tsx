@@ -6,9 +6,11 @@ interface Props {
   filters: UsageFilters;
   onChange: (next: UsageFilters) => void;
   macOptions: string[];
+  onApply?: () => void;
+  isApplying?: boolean;
 }
 
-export default function UsageFilterBar({ filters, onChange, macOptions }: Props) {
+export default function UsageFilterBar({ filters, onChange, macOptions, onApply, isApplying }: Props) {
   const { t } = useTranslation();
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
@@ -61,6 +63,11 @@ export default function UsageFilterBar({ filters, onChange, macOptions }: Props)
           <option value="active">{t('success.filters.statusActive')}</option>
           <option value="inactive">{t('success.filters.statusInactive')}</option>
         </select>
+      </div>
+      <div className="cp-filter cp-filter--actions">
+        <button type="button" className="cp-btn cp-btn--primary" onClick={onApply} disabled={isApplying}>
+          {isApplying ? t('success.loading') : t('success.filters.apply')}
+        </button>
       </div>
     </div>
   );

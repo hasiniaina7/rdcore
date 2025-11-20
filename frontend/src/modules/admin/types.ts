@@ -1,3 +1,5 @@
+import type { UsageTimeseries } from '../usage/types';
+
 export type AdminAuthMode = 'static' | 'radiusmysql';
 
 export interface AdminAuthModes {
@@ -39,6 +41,7 @@ export interface AdminUserInsights {
     totalTimeSeconds: number;
     sessionCount: number;
   }>;
+  series: UsageTimeseries;
   activeSessions: Array<Record<string, unknown>>;
   inactiveSessions: Array<Record<string, unknown>>;
   activeCount: number;

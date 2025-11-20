@@ -28,7 +28,7 @@ import {
 } from '../modules/usage/utils';
 import UsageFilterBar from '../modules/usage/components/UsageFilterBar';
 import SessionTable from '../modules/usage/components/SessionTable';
-import type { UsageFilters } from '../modules/usage/types';
+import type { UsageFilters, UsageTimeseriesGranularity } from '../modules/usage/types';
 import { disconnectUsageSessions } from '../modules/usage/api';
 import { useAuth } from '../modules/auth/AuthProvider';
 
@@ -42,6 +42,10 @@ export default function Success() {
   const [macInput, setMacInput] = useState(session?.profile?.mac || params.mac || '');
   const [macOverride, setMacOverride] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<UsageFilters>({ status: 'all' });
+  const [serverFilters, setServerFilters] = useState<{ startDate?: string; endDate?: string; status?: UsageFilters['status'] }>({
+    status: 'all',
+  });
+  const [timeseriesMode, setTimeseriesMode] = useState<UsageTimeseriesGranularity>('day');
   const [banner, setBanner] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
   const [pendingDisconnectId, setPendingDisconnectId] = useState<string | null>(null);
 
@@ -52,9 +56,15 @@ export default function Success() {
 
   const activeMac = macOverride ?? session?.profile?.mac ?? undefined;
 
-  const { usage, summary, activeSessions, inactiveSessions, errors, isLoading, lastUpdated, refresh } = useUsageData({
+  const { usage, summary, activeSessions, inactiveSessions, timeseries, errors, isLoading, lastUpdated, refresh } = useUsageData({
     enabled: Boolean(session),
     mac: activeMac,
+    filters: {
+      startDate: serverFilters.startDate,
+      endDate: serverFilters.endDate,
+      status: serverFilters.status,
+      granularity: timeseriesMode,
+    },
   });
 
   const sessions = useMemo(() => combineSessions(activeSessions?.sessions, inactiveSessions?.sessions), [activeSessions, inactiveSessions]);
@@ -80,6 +90,19 @@ export default function Success() {
       { label: t('success.chart.monthlyBar'), mb: Number((monthlySummary.totalBytes / MB).toFixed(2)), sessions: monthlySummary.sessionCount },
     ],
     [monthlySummary, t, weeklySummary]
+  );
+  const clusterData = useMemo(
+    () =>
+      timeseries?.buckets.map((bucket) => ({
+        label: bucket.label,
+        mb: Number((bucket.totalBytes / MB).toFixed(2)),
+        sessions: bucket.sessionCount,
+      })) ?? [],
+    [timeseries]
+  );
+  const selectedRangeLabel = useMemo(
+    () => formatRangeLabel(serverFilters.startDate, serverFilters.endDate),
+    [serverFilters.endDate, serverFilters.startDate]
   );
 
   const onlineCount = activeSessions?.sessions.length ?? 0;
@@ -118,7 +141,31 @@ export default function Success() {
     [refresh, t]
   );
 
-  const resetFilters = () => setFilters({ status: 'all' });
+  const handleApplyFilters = useCallback(() => {
+    const nextRange = buildRangeForMode(timeseriesMode, filters.startDate);
+    setFilters((prev) => ({
+      ...prev,
+      startDate: nextRange.uiStart,
+      endDate: nextRange.uiEnd,
+    }));
+    setServerFilters({
+      startDate: nextRange.serverStart,
+      endDate: nextRange.serverEnd,
+      status: filters.status ?? 'all',
+    });
+  }, [filters.startDate, filters.status, timeseriesMode]);
+
+  const resetFilters = useCallback(() => {
+    setFilters({
+      status: 'all',
+      startDate: undefined,
+      endDate: undefined,
+      router: undefined,
+      deviceMac: undefined,
+      minMegabytes: undefined,
+    });
+    setServerFilters({ status: 'all' });
+  }, []);
 
   return (
     <div className="cp-dashboard">
@@ -241,7 +288,13 @@ export default function Success() {
                 </button>
               </div>
             </div>
-            <UsageFilterBar filters={filters} onChange={setFilters} macOptions={macOptions} />
+            <UsageFilterBar
+              filters={filters}
+              onChange={setFilters}
+              macOptions={macOptions}
+              onApply={handleApplyFilters}
+              isApplying={isLoading}
+            />
           </article>
 
           <section className="cp-grid cp-grid--2">
@@ -289,6 +342,78 @@ export default function Success() {
               </div>
             </article>
           </section>
+
+          <article className="cp-card">
+            <div className="cp-card__header">
+              <div>
+                <p className="cp-eyebrow">{t('success.chart.clusterEyebrow')}</p>
+                <h2 className="cp-title">{t('success.chart.clusterTitle')}</h2>
+                <p className="cp-card__meta">
+                  {selectedRangeLabel ? t('success.chart.rangeSummary', { range: selectedRangeLabel }) : t('success.chart.rangeEmpty')}
+                </p>
+              </div>
+              <div className="cp-pill-switch" role="group" aria-label={t('success.chart.modeSelector')}>
+                {(['hour', 'day', 'month'] as UsageTimeseriesGranularity[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`cp-pill-switch__btn ${timeseriesMode === mode ? 'is-active' : ''}`}
+                    onClick={() => setTimeseriesMode(mode)}
+                  >
+                    {t(`success.chart.modes.${mode}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="cp-chart cp-chart--cluster">
+              {clusterData.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={clusterData} margin={{ left: 0, right: 16, top: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5f5" />
+                    <XAxis dataKey="label" stroke="#94a3b8" />
+                    <YAxis yAxisId="left" stroke="#94a3b8" tickFormatter={(value) => `${value} MB`} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" tickFormatter={(value) => `${value}`} />
+                    <Tooltip
+                      formatter={(value, name) =>
+                        name === t('success.chart.megabytes')
+                          ? [`${value} MB`, t('success.chart.megabytes')]
+                          : [value, t('success.chart.sessions')]
+                      }
+                      labelFormatter={(label) => `${t('success.chart.bucketLabel')}: ${label}`}
+                    />
+                    <defs>
+                      <linearGradient id="clusterMb" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2563eb" stopOpacity="0.9" />
+                        <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.9" />
+                      </linearGradient>
+                    </defs>
+                    <Bar
+                      yAxisId="left"
+                      dataKey="mb"
+                      fill="url(#clusterMb)"
+                      name={t('success.chart.megabytes')}
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={28}
+                    />
+                    <Bar
+                      yAxisId="right"
+                      dataKey="sessions"
+                      fill="#f97316"
+                      name={t('success.chart.sessions')}
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={28}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p>
+                  {selectedRangeLabel
+                    ? t('success.chart.noDataRange', { range: selectedRangeLabel })
+                    : t('success.chart.noData')}
+                </p>
+              )}
+            </div>
+          </article>
 
           <article className="cp-card">
             <div className="cp-card__header">
@@ -359,4 +484,102 @@ function formatText(value: unknown, fallback = '—') {
     return value.toString();
   }
   return fallback;
+}
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function formatRangeLabel(start?: string, end?: string) {
+  if (!start && !end) {
+    return '';
+  }
+  const format = (value?: string) => {
+    if (!value) {
+      return null;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toLocaleDateString();
+  };
+  const startLabel = format(start);
+  const endLabel = format(end);
+  if (startLabel && endLabel) {
+    return `${startLabel} → ${endLabel}`;
+  }
+  return startLabel || endLabel || '';
+}
+
+function buildRangeForMode(mode: UsageTimeseriesGranularity, startValue?: string) {
+  const reference = startValue ? new Date(startValue) : new Date();
+  if (Number.isNaN(reference.getTime())) {
+    reference.setTime(Date.now());
+  }
+  if (mode === 'hour') {
+    const start = startOfDay(reference);
+    const end = endOfDay(reference);
+    return formatRange(start, end);
+  }
+  if (mode === 'day') {
+    const start = startOfWeek(reference);
+    const end = endOfDay(addDays(start, 6));
+    return formatRange(start, end);
+  }
+  const start = startOfMonth(reference);
+  const end = endOfMonth(reference);
+  return formatRange(start, end);
+}
+
+function formatRange(start: Date, end: Date) {
+  return {
+    uiStart: formatDateInput(start),
+    uiEnd: formatDateInput(end),
+    serverStart: start.toISOString(),
+    serverEnd: end.toISOString(),
+  };
+}
+
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfDay(date: Date) {
+  const clone = new Date(date);
+  clone.setHours(0, 0, 0, 0);
+  return clone;
+}
+
+function endOfDay(date: Date) {
+  const clone = new Date(date);
+  clone.setHours(23, 59, 59, 999);
+  return clone;
+}
+
+function addDays(date: Date, days: number) {
+  const clone = new Date(date);
+  clone.setTime(clone.getTime() + days * DAY_IN_MS);
+  return clone;
+}
+
+function startOfWeek(date: Date) {
+  const clone = startOfDay(date);
+  const day = clone.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  clone.setDate(clone.getDate() + diff);
+  return clone;
+}
+
+function startOfMonth(date: Date) {
+  const clone = startOfDay(date);
+  clone.setDate(1);
+  return clone;
+}
+
+function endOfMonth(date: Date) {
+  const start = startOfMonth(date);
+  const clone = new Date(start);
+  clone.setMonth(clone.getMonth() + 1);
+  clone.setDate(0);
+  clone.setHours(23, 59, 59, 999);
+  return clone;
 }
