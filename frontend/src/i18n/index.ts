@@ -122,7 +122,7 @@ const resources = {
           voucherCode: 'Voucher code',
           infoShortcutTitle: 'Usage shortcut',
           infoShortcutBody: 'Open the TECHZONE usage dashboard immediately with the credentials you entered.',
-          infoShortcutCta: 'Open usage dashboard',
+          infoShortcutCta: 'Ouvrir la page info conso',
           infoShortcutHint: 'Opens in a new tab. If the fields are empty you can fill them on the dashboard.',
           legalLink: 'Terms & Conditions'
         },
