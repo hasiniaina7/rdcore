@@ -2,8 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const API_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:4000';
+const APP_BASE = process.env.VITE_APP_BASENAME || '/';
 
 export default defineConfig({
+  base: APP_BASE,
   plugins: [react()],
   server: {
     host: '0.0.0.0',
