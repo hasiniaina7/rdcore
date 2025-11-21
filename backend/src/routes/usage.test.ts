@@ -95,11 +95,13 @@ describe('usage routes', () => {
     );
     expect(mockedListActiveSessions).toHaveBeenCalledWith(
       'alice',
-      expect.objectContaining({ limit: undefined, status: undefined })
+      expect.objectContaining({ limit: undefined, status: undefined }),
+      'ff:ee'
     );
     expect(mockedListInactiveSessions).toHaveBeenCalledWith(
       'alice',
-      expect.objectContaining({ limit: undefined, status: undefined })
+      expect.objectContaining({ limit: undefined, status: undefined }),
+      'ff:ee'
     );
   });
 
@@ -129,7 +131,7 @@ describe('usage routes', () => {
   });
 
   it('passes time filters to insights endpoints', async () => {
-    mockedRequireUsageSession.mockReturnValue({ username: 'alice' });
+    mockedRequireUsageSession.mockReturnValue({ username: 'alice', mac: 'aa:bb' });
     mockedFetchUsageByUsername.mockResolvedValue({
       username: 'alice',
       historyLimit: 123,
@@ -154,7 +156,7 @@ describe('usage routes', () => {
   });
 
   it('returns usage timeseries data', async () => {
-    mockedRequireUsageSession.mockReturnValue({ username: 'alice' });
+    mockedRequireUsageSession.mockReturnValue({ username: 'alice', mac: 'aa:bb' });
     mockedFetchUsageTimeseries.mockResolvedValue({
       startDate: '2024-05-01T00:00:00.000Z',
       endDate: '2024-05-07T23:59:59.000Z',
@@ -173,7 +175,7 @@ describe('usage routes', () => {
   });
 
   it('forwards filters to session list endpoints', async () => {
-    mockedRequireUsageSession.mockReturnValue({ username: 'alice' });
+    mockedRequireUsageSession.mockReturnValue({ username: 'alice', mac: 'aa:bb' });
     mockedListActiveSessions.mockResolvedValue({ sessions: [] });
     mockedListInactiveSessions.mockResolvedValue({ sessions: [] });
 
@@ -183,7 +185,8 @@ describe('usage routes', () => {
     expect(activeRes.status).toBe(200);
     expect(mockedListActiveSessions).toHaveBeenCalledWith(
       'alice',
-      expect.objectContaining({ limit: 10, status: 'inactive' })
+      expect.objectContaining({ limit: 10, status: 'inactive' }),
+      'aa:bb'
     );
     const [, activeOptions] = mockedListActiveSessions.mock.calls[0];
     expect(activeOptions?.startDate).toEqual(new Date('2024-05-01T00:00:00.000Z'));

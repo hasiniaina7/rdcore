@@ -43,7 +43,7 @@ export async function fetchUsage(
   const derivedMac = extractMacFromSessions(sessions);
 
   if (!derivedMac) {
-    throw createError(404, 'Unable to determine MAC address for this user');
+    throw createError(404, 'Pa de session trouvée pour cet utilisateur, impossible de déterminer l\'adresse MAC');
   }
 
   const usage = await getUsage(normalizedUsername, {

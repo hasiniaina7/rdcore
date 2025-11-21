@@ -1,5 +1,19 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+
+const envCandidates = [
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../.env'),
+];
+
+for (const candidate of envCandidates) {
+  if (fs.existsSync(candidate)) {
+    dotenv.config({ path: candidate, override: false });
+  }
+}
 
 dotenv.config();
 
@@ -34,7 +48,19 @@ const envSchema = z.object({
   ADMIN_TOKEN_TTL_MINUTES: z.coerce.number().default(240),
   USAGE_SESSION_TTL_MINUTES: z.coerce.number().default(30),
   USAGE_SESSION_CACHE_SIZE: z.coerce.number().default(1000),
-  CORS_ALLOWED_ORIGINS: z.string().optional().default('http://localhost:5173,https://hotspot.techzone.lat'),
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .optional()
+    .default(
+      [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://192.168.4.244:5173',
+        'http://192.168.4.244:5174',
+        'https://hotspot.techzone.lat',
+      ].join(',')
+    ),
+  RADIUS_HTTP_TIMEOUT_MS: z.coerce.number().default(15000),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -5,7 +5,7 @@ import { DynamicDetailResponse } from '../types';
 
 const radiusClient = axios.create({
   baseURL: config.RADIUS_BASE_URL,
-  timeout: 8000,
+  timeout: config.RADIUS_HTTP_TIMEOUT_MS,
 });
 
 const withDefaults = (params: Record<string, unknown>) => ({
@@ -86,23 +86,59 @@ type SessionsOptions = {
   page?: number;
   start?: number;
   extraParams?: Record<string, unknown>;
+  caseInsensitive?: boolean;
+};
+
+const buildUsernameAttempts = (rawUsername: string | undefined, caseInsensitive: boolean) => {
+  const normalized = rawUsername?.trim();
+  if (!normalized) {
+    return [normalized];
+  }
+
+  if (!caseInsensitive) {
+    return [normalized];
+  }
+
+  const candidates = new Set<string>([normalized, normalized.toLowerCase(), normalized.toUpperCase()]);
+  return Array.from(candidates);
 };
 
 export async function getSessions(username: string, limit = 10, options?: SessionsOptions) {
-  const { onlyConnected = false, page = 1, start = 0, extraParams = {} } = options ?? {};
-  return timedRequest(async () => {
+  const { onlyConnected, page = 1, start = 0, extraParams = {}, caseInsensitive = true } = options ?? {};
+
+  const attemptRequest = async (usernameParam: string | undefined) => {
+    const params: Record<string, unknown> = {
+      limit,
+      page,
+      start,
+      sort: 'acctstarttime',
+      dir: 'DESC',
+      ...extraParams,
+    };
+    if (usernameParam) {
+      params.username = usernameParam;
+    }
+    if (typeof onlyConnected === 'boolean') {
+      params.only_connected = onlyConnected ? 'true' : 'false';
+    }
     const { data } = await radiusClient.get('/radaccts/index.json', {
-      params: withDefaults({
-        username,
-        limit,
-        only_connected: onlyConnected ? 'true' : 'false',
-        page,
-        start,
-        ...extraParams,
-      }),
+      params: withDefaults(params),
     });
     return data;
-  }, 'sessions');
+  };
+
+  const attempts = buildUsernameAttempts(username, caseInsensitive);
+  let lastResponse: Awaited<ReturnType<typeof attemptRequest>> | undefined;
+
+  for (const candidate of attempts) {
+    lastResponse = await timedRequest(() => attemptRequest(candidate), 'sessions');
+    const items = Array.isArray(lastResponse?.items) ? lastResponse.items : [];
+    if (!caseInsensitive || items.length > 0) {
+      return lastResponse;
+    }
+  }
+
+  return lastResponse ?? (await timedRequest(() => attemptRequest(username?.trim()), 'sessions'));
 }
 
 export async function kickSessions(radacctIds: string[]) {

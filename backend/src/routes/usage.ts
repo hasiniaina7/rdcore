@@ -129,12 +129,16 @@ router.get('/active-sessions', async (req, res, next) => {
       status: sessionStatusParam,
     });
     const params = schema.parse(req.query);
-    const data = await listActiveSessions(session.username, {
-      limit: params.limit,
-      startDate: params.startDate,
-      endDate: params.endDate,
-      status: params.status,
-    });
+    const data = await listActiveSessions(
+      session.username,
+      {
+        limit: params.limit,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        status: params.status,
+      },
+      session.mac
+    );
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -151,12 +155,16 @@ router.get('/inactive-sessions', async (req, res, next) => {
       status: sessionStatusParam,
     });
     const params = schema.parse(req.query);
-    const data = await listInactiveSessions(session.username, {
-      limit: params.limit,
-      startDate: params.startDate,
-      endDate: params.endDate,
-      status: params.status,
-    });
+    const data = await listInactiveSessions(
+      session.username,
+      {
+        limit: params.limit,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        status: params.status,
+      },
+      session.mac
+    );
     res.json({ success: true, data });
   } catch (error) {
     next(error);

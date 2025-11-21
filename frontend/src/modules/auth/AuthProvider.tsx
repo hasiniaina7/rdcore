@@ -19,6 +19,7 @@ type AuthContextValue = {
 };
 
 const STORAGE_KEY = 'cp:usage-session';
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -59,6 +60,28 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const login = useCallback((next: UsageSession) => setSession(next), []);
   const logout = useCallback(() => setSession(null), []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!session) {
+      return;
+    }
+    const now = Date.now();
+    const tokenTimeout = typeof session.expiresAt === 'number' ? Math.max(session.expiresAt - now, 0) : Infinity;
+    const timerDuration = Math.min(tokenTimeout, INACTIVITY_TIMEOUT_MS);
+    if (!Number.isFinite(timerDuration) || timerDuration <= 0) {
+      setSession(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSession(null);
+    }, timerDuration);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [session]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

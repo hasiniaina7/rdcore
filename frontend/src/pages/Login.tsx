@@ -22,10 +22,17 @@ export default function Login() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    const normalizedUsername = form.username.trim();
+    if (!normalizedUsername || !form.password.includes(normalizedUsername)) {
+      setError(t('login.passwordMismatch'));
+      return;
+    }
+
     setIsLoading(true);
     try {
       const result = await requestLogin({
-        username: form.username,
+        username: normalizedUsername,
         password: form.password,
         mac: form.mac || undefined,
       });
@@ -49,7 +56,7 @@ export default function Login() {
         <h1>{t('login.title')}</h1>
         <p>{t('login.subtitle')}</p>
         <ul>
-          <li>Hotspot Omada + RadiusDesk orchestration</li>
+          <li>Hotspot Omada + Mikrotik orchestration</li>
           <li>Usage dashboard en temps réel</li>
           <li>Sessions protégées par jeton temporaire</li>
         </ul>
@@ -63,7 +70,7 @@ export default function Login() {
               className="cp-input"
               value={form.username}
               onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-              placeholder="user@example.com"
+              placeholder={t('login.usernamePlaceholder')}
               required
             />
           </label>

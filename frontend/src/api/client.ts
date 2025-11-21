@@ -4,7 +4,7 @@ const resolvedBaseUrl = (import.meta.env.VITE_API_BASE_URL && import.meta.env.VI
 
 const client = axios.create({
   baseURL: resolvedBaseUrl,
-  timeout: 8000,
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 15000),
 });
 
 let authToken: string | null = null;
