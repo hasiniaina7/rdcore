@@ -30,7 +30,8 @@ const resources = {
         showMac: 'Add MAC address',
         hideMac: 'Hide MAC field',
         macHint: 'Provide the MAC only if support asked for it.',
-        macNotFound: 'We could not find a recent device for this account. If you know the MAC, add it and try again.',
+        macNotFound:
+          'We could not find a recent device for this account. If you know the MAC, add it and try again. This account may never have been used or could have expired after exhausting its quota.',
         submit: 'Sign in',
         loading: 'Signing in…',
         help: 'Credentials are provided by your hotspot operator.',
@@ -374,7 +375,8 @@ const resources = {
         showMac: 'Ajouter une adresse MAC',
         hideMac: 'Masquer le champ MAC',
         macHint: 'Renseignez la MAC uniquement si elle vous a été fournie.',
-        macNotFound: "Aucun appareil récent détecté pour ce compte. Ajoutez la MAC si vous la connaissez, puis réessayez.",
+        macNotFound:
+          "Aucun appareil récent détecté pour ce compte. Ajoutez la MAC si vous la connaissez, puis réessayez. Ce compte peut ne jamais avoir été utilisé ou avoir expiré après avoir épuisé son quota.",
         submit: 'Se connecter',
         loading: 'Connexion…',
         help: 'Les identifiants sont fournis par votre opérateur hotspot.',
@@ -718,7 +720,8 @@ const resources = {
         showMac: 'Agregar dirección MAC',
         hideMac: 'Ocultar campo MAC',
         macHint: 'Solo introduce la MAC si soporte te la proporcionó.',
-        macNotFound: 'No encontramos un dispositivo reciente para esta cuenta. Si conoces la MAC, añádela y vuelve a intentarlo.',
+        macNotFound:
+          'No encontramos un dispositivo reciente para esta cuenta. Si conoces la MAC, añádela y vuelve a intentarlo. Es posible que esta cuenta nunca se haya utilizado o haya expirado al agotar su cuota.',
         submit: 'Iniciar sesión',
         loading: 'Ingresando…',
         help: 'Las credenciales las entrega el operador del hotspot.',
