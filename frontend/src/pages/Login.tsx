@@ -12,6 +12,7 @@ export default function Login() {
   const [form, setForm] = useState({ username: '', password: '', mac: '' });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showMacField, setShowMacField] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -42,8 +43,11 @@ export default function Login() {
       const message =
         (err as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ||
         (err as { message?: string }).message ||
-        t('login.error');
-      setError(message);
+        '';
+      const normalized = message.includes('Unable to determine MAC address')
+        ? t('login.macNotFound')
+        : message || t('login.error');
+      setError(normalized);
     } finally {
       setIsLoading(false);
     }
@@ -86,16 +90,28 @@ export default function Login() {
               required
             />
           </label>
-          <label className="cp-field" htmlFor="login-mac">
-            {t('login.mac')}
-            <input
-              id="login-mac"
-              className="cp-input"
-              value={form.mac}
-              onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
-              placeholder="AA:BB:CC:DD:EE:FF"
-            />
-          </label>
+          <div style={{ marginBottom: '1rem' }}>
+            <button
+              type="button"
+              className="cp-btn cp-btn--ghost"
+              onClick={() => setShowMacField((prev) => !prev)}
+            >
+              {showMacField ? t('login.hideMac') : t('login.showMac')}
+            </button>
+          </div>
+          {showMacField && (
+            <label className="cp-field" htmlFor="login-mac">
+              {t('login.mac')}
+              <input
+                id="login-mac"
+                className="cp-input"
+                value={form.mac}
+                onChange={(event) => setForm((prev) => ({ ...prev, mac: event.target.value }))}
+                placeholder="AA:BB:CC:DD:EE:FF"
+              />
+              <span className="cp-field__hint">{t('login.macHint')}</span>
+            </label>
+          )}
           <button type="submit" className="cp-btn cp-btn--primary" disabled={isLoading}>
             {isLoading ? t('login.loading') : t('login.submit')}
           </button>

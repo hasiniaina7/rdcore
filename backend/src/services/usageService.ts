@@ -11,6 +11,8 @@ type QuotaMetadata = {
   expiresAt?: string;
   timeCapSeconds?: number | null;
   timeUsedSeconds?: number;
+  dataUsedBytes?: number;
+  dataCapBytes?: number | null;
 };
 
 const toNumber = (value: unknown): number | undefined => {
@@ -64,6 +66,36 @@ const extractFirstRecord = (payload: RadiusdeskCollection | undefined): Record<s
   return payload.items[0];
 };
 
+const hasQuotaMetadata = (quota: QuotaMetadata) =>
+  Boolean(
+    quota.expiresAt ||
+      typeof quota.timeCapSeconds === 'number' ||
+      typeof quota.timeUsedSeconds === 'number' ||
+      typeof quota.dataUsedBytes === 'number' ||
+      typeof quota.dataCapBytes === 'number'
+  );
+
+const buildUsageFromQuota = (
+  username: string,
+  quota: QuotaMetadata,
+  withSessions: boolean,
+  mac?: string
+): UsageStats => {
+  const timeRemainingSeconds = computeRemainingSeconds(quota.timeCapSeconds, quota.timeUsedSeconds, quota.expiresAt);
+  return {
+    username,
+    mac,
+    dataUsed: quota.dataUsedBytes ?? undefined,
+    dataCap: quota.dataCapBytes ?? null,
+    timeUsed: quota.timeUsedSeconds ?? undefined,
+    timeCap: quota.timeCapSeconds ?? null,
+    expiresAt: quota.expiresAt,
+    timeRemainingSeconds,
+    depleted: false,
+    sessions: withSessions ? [] : [],
+  };
+};
+
 async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMetadata> {
   const normalized = username?.trim();
   if (!normalized) {
@@ -76,7 +108,15 @@ async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMe
       const expiresAt = toIsoDate(record.to_date ?? record.expire ?? record.toDate);
       const timeCapSeconds = toNumber(record.time_cap ?? record.timeCap);
       const timeUsedSeconds = toNumber(record.time_used ?? record.timeUsed);
-      return { expiresAt, timeCapSeconds: timeCapSeconds ?? null, timeUsedSeconds: timeUsedSeconds ?? undefined };
+      const dataUsedBytes = toNumber(record.data_used ?? record.dataUsed);
+      const dataCapBytes = toNumber(record.data_cap ?? record.dataCap) ?? null;
+      return {
+        expiresAt,
+        timeCapSeconds: timeCapSeconds ?? null,
+        timeUsedSeconds: timeUsedSeconds ?? undefined,
+        dataUsedBytes,
+        dataCapBytes,
+      };
     }
   } catch {
     // Ignore lookup issues and fall back to vouchers.
@@ -88,7 +128,15 @@ async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMe
       const expiresAt = toIsoDate(record.expire ?? record.to_date);
       const timeCapSeconds = toNumber(record.time_cap ?? record.timeCap);
       const timeUsedSeconds = toNumber(record.time_used ?? record.timeUsed);
-      return { expiresAt, timeCapSeconds: timeCapSeconds ?? null, timeUsedSeconds: timeUsedSeconds ?? undefined };
+      const dataUsedBytes = toNumber(record.data_used ?? record.dataUsed);
+      const dataCapBytes = toNumber(record.data_cap ?? record.dataCap) ?? null;
+      return {
+        expiresAt,
+        timeCapSeconds: timeCapSeconds ?? null,
+        timeUsedSeconds: timeUsedSeconds ?? undefined,
+        dataUsedBytes,
+        dataCapBytes,
+      };
     }
   } catch {
     // Ignore voucher lookup failures.
@@ -123,11 +171,13 @@ export async function fetchUsage(
     const timeUsedSeconds = usage?.data?.time_used ?? quota.timeUsedSeconds;
     const timeCapSeconds = usage?.data?.time_cap ?? quota.timeCapSeconds ?? null;
     const timeRemainingSeconds = computeRemainingSeconds(timeCapSeconds, timeUsedSeconds, quota.expiresAt);
+    const dataUsedBytes = quota.dataUsedBytes ?? usage?.data?.data_used ?? undefined;
+    const dataCapBytes = quota.dataCapBytes ?? usage?.data?.data_cap ?? null;
     return {
       username: normalizedUsername,
       mac: normalizedMac,
-      dataUsed: usage?.data?.data_used ?? undefined,
-      dataCap: usage?.data?.data_cap ?? null,
+      dataUsed: dataUsedBytes,
+      dataCap: dataCapBytes,
       timeUsed: timeUsedSeconds,
       timeCap: timeCapSeconds,
       expiresAt: quota.expiresAt,
@@ -141,6 +191,10 @@ export async function fetchUsage(
   const derivedMac = extractMacFromSessions(sessions);
 
   if (!derivedMac) {
+    const quota = await quotaPromise;
+    if (hasQuotaMetadata(quota)) {
+      return buildUsageFromQuota(normalizedUsername, quota, withSessions);
+    }
     throw createError(404, 'Unable to determine MAC address for this user');
   }
 
@@ -156,11 +210,14 @@ export async function fetchUsage(
   const timeCapSeconds = usage?.data?.time_cap ?? quota.timeCapSeconds ?? null;
   const timeRemainingSeconds = computeRemainingSeconds(timeCapSeconds, timeUsedSeconds, quota.expiresAt);
 
+  const dataUsedBytes = quota.dataUsedBytes ?? usage?.data?.data_used ?? undefined;
+  const dataCapBytes = quota.dataCapBytes ?? usage?.data?.data_cap ?? null;
+
   return {
     username: normalizedUsername,
     mac: derivedMac,
-    dataUsed: usage?.data?.data_used ?? undefined,
-    dataCap: usage?.data?.data_cap ?? null,
+    dataUsed: dataUsedBytes,
+    dataCap: dataCapBytes,
     timeUsed: timeUsedSeconds,
     timeCap: timeCapSeconds,
     expiresAt: quota.expiresAt,
