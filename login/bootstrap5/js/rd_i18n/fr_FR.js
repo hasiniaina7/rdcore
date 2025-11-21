@@ -155,7 +155,7 @@ localizedStrings: {
     'sTermsQuickIntro': 'En utilisant le Wi-Fi TECHZONE vous acceptez les règles suivantes :',
     'sTermsQuickItem1': 'L’accès est journalisé pour des raisons de sécurité et de conformité.',
     'sTermsQuickItem2': 'Pas d’abus de bande passante, pas de partage d’identifiants ni de contenus illicites.',
-    'sTermsQuickItem3': 'L’opérateur peut suspendre votre accès en cas d’usage suspect.',
-    'sTermsQuickFooter': 'Les conditions complètes sont disponibles sur demande auprès de l’opérateur.'
+    'sTermsQuickItem3': 'TECHZONE peut suspendre votre accès en cas d’usage suspect.',
+    'sTermsQuickFooter': 'Les conditions complètes sont disponibles sur demande auprès de TECHZONE.'
 }
 }
