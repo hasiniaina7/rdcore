@@ -1,5 +1,10 @@
+import { useEffect } from 'react';
+
 export default function Terms() {
   const updated = '01 Aout 2024';
+  useEffect(() => {
+    document.title = 'TECHZONE · Conditions';
+  }, []);
   return (
     <article className="cp-card">
       <div className="cp-card__header">

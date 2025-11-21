@@ -1,7 +1,11 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function Privacy() {
   const { t } = useTranslation();
+  useEffect(() => {
+    document.title = `TECHZONE · ${t('nav.privacy')}`;
+  }, [t]);
   const sections = [
     { title: t('privacy.collectionTitle'), body: t('privacy.collectionBody') },
     { title: t('privacy.usageTitle'), body: t('privacy.usageBody') },

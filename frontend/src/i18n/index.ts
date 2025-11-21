@@ -13,7 +13,7 @@ const resources = {
       },
       layout: {
         eyebrow: 'Omada hotspot',
-        title: 'Dynamic login',
+        title: 'Info consumption',
         language: 'Choose language',
         navLabel: 'Primary navigation',
         logout: 'Logout',
@@ -357,7 +357,7 @@ const resources = {
       },
       layout: {
         eyebrow: 'TECHZONE WIFI',
-        title: 'Connexion dynamique',
+        title: 'Info Consommation',
         language: 'Changer de langue',
         navLabel: 'Navigation principale',
         logout: 'Se déconnecter',
@@ -701,7 +701,7 @@ const resources = {
       },
       layout: {
         eyebrow: 'Portal Omada',
-        title: 'Inicio dinámico',
+        title: 'Info Consumo',
         language: 'Cambiar idioma',
         navLabel: 'Navegación principal',
         logout: 'Cerrar sesión',

@@ -29,6 +29,10 @@ export default function Success() {
   const [pendingDisconnectId, setPendingDisconnectId] = useState<string | null>(null);
 
   useEffect(() => {
+    document.title = `TECHZONE · ${t('nav.success')}`;
+  }, [t]);
+
+  useEffect(() => {
     setMacInput(session?.profile?.mac || '');
     setMacOverride(undefined);
   }, [session?.profile?.mac]);

@@ -15,6 +15,10 @@ export default function Login() {
   const [showMacField, setShowMacField] = useState(false);
 
   useEffect(() => {
+    document.title = `TECHZONE · ${t('nav.login')}`;
+  }, [t]);
+
+  useEffect(() => {
     if (session) {
       navigate('/success', { replace: true });
     }

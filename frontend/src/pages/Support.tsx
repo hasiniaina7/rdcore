@@ -1,7 +1,11 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function Support() {
   const { t } = useTranslation();
+  useEffect(() => {
+    document.title = `TECHZONE · ${t('nav.support')}`;
+  }, [t]);
 
   return (
     <article className="cp-card">
