@@ -1,8 +1,100 @@
 import createError from 'http-errors';
-import { getUsage, getSessions, kickSessions } from './radiusdeskIntegration';
+import { getUsage, getSessions, kickSessions, findPermanentUser, findVoucher } from './radiusdeskIntegration';
 import { UsageStats } from '../types';
 
 type SessionsPayload = Awaited<ReturnType<typeof getSessions>>;
+type RadiusdeskCollection = {
+  items?: Array<Record<string, unknown>>;
+};
+
+type QuotaMetadata = {
+  expiresAt?: string;
+  timeCapSeconds?: number | null;
+  timeUsedSeconds?: number;
+};
+
+const toNumber = (value: unknown): number | undefined => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const toIsoDate = (value: unknown): string | undefined => {
+  if (value == null) {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value.toISOString();
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    return new Date(value).toISOString();
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const ts = Date.parse(value);
+    if (Number.isNaN(ts)) {
+      return undefined;
+    }
+    return new Date(ts).toISOString();
+  }
+  return undefined;
+};
+
+const computeRemainingSeconds = (timeCapSeconds?: number | null, timeUsedSeconds?: number, expiresAt?: string) => {
+  if (typeof timeCapSeconds === 'number' && typeof timeUsedSeconds === 'number') {
+    return Math.max(0, Math.floor(timeCapSeconds - timeUsedSeconds));
+  }
+  if (typeof timeCapSeconds === 'number') {
+    return Math.max(0, Math.floor(timeCapSeconds));
+  }
+  if (expiresAt) {
+    const expires = Date.parse(expiresAt);
+    if (!Number.isNaN(expires)) {
+      return Math.max(0, Math.floor((expires - Date.now()) / 1000));
+    }
+  }
+  return undefined;
+};
+
+const extractFirstRecord = (payload: RadiusdeskCollection | undefined): Record<string, unknown> | undefined => {
+  if (!payload?.items || !Array.isArray(payload.items)) {
+    return undefined;
+  }
+  return payload.items[0];
+};
+
+async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMetadata> {
+  const normalized = username?.trim();
+  if (!normalized) {
+    return {};
+  }
+  try {
+    const response = await findPermanentUser(normalized);
+    const record = extractFirstRecord(response);
+    if (record) {
+      const expiresAt = toIsoDate(record.to_date ?? record.expire ?? record.toDate);
+      const timeCapSeconds = toNumber(record.time_cap ?? record.timeCap);
+      const timeUsedSeconds = toNumber(record.time_used ?? record.timeUsed);
+      return { expiresAt, timeCapSeconds: timeCapSeconds ?? null, timeUsedSeconds: timeUsedSeconds ?? undefined };
+    }
+  } catch {
+    // Ignore lookup issues and fall back to vouchers.
+  }
+  try {
+    const response = await findVoucher(normalized);
+    const record = extractFirstRecord(response);
+    if (record) {
+      const expiresAt = toIsoDate(record.expire ?? record.to_date);
+      const timeCapSeconds = toNumber(record.time_cap ?? record.timeCap);
+      const timeUsedSeconds = toNumber(record.time_used ?? record.timeUsed);
+      return { expiresAt, timeCapSeconds: timeCapSeconds ?? null, timeUsedSeconds: timeUsedSeconds ?? undefined };
+    }
+  } catch {
+    // Ignore voucher lookup failures.
+  }
+  return {};
+}
 
 export async function fetchUsage(
   username: string,
@@ -19,6 +111,7 @@ export async function fetchUsage(
   }
 
   const normalizedMac = mac?.trim() || undefined;
+  const quotaPromise = fetchQuotaMetadata(normalizedUsername);
 
   if (normalizedMac) {
     const usagePromise = getUsage(normalizedUsername, {
@@ -26,14 +119,19 @@ export async function fetchUsage(
       mac: normalizedMac,
     });
     const sessionsPromise = withSessions ? getSessions(normalizedUsername, limit) : Promise.resolve(undefined);
-    const [usage, sessions] = await Promise.all([usagePromise, sessionsPromise]);
+    const [usage, sessions, quota] = await Promise.all([usagePromise, sessionsPromise, quotaPromise]);
+    const timeUsedSeconds = usage?.data?.time_used ?? quota.timeUsedSeconds;
+    const timeCapSeconds = usage?.data?.time_cap ?? quota.timeCapSeconds ?? null;
+    const timeRemainingSeconds = computeRemainingSeconds(timeCapSeconds, timeUsedSeconds, quota.expiresAt);
     return {
       username: normalizedUsername,
       mac: normalizedMac,
       dataUsed: usage?.data?.data_used ?? undefined,
       dataCap: usage?.data?.data_cap ?? null,
-      timeUsed: usage?.data?.time_used ?? undefined,
-      timeCap: usage?.data?.time_cap ?? null,
+      timeUsed: timeUsedSeconds,
+      timeCap: timeCapSeconds,
+      expiresAt: quota.expiresAt,
+      timeRemainingSeconds,
       depleted: Boolean(usage?.data?.depleted),
       sessions: withSessions ? sessions?.items ?? [] : [],
     };
@@ -43,21 +141,30 @@ export async function fetchUsage(
   const derivedMac = extractMacFromSessions(sessions);
 
   if (!derivedMac) {
-    throw createError(404, 'Pa de session trouvée pour cet utilisateur, impossible de déterminer l\'adresse MAC');
+    throw createError(404, 'Unable to determine MAC address for this user');
   }
 
-  const usage = await getUsage(normalizedUsername, {
-    password: normalizedPassword,
-    mac: derivedMac,
-  });
+  const [usage, quota] = await Promise.all([
+    getUsage(normalizedUsername, {
+      password: normalizedPassword,
+      mac: derivedMac,
+    }),
+    quotaPromise,
+  ]);
+
+  const timeUsedSeconds = usage?.data?.time_used ?? quota.timeUsedSeconds;
+  const timeCapSeconds = usage?.data?.time_cap ?? quota.timeCapSeconds ?? null;
+  const timeRemainingSeconds = computeRemainingSeconds(timeCapSeconds, timeUsedSeconds, quota.expiresAt);
 
   return {
     username: normalizedUsername,
     mac: derivedMac,
     dataUsed: usage?.data?.data_used ?? undefined,
     dataCap: usage?.data?.data_cap ?? null,
-    timeUsed: usage?.data?.time_used ?? undefined,
-    timeCap: usage?.data?.time_cap ?? null,
+    timeUsed: timeUsedSeconds,
+    timeCap: timeCapSeconds,
+    expiresAt: quota.expiresAt,
+    timeRemainingSeconds,
     depleted: Boolean(usage?.data?.depleted),
     sessions: withSessions ? sessions?.items ?? [] : [],
   };

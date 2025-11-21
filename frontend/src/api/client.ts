@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 
 const resolvedBaseUrl = (import.meta.env.VITE_API_BASE_URL && import.meta.env.VITE_API_BASE_URL.trim()) || '/api';
 
@@ -14,17 +14,15 @@ export function setApiAuthToken(token: string | null) {
 }
 
 client.interceptors.request.use((config) => {
-  const headers = (config.headers ?? {}) as Record<string, unknown>;
+  const headers = AxiosHeaders.from(config.headers);
   if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
-    headers.authorization = headers.Authorization;
+    headers.set('Authorization', `Bearer ${authToken}`);
   } else {
-    delete headers.Authorization;
-    delete headers.authorization;
+    headers.delete('Authorization');
   }
-  headers['Cache-Control'] = 'no-cache';
-  headers.Pragma = 'no-cache';
-  headers['If-Modified-Since'] = '0';
+  headers.set('Cache-Control', 'no-cache');
+  headers.set('Pragma', 'no-cache');
+  headers.set('If-Modified-Since', '0');
   config.headers = headers;
   if (config.method?.toLowerCase() === 'get') {
     if (config.params instanceof URLSearchParams) {

@@ -155,8 +155,15 @@ export async function kickSessions(radacctIds: string[]) {
 
 export async function findPermanentUser(username: string) {
   return timedRequest(async () => {
+    const filter = JSON.stringify([
+      {
+        property: 'username',
+        operator: 'like',
+        value: username,
+      },
+    ]);
     const { data } = await radiusClient.get('/permanent-users/index.json', {
-      params: withDefaults({ username, limit: 1 }),
+      params: withDefaults({ limit: 1, page: 1, start: 0, filter }),
     });
     return data;
   }, 'permanent-users');
@@ -173,8 +180,15 @@ export async function getPermanentUserPassword(userId: string) {
 
 export async function findVoucher(name: string) {
   return timedRequest(async () => {
+    const filter = JSON.stringify([
+      {
+        property: 'name',
+        operator: 'like',
+        value: name,
+      },
+    ]);
     const { data } = await radiusClient.get('/vouchers/index.json', {
-      params: withDefaults({ name, limit: 1 }),
+      params: withDefaults({ limit: 1, page: 1, start: 0, filter }),
     });
     return data;
   }, 'vouchers');

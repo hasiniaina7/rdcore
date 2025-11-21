@@ -1,20 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchUsage } from './usageService';
-import { getUsage, getSessions } from './radiusdeskIntegration';
+import { getUsage, getSessions, findPermanentUser, findVoucher } from './radiusdeskIntegration';
 
 vi.mock('./radiusdeskIntegration', () => ({
   getUsage: vi.fn(),
   getSessions: vi.fn(),
   kickSessions: vi.fn(),
+  findPermanentUser: vi.fn(),
+  findVoucher: vi.fn(),
 }));
 
 const mockedGetUsage = vi.mocked(getUsage);
 const mockedGetSessions = vi.mocked(getSessions);
+const mockedFindPermanentUser = vi.mocked(findPermanentUser);
+const mockedFindVoucher = vi.mocked(findVoucher);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedGetUsage.mockResolvedValue({ data: {} });
   mockedGetSessions.mockResolvedValue({ items: [] });
+  mockedFindPermanentUser.mockResolvedValue({ items: [] });
+  mockedFindVoucher.mockResolvedValue({ items: [] });
 });
 
 describe('fetchUsage', () => {

@@ -49,10 +49,12 @@ export default function Success() {
   const dataProgress = calculateProgress(usage?.dataUsed, usage?.dataCap);
   const effectiveTimeUsed = usage?.timeUsed ?? aggregates?.monthTime ?? 0;
   const effectiveTimeCap = usage?.timeCap ?? null;
-  const timeProgress = calculateProgress(effectiveTimeUsed, effectiveTimeCap ?? undefined);
-  const remainingSeconds =
+  const derivedRemaining =
     effectiveTimeCap != null ? Math.max(0, effectiveTimeCap - effectiveTimeUsed) : undefined;
-  const remainingLabel = secondsToDuration(remainingSeconds);
+  const timeRemainingSeconds = usage?.timeRemainingSeconds ?? derivedRemaining;
+  const timeProgress = calculateProgress(effectiveTimeUsed, effectiveTimeCap ?? undefined);
+  const remainingLabel = secondsToDuration(timeRemainingSeconds);
+  const expirationLabel = usage?.expiresAt ? new Date(usage.expiresAt).toLocaleString() : null;
   const lastUpdatedLabel = lastUpdated ? new Date(lastUpdated).toLocaleString() : '—';
   const isOmadaBridge = params.fromOmada === '1' || params.mode === 'omada';
 
@@ -166,8 +168,11 @@ export default function Success() {
           <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={timeProgress ?? 0} role="progressbar">
             <div className="cp-progress__bar" style={{ width: `${timeProgress ?? 0}%` }} />
           </div>
-          {effectiveTimeCap != null && (
+          {timeRemainingSeconds != null && (
             <p className="cp-card__meta">{t('success.timeRemaining', { value: remainingLabel })}</p>
+          )}
+          {expirationLabel && (
+            <p className="cp-card__meta">{t('success.timeExpiration', { value: expirationLabel })}</p>
           )}
         </article>
         <article className="cp-card">

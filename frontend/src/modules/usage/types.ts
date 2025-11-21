@@ -14,6 +14,8 @@ export interface UsageStats {
   dataCap?: number | null;
   timeUsed?: number;
   timeCap?: number | null;
+  expiresAt?: string;
+  timeRemainingSeconds?: number;
   depleted: boolean;
   sessions: SessionRecord[];
 }
