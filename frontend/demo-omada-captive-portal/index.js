@@ -14,7 +14,7 @@ var MAX_INPUT_LEN = 2000;
 var radiusMode = 'user';
 var welcomeCountdownInterval;
 var welcomeRedirectTimeout;
-var TECHZONE_SUCCESS_BASE_URL = "http://167.86.71.186:5173/success?key=test_dynamic_keys";
+var TECHZONE_SUCCESS_BASE_URL = "https://info.techzone.lat";
 var lastAuthContext = { username: "", password: "" };
 var lastSuccessUrl = TECHZONE_SUCCESS_BASE_URL;
 var THEME_STORAGE_KEY = "demoOmadaTheme";

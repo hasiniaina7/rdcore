@@ -366,7 +366,7 @@ const resources = {
       },
       login: {
         eyebrow: 'Tableau sécurisé',
-        title: 'Connexion usage',
+        title: 'Info Consommation',
         subtitle: 'Saisissez vos identifiants du portail pour afficher la consommation.',
         username: "Nom d'utilisateur",
         password: 'Mot de passe',
