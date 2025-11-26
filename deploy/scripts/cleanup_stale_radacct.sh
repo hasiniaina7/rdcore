@@ -12,6 +12,7 @@ CURRENT_LOG="${LOG_DIR}/cleanup_stale_radacct.log"
 require_root
 
 STALE_SESSION_GRACE_SECONDS="${STALE_SESSION_GRACE_SECONDS:-900}"
+MIN_SESSION_AGE_SECONDS="${MIN_SESSION_AGE_SECONDS:-300}"
 DB_USER_CLEANUP="${DB_USER_CLEANUP:-root}"
 
 declare -a MYSQL_AUTH=("-u" "${DB_USER_CLEANUP}")
@@ -55,6 +56,10 @@ acctstoptime IS NULL
         (acctupdatetime IS NOT NULL AND acctupdatetime < '${CUTOFF_TS}')
      OR (acctupdatetime IS NULL AND acctstarttime < '${CUTOFF_TS}')
   )
+  AND (
+        acctupdatetime IS NULL
+     OR TIMESTAMPDIFF(SECOND, acctupdatetime, UTC_TIMESTAMP()) >= ${MIN_SESSION_AGE_SECONDS}
+   )
 SQL
 )
 COUNT_SQL="SELECT COUNT(*) FROM radacct WHERE ${WHERE_CLAUSE};"
@@ -84,3 +89,4 @@ if ! mysql_exec -N -B -e "${UPDATE_SQL}"; then
 fi
 
 log INFO "Sessions fermées automatiquement: ${ROWS}"
+log INFO "cleanup ran; skipping sessions younger than ${MIN_SESSION_AGE_SECONDS} seconds"

@@ -52,7 +52,13 @@ offset=0
 while (( offset < TOTAL )); do
   mapfile -t BATCH_USERS < <(
     ${MYSQL_CMD} -N -B "${DB_NAME}" \
-      -e "SELECT username FROM user_stats WHERE username <> '' GROUP BY username ORDER BY username LIMIT ${BATCH_SIZE} OFFSET ${offset};"
+  -e "SELECT us.username
+           FROM user_stats us
+           JOIN radacct r ON us.radacct_id = r.radacctid
+          WHERE us.username <> '' AND r.acctstoptime IS NOT NULL
+       GROUP BY us.username
+       ORDER BY us.username
+       LIMIT ${BATCH_SIZE} OFFSET ${offset};"
   )
 
   if (( ${#BATCH_USERS[@]} == 0 )); then
