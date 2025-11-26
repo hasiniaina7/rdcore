@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# phpMyAdmin one-shot setup for Nginx + PHP-FPM.
+# phpMyAdmin one-shot setup for Nginx + PHP-FPM (loopback-only).
 # - Installs phpMyAdmin + required PHP extensions.
 # - Enables mbstring and reloads PHP-FPM.
 # - Writes an Nginx snippet limited to loopback for /phpmyadmin/.
-# - Prints next steps (include snippet, test, reload, and SSH tunnel access).
+# - Prints next steps (include snippet or inline block, test, reload, SSH tunnel).
 #
 # Usage (run manually after base install scripts):
 #   sudo ./scripts/setup_phpmyadmin.sh
@@ -68,7 +68,10 @@ EOF
 echo "==> Next steps (manual)"
 echo "1) Include the snippet inside your Nginx server block, e.g.:"
 echo "     include /etc/nginx/snippets/phpmyadmin.conf;"
-echo "   (Edit /etc/nginx/sites-available/radiusdesk.conf or the relevant vhost)."
+echo "   (Edit /etc/nginx/sites-available/radiusdesk.conf ou le vhost concerné)."
+echo "   Option recommandé pour accès distant sécurisé : ajoutez un alias dédié dans server_name,"
+echo "   par exemple :"
+echo "     server_name hotspot.techzone.lat radiusdesk dbadmin.techzone.lat;"
 echo "   Reminder block if you prefer inline instead of include:"
 echo "   location /phpmyadmin/ {"
 echo "       alias /usr/share/phpmyadmin/;"
@@ -86,8 +89,11 @@ echo "   }"
 echo "2) Test and reload Nginx:"
 echo "     sudo nginx -t && sudo systemctl reload nginx"
 echo "3) Access locally on the server: https://127.0.0.1/phpmyadmin/ (or http)."
-echo "4) Access remotely via SSH tunnel (HTTPS example):"
-echo "     ssh -L 8443:127.0.0.1:443 -i /home/mastershark-linux/ssh/desk-pem.pem ubuntu@hotspot.techzone.lat"
-echo "     puis ouvrez https://localhost:8443/phpmyadmin/"
+echo "4) Access remotely via SSH tunnel (HTTPS example, avec alias dédié):"
+echo "     ssh -f -N -L 8443:127.0.0.1:443 -i /home/mastershark-linux/ssh/desk-pem.pem ubuntu@hotspot.techzone.lat"
+echo "   Sur votre machine locale, ajoutez dans /etc/hosts uniquement pour l'alias phpMyAdmin :"
+echo "     127.0.0.1   dbadmin.techzone.lat"
+echo "   puis ouvrez dans le navigateur :"
+echo "     https://dbadmin.techzone.lat:8443/phpmyadmin/"
 echo "5) Ensure MySQL is not exposed: bind to 127.0.0.1 in mysqld.cnf and restart mysql if needed."
 echo "Done."
