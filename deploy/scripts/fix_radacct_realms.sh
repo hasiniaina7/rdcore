@@ -25,6 +25,12 @@ mysql_exec(){
     "${DB_NAME}" -e "${sql}"
 }
 
+mysql_exec_stdin(){
+  MYSQL_PWD="${MYSQL_PASS}" mysql \
+    -h "${MYSQL_HOST}" -P "${MYSQL_PORT}" \
+    -u "${MYSQL_USER}" "${DB_NAME}"
+}
+
 log INFO "Backfill (permanent_users)."
 mysql_exec "\
   UPDATE radacct ra\
@@ -64,40 +70,40 @@ log INFO "Suppression trigger existant."
 mysql_exec "DROP TRIGGER IF EXISTS bi_radacct_realm;"
 
 log INFO "Installation du trigger bi_radacct_realm."
-mysql_exec "\
-DELIMITER //\
-CREATE TRIGGER bi_radacct_realm\
-BEFORE INSERT ON radacct\
-FOR EACH ROW\
-BEGIN\
-  DECLARE realm_name VARCHAR(64);\
-  IF NEW.realm IS NULL OR NEW.realm = '' THEN\
-    SELECT r.name INTO realm_name\
-      FROM permanent_users pu JOIN realms r ON r.id = pu.realm_id\
-     WHERE pu.username = NEW.username LIMIT 1;\
-    IF realm_name IS NULL THEN\
-      SELECT r.name INTO realm_name\
-        FROM vouchers v JOIN realms r ON r.id = v.realm_id\
-       WHERE v.name = NEW.username LIMIT 1;\
-    END IF;\
-    IF realm_name IS NULL THEN\
-      SELECT r.name INTO realm_name\
-        FROM devices d JOIN realms r ON r.id = d.realm_id\
-       WHERE d.name = NEW.username LIMIT 1;\
-    END IF;\
-    IF realm_name IS NULL THEN\
-      SELECT value INTO realm_name\
-        FROM radcheck\
-       WHERE username = NEW.username AND attribute = 'Rd-Realm'\
-       LIMIT 1;\
-    END IF;\
-    IF realm_name IS NOT NULL THEN\
-      SET NEW.realm = realm_name;\
-    END IF;\
-  END IF;\
-END//\
-DELIMITER ;\
-"
+mysql_exec_stdin <<'EOF'
+DELIMITER //
+CREATE TRIGGER bi_radacct_realm
+BEFORE INSERT ON radacct
+FOR EACH ROW
+BEGIN
+  DECLARE realm_name VARCHAR(64);
+  IF NEW.realm IS NULL OR NEW.realm = '' THEN
+    SELECT r.name INTO realm_name
+      FROM permanent_users pu JOIN realms r ON r.id = pu.realm_id
+     WHERE pu.username = NEW.username LIMIT 1;
+    IF realm_name IS NULL THEN
+      SELECT r.name INTO realm_name
+        FROM vouchers v JOIN realms r ON r.id = v.realm_id
+       WHERE v.name = NEW.username LIMIT 1;
+    END IF;
+    IF realm_name IS NULL THEN
+      SELECT r.name INTO realm_name
+        FROM devices d JOIN realms r ON r.id = d.realm_id
+       WHERE d.name = NEW.username LIMIT 1;
+    END IF;
+    IF realm_name IS NULL THEN
+      SELECT value INTO realm_name
+        FROM radcheck
+       WHERE username = NEW.username AND attribute = 'Rd-Realm'
+       LIMIT 1;
+    END IF;
+    IF realm_name IS NOT NULL THEN
+      SET NEW.realm = realm_name;
+    END IF;
+  END IF;
+END//
+DELIMITER ;
+EOF
 
 log INFO "Contrôle final :"
 mysql_exec "SELECT COUNT(*) total, SUM(realm IS NULL OR realm='') empty FROM radacct;"

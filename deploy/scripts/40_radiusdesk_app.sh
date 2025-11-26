@@ -298,6 +298,8 @@ fi
 log INFO "Activation du cron RADIUSdesk."
 if [[ -f /var/www/rdcore/cake4/rd_cake/setup/cron/cron4 ]]; then
   cp /var/www/rdcore/cake4/rd_cake/setup/cron/cron4 /etc/cron.d/cron4_radiusdesk
+  #cp /var/www/html/cake4/rd_cake/setup/cron/cron4 /etc/cron.d/
+  #cp /var/www/html/cake4/rd_cake/setup/cron/cron4 /etc/cron.d/
   chmod 644 /etc/cron.d/cron4_radiusdesk
 else
   log WARN "cron4 introuvable, cron non installé."
