@@ -93,7 +93,8 @@ Ext.define('Rd.controller.cAccessPoints', {
         'components.cmbDynamicDetail',
         'components.winHardwareAddAction',
         'components.winCsvColumnSelect',
-        'aps.pnlApViewLink'
+        'aps.pnlApViewLink',
+        'aps.pnlApVpnConnections'
     ],
     stores: [ 'sApProfiles', 'sApLists'  ],
     models: [ 'mApProfile',  'mApList', 'mDynamicDetail' ],
@@ -117,8 +118,8 @@ Ext.define('Rd.controller.cAccessPoints', {
         gateway         : true,
         //--Apr 2025 Routing
         activeTab       : null,
-        processingRoute : false 
-         
+        processingRoute : false,
+        apListEdit      : 'basic' // 'vpn' or 'wifi' 
     },
     refs: [
         {  ref: 'grid',             selector: 'gridApProfiles'},
@@ -158,7 +159,7 @@ Ext.define('Rd.controller.cAccessPoints', {
             },
             'gridApProfiles #edit'   : {
                 click:      me.edit
-            },
+            },            
             'gridApProfiles #ban': {
                 click: me.ban
             },
@@ -173,7 +174,6 @@ Ext.define('Rd.controller.cAccessPoints', {
             },
             			      
             //Known aps
- 
             'gridApLists '  : {
                 select:   function(){
                     console.log("AP Grid List Selected");
@@ -208,6 +208,9 @@ Ext.define('Rd.controller.cAccessPoints', {
             },
             'gridApLists #edit': {
                 click:  me.editAp
+            },
+            'gridApLists #edit menuitem[group=apEdit]'   : {
+                click:      me.editOptionClick
             },
             'gridApLists #view' : {
 				click	: me.viewAp
@@ -421,6 +424,25 @@ Ext.define('Rd.controller.cAccessPoints', {
             });
         }
     },
+    
+    //FIXME add code to change the edit icon to shiled or wifi (Ssid) and ahandle edit accordingly
+    editOptionClick : function(menu_item){
+        var me      = this;
+        var n       = menu_item.getItemId();
+        var b       = menu_item.up('button');
+        if(n == 'mnuBasic'){
+            b.setGlyph(Rd.config.icnEdit);
+            me.setApListEdit('basic');
+        }        
+        if(n == 'mnuVpn'){
+           b.setGlyph(Rd.config.icnShield);
+           me.setApListEdit('vpn');
+        }
+        if(n == 'mnuWifi'){
+           b.setGlyph(Rd.config.icnSsid);
+           me.setApListEdit('wifi');
+        }  
+    },       
     editAp: function(button){
         var me      = this;     
         var tab     = me.getTabAccessPoints(); 
@@ -442,17 +464,60 @@ Ext.define('Rd.controller.cAccessPoints', {
                     Ext.ux.Constants.msgWarn
                 );
             }else{
+            
                 var sr      = me.getGridApLists().getSelectionModel().getLastSelected();
                 var id      = sr.getId();
                 var name    = sr.get('name'); 
-				var apProfileId = sr.get('ap_profile_id');
-				var apProfile   = sr.get('ap_profile');
-                Ext.getApplication().runAction('cAccessPointAp','Index',id,{
-                    name        : name,
-                    apProfileId : apProfileId,
-                    apProfile   : apProfile,
-                    store       : store
-                });
+			    var apProfileId = sr.get('ap_profile_id');
+			    var apProfile   = sr.get('ap_profile');
+            
+                if(me.getApListEdit() === 'basic'){           
+                   
+                    Ext.getApplication().runAction('cAccessPointAp','Index',id,{
+                        name        : name,
+                        apProfileId : apProfileId,
+                        apProfile   : apProfile,
+                        store       : store
+                    });
+                }
+                
+                if(me.getApListEdit() === 'vpn'){                
+                    const tp   = button.up('tabpanel');
+                    var tab_id = 'ApVpn_'+id;
+                    var nt     = tp.down('#'+tab_id);
+                    if(nt){
+                        tp.setActiveTab(tab_id); //Set focus on  Tab
+                        return;
+                    }
+                    tp.add({
+                        glyph     : Rd.config.icnShield,
+                        closable  : true,
+                        xtype     : 'pnlApVpnConnections',
+                        title     : name,
+                        itemId    : tab_id,
+                        ap_id     : id
+                    });
+                    tp.setActiveTab(tab_id);                                                  
+                }
+                
+                if(me.getApListEdit() === 'wifi'){
+                    const tp   = button.up('tabpanel');
+                    var tab_id = 'ApWifi_'+id;
+                    var nt     = tp.down('#'+tab_id);
+                    if(nt){
+                        tp.setActiveTab(tab_id); //Set focus on  Tab
+                        return;
+                    }
+                    tp.add({
+                        glyph     : Rd.config.icnSsid,
+                        closable  : true,
+                        xtype     : 'panel',
+                        title     : name,
+                        itemId    : tab_id,
+                        ap_id     : id,
+                    });
+                    tp.setActiveTab(tab_id); 
+                }                    
             }
         }
     },

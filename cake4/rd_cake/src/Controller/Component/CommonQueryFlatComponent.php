@@ -175,8 +175,7 @@ class CommonQueryFlatComponent extends Component {
 			    if($req_q['sort'] == 'ppsk_name'){
 			        $sort = 'PrivatePsks.name';
 			    }
-			    
-			    				    
+			    			    				    
 			    $dir  = isset($req_q['dir']) ? $req_q['dir'] : $dir;
 				    				
 			}
@@ -256,7 +255,7 @@ class CommonQueryFlatComponent extends Component {
                         $col = 'RealmVlans'.'.'.$f->property;
                     }
                     
-                    $date_array = ['created', 'modified'];
+                    $date_array = ['created', 'modified','last_contact','last_accept_time','last_reject_time','from_date','to_date'];
                     if(in_array($f->property,$date_array)){
                         if($f->operator == 'eq'){
                             array_push($where_clause,array("DATE($col)" => $f->value));

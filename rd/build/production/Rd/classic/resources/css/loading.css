@@ -515,3 +515,69 @@
   text-align: center;
 }
 
+/*===== Custom Checkbox ======*/
+
+/* Hide the native checkbox, keep label */
+.x-toggle-checkbox .x-form-cb-wrap .x-form-cb {
+    display: none;
+}
+
+.x-toggle-checkbox .x-form-cb-wrap {
+    padding-left: 0;
+}
+
+/* Label becomes the switch container */
+.x-toggle-checkbox .x-form-cb-label {
+    position: relative;
+    padding-left: 52px;       /* space for the switch */
+    cursor: pointer;
+    line-height: 20px;
+}
+
+/* Track – default (OFF) */
+.x-toggle-checkbox .x-form-cb-label:before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    margin-top: -8px;
+    width: 36px;
+    height: 16px;
+    border-radius: 8px;
+    background: #cccccc;
+    box-shadow: inset 0 0 0 1px #8fb0da;
+}
+
+/* Knob – default (OFF) */
+.x-toggle-checkbox .x-form-cb-label:after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    margin-top: -6px;
+    width: 14px;
+    height: 12px;
+    border-radius: 6px;
+    background: #ffffff;
+    box-shadow: 0 0 0 1px #8fb0da;
+    transition: left .15s ease;
+}
+
+/* ✅ CHECKED state – note the combined classes here */
+.x-toggle-checkbox.x-form-cb-checked .x-form-cb-label:before {
+    background: #1ba31b;      /* green when ON */
+}
+
+.x-toggle-checkbox.x-form-cb-checked .x-form-cb-label:after {
+    left: 20px;               /* move knob to the right */
+}
+
+.x-toggle-checkbox .x-form-cb-label {
+    font-size: 16px;
+    color: #29465b;
+    font-weight: 500;       /* optional */
+    padding-left: 52px;     /* keep space for switch */
+    line-height: 22px;      /* optional for vertical balance */
+}
+
+/*===== END Custom Checkbox ======*/

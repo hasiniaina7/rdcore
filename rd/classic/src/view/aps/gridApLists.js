@@ -147,14 +147,56 @@ Ext.define('Rd.view.aps.gridApLists' ,{
         }); 
         
           
-        me.bbar = [{
-            xtype       : 'pagingtoolbar',
-            store       : me.store,
-            displayInfo : true,
-            plugins     : {
-                'ux-progressbarpager': true
+        me.bbar = [
+            {
+                xtype       : 'pagingtoolbar',
+                store       : me.store,
+                displayInfo : true,
+                plugins     : {
+                    'ux-progressbarpager': true
+                }
+            },
+            '->',
+            {
+                xtype  : 'component',
+                itemId : 'stateTotals',
+                tpl    : [
+                    "<div style='font-size:larger;width:380px;'>",
+                        "<div style='padding:2px; display:flex; gap:8px; flex-wrap:wrap;'>",
+                            '<tpl if="aps_active &gt; 0">',
+                                "<span class='rd-chip rd-chip--green'>",
+                                    "<i class='fa fa-play'></i> {aps_active} Active",
+                                "</span>",                            
+                            '<tpl else>',
+                                "<span class='rd-chip rd-chip--muted'>",
+                                    "<i class='fa fa-play'></i> {aps_active} Active",
+                                "</span>",                          
+                            '</tpl>',
+                            '<tpl if="aps_suspended &gt; 0">',
+                                "<span class='rd-chip rd-chip--warning'>",
+                                    "<i class='fa fa-pause'></i> {aps_suspended} Suspended",
+                                "</span>",                            
+                            '<tpl else>',
+                                "<span class='rd-chip rd-chip--muted'>",
+                                    "<i class='fa fa-pause'></i> {aps_suspended} Suspended",
+                                "</span>",                          
+                            '</tpl>',
+                            '<tpl if="aps_inactive &gt; 0">',
+                                "<span class='rd-chip rd-chip--gray'>",
+                                    "<i class='fa fa-stop'></i> {aps_inactive} Inactive",
+                                "</span>",                            
+                            '<tpl else>',
+                                "<span class='rd-chip rd-chip--muted'>",
+                                    "<i class='fa fa-stop'></i> {aps_inactive} Inactive",
+                                "</span>",                          
+                            '</tpl>',
+                        '</div>',
+                    "</div>"
+                ],
+                data : { aps_active : 0, aps_suspended : 0, aps_inactive : 0 },
+                cls  : 'lblRd'      
             }
-        }];
+        ];
         
 		me.tbar     = Ext.create('Rd.view.components.ajaxToolbar',{'url': me.urlMenu});
 		
@@ -169,7 +211,8 @@ Ext.define('Rd.view.aps.gridApLists' ,{
                 
                 	const gateway       = record.get('gateway');
                 	const reboot_flag   = record.get('reboot_flag');
-                	const override_flag = record.get('override_flag');             	
+                	const override_flag = record.get('override_flag');
+                	const vpn           = record.get('vpn'); //VPN can be 'disabled','up' or 'down'             	
                 	const apId          = record.get('id');
              	 
                 	var rb_string   = '';
@@ -181,11 +224,23 @@ Ext.define('Rd.view.aps.gridApLists' ,{
                 	    override_string = `<i class="fa fa-tag" style="color:#34ebe8;"></i> `;
                 	}
                 	
+                	//VPN indicator
+                	var vpn_string = '';
+                	if(vpn  == 'disabled'){      	
+                	    rb_string = `<span style="color:grey;"><span style="font-family:FontAwesome;style=color:grey;">&#xf132</span></span>`;    
+                	}
+                	if(vpn  == 'up'){
+                	    rb_string = `<span style="color:green;"><span style="font-family:FontAwesome;;">&#xf132</span></span>`;    
+                	}
+                	if(vpn  == 'down'){
+                	    rb_string = `<span style="color:orange;"><span style="font-family:FontAwesome;">&#xf132</span></span>`;    
+                	}
+                	
                     if(gateway == 'yes'){
-                        return `<div style="text-align:left;">${override_string} ${rb_string}  <a href="javascript:void(0)" class='grid-link'>${value}</a></div>`;
+                        return `<div style="text-align:left;">${override_string} ${rb_string} ${vpn_string}  <a href="javascript:void(0)" class='grid-link'>${value}</a></div>`;
                     }
                     if(gateway == 'no'){
-                        return `<div style="text-align:left;">${override_string} ${rb_string}  <a href="javascript:void(0)" class='grid-link'>${value}</a></div>`;
+                        return `<div style="text-align:left;">${override_string} ${rb_string} ${vpn_string}  <a href="javascript:void(0)" class='grid-link'>${value}</a></div>`;
                     }  	             
                 },
                 stateId     : 'StateGridApLists4',

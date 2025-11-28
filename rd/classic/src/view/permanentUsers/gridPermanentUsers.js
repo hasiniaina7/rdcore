@@ -18,7 +18,8 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
         'Ext.ux.ProgressBarPager'
     ],
     viewConfig: {
-        loadMask:true
+        loadMask:true,
+        enableTextSelection: true
     },
     urlMenu: '/cake4/rd_cake/permanent-users/menu-for-grid.json',
     plugins     : 'gridfilters',  //*We specify this
@@ -198,21 +199,29 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
             },
             { 
                 text        : 'Last Seen',
-                dataIndex   : 'last_seen',
+                dataIndex   : 'last_contact',
                 tdCls       : 'gridTree',
                 hidden      : false,
-                sortable    : false, 
+                sortable    : true, 
                 xtype       : 'templatecolumn', 
                 tpl         : new Ext.XTemplate(
                     "<tpl if='last_seen.status == \"never\"'><span style='color:blue;'><span class='fa' style='font-family:FontAwesome;'>&#xf10c</span></span>  Never</tpl>",
-                    "<tpl if='last_seen.status == \"offline\"'><span class='fa' style='font-family:FontAwesome;'>&#xf10c</span>  Offline for {last_seen.span}</tpl>",
+                    "<tpl if='last_seen.status == \"offline\"'><span class='fa' style='font-family:FontAwesome;'>&#xf10c</span>  Offline for {last_seen.span}</tpl>",                 
                     "<tpl if='last_seen.status == \"online\"'>",
-                        "<tpl if='active == true'><span style='color:green;'><i class=\"fa fa-circle\"></i></span></tpl>",
-                        "<tpl if='active == false'><span style='color:orange;'><i class=\"fa fa-circle\"></i></span></tpl>",
+                        "<tpl if='last_seen.status == \"online\" && last_seen.stale'>",
+                            "<span style='color:purple;'><i class=\"fa fa-exclamation\"></i>  </span>",
+                        "</tpl>",
+                        "<tpl if='admin_state == \"active\"'><span style='color:green;'><i class=\"fa fa-circle\"></i></span></tpl>",
+                        "<tpl if='admin_state == \"suspended\"'><span style='color:orange;'><i class=\"fa fa-circle\"></i></span></tpl>",
+                        "<tpl if='admin_state == \"terminated\"'><span style='color:red;'><i class=\"fa fa-circle\"></i></span></tpl>",
                         '  Online for {last_seen.span}',
-                    '</tpl>'
+                    '</tpl>',
+                    "<tpl if='last_contact'>",
+                        "<div style='font-size:11px;color:#888;'>Last contact: {last_contact:date(\"Y-m-d H:i\")}</div>",
+                    '</tpl>',
                 ),
                 width       : 180,
+                filter      : {type: 'date',dateFormat: 'Y-m-d'},
                 stateId		: 'StateGridPermanentUsers17a'
             },
             {
@@ -221,7 +230,7 @@ Ext.define('Rd.view.permanentUsers.gridPermanentUsers' ,{
                 tdCls       : 'gridTree',
                 hidden      : true,
                 sortable    : false,
-                width       : 180,
+                width       : 200,
                 stateId     : 'StateGridPermanentUsers17b'
             }, 
             {

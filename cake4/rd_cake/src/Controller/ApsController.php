@@ -42,6 +42,8 @@ class ApsController extends AppController {
         $this->loadComponent('Formatter');
         $this->loadComponent('TimeCalculations');
         $this->loadComponent('GridFilter');
+        
+        $this->loadComponent('Vpn');
            
         $this->loadComponent('CommonQueryFlat', [ //Very important to specify the Model
             'model' => 'Aps'
@@ -148,7 +150,8 @@ class ApsController extends AppController {
             'ApUptmHistories',
             'ApConnectionSettings',
             'ApStaticEntryOverrides',
-            'WanMwan3Status' //Dec 2024 Multi-WAN
+            'WanMwan3Status', //Dec 2024 Multi-WAN
+            'ApVpnConnections'
         ],'Aps');
 
         //===== PAGING (MUST BE LAST) ======
@@ -501,6 +504,11 @@ class ApsController extends AppController {
 				        $this->LteHelper->getRsrqGui($mao);
 				        $this->LteHelper->getSnrGui($mao);
 				  	}                            
+                }
+                
+                //$mao->vpn = 'disabled'; //FIXME ADD Check for VPN (can be disabled, up or down
+                if($i->ap_vpn_connections){
+                    $mao->vpn = $this->Vpn->StatusForAp($i->ap_vpn_connections);
                 }
 
                 unset($mao->ap_actions);

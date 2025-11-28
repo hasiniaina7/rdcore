@@ -30,7 +30,7 @@ class ApsTable extends Table {
         $this->hasMany('ApWifiSettings', ['dependent' => true]);
         $this->hasMany('OpenvpnServerClients', ['dependent' => true]);
 
-        $this->hasOne('ApLoads', [['dependent' => true]]);
+        $this->hasOne('ApLoads', ['dependent' => true]);
         $this->hasMany('ApUptmHistories',  [
 				//'dependent' => true, //Had to remove the dependent since it failed due to conditions FIXME for further investigation
 				'foreignKey'	=> 'ap_id',
@@ -66,6 +66,8 @@ class ApsTable extends Table {
         $this->hasMany('ApStaticEntryOverrides',  ['dependent' => true]);		
 	    $this->hasMany('ApConnectionSettings', ['dependent' => true]);
 	    $this->hasMany('ApSqmStats', ['dependent' => true]);
+	    
+	    $this->hasMany('ApVpnConnections', ['dependent' => true]);
 	      
 	    $this->belongsTo('MultiWanProfiles');
 	    

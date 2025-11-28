@@ -1739,7 +1739,22 @@ class GridButtonsFlatComponent extends Component {
 				$this->btnReloadTimer,
 				$this->btnAdd,
 				$this->btnDelete,
-				$this->btnEdit,
+				//$this->btnEdit,
+				[
+                    'xtype'     => 'splitbutton',
+                    'glyph'     => Configure::read('icnEdit'),
+                    'scale'     => $this->scale,
+                    'itemId'    => 'edit',
+                    'tooltip'   => __('Edit'),
+                    'ui'        => $this->btnUiEdit,
+                    'menu'      => [
+                        'items' => [
+                            [ 'text'  => __('Basic Edit'),      'itemId'    => 'mnuBasic', 'group' => 'apEdit', 'checked' => true ],
+                            [ 'text'  => __('VPN Connections'), 'itemId'    => 'mnuVpn',   'group' => 'apEdit' ,'checked' => false],
+                            [ 'text'  => __('WiFi Overrides'),  'itemId'    => 'mnuWifi',  'group' => 'apEdit', 'checked' => false]
+                        ]
+                    ]
+                ],
 				$this->btnView,
 				$this->btnExecute,
 				$this->btnConfigCall,

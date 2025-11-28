@@ -148,7 +148,6 @@ if not exists (select * from information_schema.columns
 
 end if;
 
-
 if not exists (select * from information_schema.columns
     where table_name = 'wireguard_sessions' and table_schema = DATABASE()) then
 	CREATE TABLE `wireguard_sessions` (
@@ -234,3 +233,6 @@ end//
 
 delimiter ;
 call add_wireguard;
+
+
+

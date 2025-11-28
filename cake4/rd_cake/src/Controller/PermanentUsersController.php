@@ -6,6 +6,7 @@ use Cake\Core\Configure;
 use Cake\Core\Configure\Engine\PhpConfig;
 use Cake\Utility\Inflector;
 use Cake\Mailer\Mailer;
+use Cake\I18n\FrozenTime;
 
 use Cake\Log\Log;
 
@@ -157,6 +158,8 @@ class PermanentUsersController extends AppController{
             $update = in_array('*', $user['rba_allowed']) || in_array('viewBasicInfo', $user['rba_allowed']);
             $delete = in_array('*', $user['rba_allowed']) || in_array('delete', $user['rba_allowed']);
         }
+        
+        $now = FrozenTime::now();
                 
         foreach($q_r as $i){
         
@@ -190,27 +193,43 @@ class PermanentUsersController extends AppController{
             unset($row["password"]);
             unset($row["token"]);
             
-            //Get more detail on the activity
+            //Get more detail on the activity           
             //select acctstarttime,acctstoptime,framedipaddress from radacct where username='ord9555@superfibre' order by acctstarttime DESC LIMIT 1;          
             $last_session = $this->{'Radaccts'}->find()->where(['username' => $i->username])->select(['acctstarttime','acctstoptime','framedipaddress'])->order('acctstarttime DESC')->first();
-            if($last_session){
-                if(!$last_session->acctstoptime){
+            if ($last_session) {
+
+                if (!$last_session->acctstoptime) { // IF there is no acctstoptime -> online
                     $row['last_seen']['status'] = 'online';
-                    $row['last_seen']['span']   = $this->TimeCalculations->time_elapsed_string($last_session->acctstarttime,false,true);                
-                }else{
+                    $row['last_seen']['span']   = $this->TimeCalculations
+                        ->time_elapsed_string($last_session->acctstarttime, false, true);
+                        
+                    if ($i->last_contact) {
+                         if ($i->last_contact->diffInHours($now) >= 24) { //Older than 24 hours - Mark it stale
+                             $row['last_seen']['stale'] = true;
+                         } else {
+                            $row['last_seen']['stale'] = false;
+                        }
+                    }
+
+                } else {
                     $row['last_seen']['status'] = 'offline';
-                    $row['last_seen']['span']   = $this->TimeCalculations->time_elapsed_string($last_session->acctstoptime,false,true);
+                    $row['last_seen']['span']   = $this->TimeCalculations
+                        ->time_elapsed_string($last_session->acctstoptime, false, true);
                 }
+
                 $row['framedipaddress'] = $last_session->framedipaddress;
-            }else{
-                //Oct 2025 We added a last_contact field which are updated also with Accounting Request
-                if($i->last_contact){
+
+            } else {
+
+                // Oct 2025 We added a last_contact field which are updated also with Accounting Request
+                if ($i->last_contact) {
                     $row['last_seen']['status'] = 'offline';
-                    $row['last_seen']['span']   = $this->TimeCalculations->time_elapsed_string($i->last_contact,false,true);                
-                }else{
+                    $row['last_seen']['span']   = $this->TimeCalculations
+                        ->time_elapsed_string($i->last_contact, false, true);
+                } else {
                     $row['last_seen'] = ['status' => 'never'];
-                }              
-            }
+                }
+            }              
             
             $actions_enabled = true;                       
             if($right == 'view'){  

@@ -1,6 +1,6 @@
-Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
+Ext.define('Rd.view.aps.pnlAccessPointAddEditApZZ', {
     extend      : 'Ext.form.Panel',
-    alias       : 'widget.pnlAccessPointAddEditAp',
+    alias       : 'widget.pnlAccessPointAddEditApZZ',
     title       : 'Edit Device',
     autoScroll	: true,
     plain       : true,
@@ -718,12 +718,8 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
             ]
         };
                
-        var pnlTop = {
-            xtype       : 'panel',
-            title       : 'General',
-            margin      : 20,
-            glyph       : Rd.config.icnGears,
-            ui          : 'panel-blue',
+        var cntTop = {
+            xtype       : 'container',
             items       : [ 
                 {
 					xtype       : 'checkbox',      
@@ -732,13 +728,6 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                     boxLabelCls : 'boxLabelRd',
 					hidden      : hide_multiple
 				},
-				{
-                    xtype       : 'component',
-                    html        : 'Basics',
-                    cls         : 'heading',
-                    margin      : '20 0 0 0',
-                    width       : w_prim+20
-                }, 
                 {
 					itemId      : 'ap_id',
 					xtype       : 'textfield',
@@ -819,13 +808,6 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
 					value       : me.mac
 				},
 				{
-                    xtype       : 'component',
-                    html        : 'WiFi overrides',
-                    cls         : 'heading',
-                    margin      : '20 0 0 0',
-                    width       : w_prim+20
-                }, 
-				{
 	                xtype       : 'tagApProfileStaticEntries',
 	                apProfileId : me.apProfileId,
 	                labelClsExtra : 'lblRd',
@@ -835,13 +817,6 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
 			        }   
 	            },
 	            cntEntryOverrides,
-	            {
-                    xtype       : 'component',
-                    html        : 'Internet connection',
-                    cls         : 'heading',
-                    margin      : '20 0 0 0',
-                    width       : w_prim+20
-                },
 				{
                     xtype       : 'cmbInternetConnection',
                     itemId      : 'cmbInternetConnection',
@@ -871,14 +846,7 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                     hideTrigger : true,
                     keyNavEnabled  : false,
                     mouseWheelEnabled	: false
-                },
-                {
-                    xtype       : 'component',
-                    html        : 'Other options',
-                    cls         : 'heading',
-                    margin      : '20 0 0 0',
-                    width       : w_prim+20
-                },
+                }, 
                 {
                     xtype     : 'checkbox',
                     boxLabel  : 'Reboot When Controller Can\'t Be Reached',
@@ -926,16 +894,23 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                     boxLabelCls : 'boxLabelRd'
                 }       
             ]
-        }; 		
+        };            
+		
 		me.items = [
-            pnlTop,          
+		    {
+                xtype       : 'panel',
+                layout      : {
+                  type  : 'vbox',
+                  align : 'start',
+                  pack  : 'start'
+                },
+                bodyStyle   : 'background: #f0f0f5',
+                bodyPadding : 10,
+                items       : cntTop
+            },            
             {
                 xtype       : 'panel',
-                title       : 'Radios',
-                glyph       : Rd.config.icnSsid,
-                border      : true,
-                ui          : 'panel-green',
-                margin      : 20,
+                bodyStyle   : 'background:#f6f6ee',
                 layout      : {
                         type    : 'vbox',
                         pack    : 'start',
@@ -943,10 +918,10 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                 },
                 bodyPadding : 10,
                 items       : [
-                  /*   {
+                     {
                         xtype       : 'container',
                         html        : '<h1><span style="color:grey;font-weight:700; font-size: smaller;">RADIOS</span><h1>'
-                    },*/
+                    },
                     {
                         xtype       : 'container',
                         layout      : {
@@ -961,8 +936,7 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                                 radio_nr    : 0,
                                 hidden      : true,
                                 flex        : 1,
-                                ui          : 'panel-green',
-                                border      : true
+                                ui          : 'panel-green'
                             },
                             {
                                 xtype       : 'pnlApRadioDetail',
@@ -970,8 +944,7 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                                 radio_nr    : 1,
                                 hidden      : true,
                                 flex        : 1,
-                                ui          : 'panel-green',
-                                border      : true
+                                ui          : 'panel-green'
                             }
                         ]
                     },
@@ -985,8 +958,7 @@ Ext.define('Rd.view.aps.pnlAccessPointAddEditAp', {
                                 radio_nr    : 2,
                                 hidden      : true,
                                 flex        : 1,
-                                ui          : 'panel-green',
-                                border      : true
+                                ui          : 'panel-green'
                             }
                         ]
                     }

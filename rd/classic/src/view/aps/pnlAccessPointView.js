@@ -10,6 +10,7 @@ Ext.define('Rd.view.aps.pnlAccessPointView', {
     requires    : [
         'Rd.view.aps.pnlApViewSqm',
         'Rd.view.aps.pnlApViewWan',
+        'Rd.view.aps.pnlApViewVpn',
         'Rd.view.aps.pnlApViewHardware',
         'Rd.view.bandwidth.pnlViewBandwidth',
         'Rd.view.aps.gridApViewActions'        
@@ -35,6 +36,12 @@ Ext.define('Rd.view.aps.pnlAccessPointView', {
                 itemId  : 'tabApViewWan',
                 xtype   : 'pnlApViewWan',
                 apId    : me.ap_id
+            },
+            {
+                title   : 'VPN CONNECTIONS',
+                itemId  : 'tabApViewVpn',
+                xtype   : 'pnlApViewVpn',
+                apId    : me.ap_id           
             },
 		/*    {
                 title   : 'HARDWARE',

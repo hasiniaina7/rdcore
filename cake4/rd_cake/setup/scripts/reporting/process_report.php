@@ -224,7 +224,13 @@ function _doReports(){
             _do_nlbw_ap_stats($report['nlbw']['data'], $ap_id );
         }
         
-
+        if (!empty($report['wg_stats'])) {
+            _do_wg_stats($report['wg_stats']);
+        }
+        if (!empty($report['ovpn_stats'])) {
+            _do_ovpn_stats($report['ovpn_stats']);
+        }
+        
         // Prepare AP updates
         $stmt_update_ap->execute([
             'gateway'   => $report['gateway'] ?? 'none',
@@ -981,6 +987,319 @@ function _do_nlbw_ap_stats($data,$ap_id){
         $stmt->execute($d);      
     }    
 }
+
+function _do_ovpn_stats(array $data) {
+    global $conn;
+
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Last session by starttime (most recent)
+    $sql_last_session = $conn->prepare("
+        SELECT *
+        FROM ap_vpn_sessions
+        WHERE ap_vpn_connection_id = :cid
+        ORDER BY starttime DESC, id DESC
+        LIMIT 1
+    ");
+
+    // Insert a brand new session (open: stoptime IS NULL)
+    $sql_insert_session = $conn->prepare("
+        INSERT INTO ap_vpn_sessions (
+            ap_vpn_connection_id,
+            starttime,
+            stoptime,
+            sessiontime,
+            rx_bytes,
+            tx_bytes
+        ) VALUES (
+            :cid,
+            :starttime,
+            NULL,
+            0,
+            :rx_bytes,
+            :tx_bytes
+        )
+    ");
+
+    // Update an existing active session (no stoptime change, only sessiontime + bytes)
+    $sql_update_active = $conn->prepare("
+        UPDATE ap_vpn_sessions
+        SET
+            sessiontime = TIMESTAMPDIFF(SECOND, starttime, :nowtime),
+            rx_bytes    = :rx_bytes,
+            tx_bytes    = :tx_bytes
+        WHERE id = :id
+    ");
+
+    // Close a session (set stoptime & sessiontime)
+    $sql_close_session = $conn->prepare("
+        UPDATE ap_vpn_sessions
+        SET
+            stoptime    = :stoptime,
+            sessiontime = TIMESTAMPDIFF(SECOND, starttime, :stoptime_calc)
+        WHERE id = :id
+    ");
+
+      foreach($data as $ovpn_stat){
+
+        $tx_bytes   = (int)$ovpn_stat['tx_bytes'];
+        $rx_bytes   = (int)$ovpn_stat['rx_bytes'];
+        $timestamp  = (int)$ovpn_stat['timestamp'];        
+        $cid        = (int)$ovpn_stat['id'];    
+        
+        if ($timestamp > 0) {
+            $sample_time = date('Y-m-d H:i:s', $timestamp);
+        } else {
+            //We skip entries where timestamp is zero (meaning the gateway could not be reached)
+            echo "No VPN conteact to Gateway Skip This Insert\n";
+            continue; 
+        }
+
+        // 2) Get last session for this connection
+        $sql_last_session->execute([':cid' => $cid]);
+        $last = $sql_last_session->fetch(PDO::FETCH_ASSOC);
+
+        // No previous session at all → create first (open) session
+        if (!$last) {
+            echo "No previous session, creating first session for connection $cid\n";
+
+            $sql_insert_session->execute([
+                ':cid'       => $cid,
+                ':starttime' => $sample_time,
+                ':rx_bytes'  => $rx_bytes,
+                ':tx_bytes'  => $tx_bytes,
+            ]);
+            continue;
+        }
+
+        $last_id       = (int)$last['id'];
+        $last_tx_bytes = (int)$last['tx_bytes'];
+        $last_stoptime = $last['stoptime']; // may be NULL
+
+        // If last session is already closed (stoptime NOT NULL),
+        // we ALWAYS start a new session with this sample.
+        if ($last_stoptime !== null) {
+            echo "Last session is closed, starting new session for connection $cid\n";
+
+            $sql_insert_session->execute([
+                ':cid'       => $cid,
+                ':starttime' => $sample_time,
+                ':rx_bytes'  => $rx_bytes,
+                ':tx_bytes'  => $tx_bytes,
+            ]);
+            
+            continue;
+        }
+
+        // At this point, last session is ACTIVE (stoptime IS NULL)
+
+        // 3) Decide if same session or new one
+        if ($tx_bytes >= $last_tx_bytes) {
+            // Same session continues → update sessiontime + bytes
+            echo "Updating active session ID $last_id for connection $cid\n";
+
+            $sql_update_active->execute([
+                ':nowtime'  => $sample_time,
+                ':rx_bytes' => $rx_bytes,
+                ':tx_bytes' => $tx_bytes,
+                ':id'       => $last_id,
+            ]);
+
+        } else {
+            // TX counter reset → close old and start new
+
+            echo "TX reset detected, closing session ID $last_id and creating new session for connection $cid\n";
+
+            // 3a) Close old session; its stoptime should be the new session's starttime
+            $sql_close_session->execute([
+                ':stoptime'         => $sample_time,
+                ':stoptime_calc'    => $sample_time,   // same value, different param name
+                ':id'               => $last_id,
+            ]);
+
+            // 3b) Insert new OPEN session (stoptime NULL)
+            $sql_insert_session->execute([
+                ':cid'       => $cid,
+                ':starttime' => $sample_time,
+                ':rx_bytes'  => $rx_bytes,
+                ':tx_bytes'  => $tx_bytes,
+            ]);
+        }
+    }
+}
+
+
+function _do_wg_stats(array $data) {
+    global $conn;
+
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Prepare statements once
+    $sql_find_conn = $conn->prepare("
+        SELECT id
+        FROM ap_vpn_connections
+        WHERE wg_public_key = :wg_public_key
+        LIMIT 1
+    ");
+
+    // Last session by starttime (most recent)
+    $sql_last_session = $conn->prepare("
+        SELECT *
+        FROM ap_vpn_sessions
+        WHERE ap_vpn_connection_id = :cid
+        ORDER BY starttime DESC, id DESC
+        LIMIT 1
+    ");
+
+    // Insert a brand new session (open: stoptime IS NULL)
+    $sql_insert_session = $conn->prepare("
+        INSERT INTO ap_vpn_sessions (
+            ap_vpn_connection_id,
+            starttime,
+            stoptime,
+            sessiontime,
+            rx_bytes,
+            tx_bytes
+        ) VALUES (
+            :cid,
+            :starttime,
+            NULL,
+            0,
+            :rx_bytes,
+            :tx_bytes
+        )
+    ");
+
+    // Update an existing active session (no stoptime change, only sessiontime + bytes)
+    $sql_update_active = $conn->prepare("
+        UPDATE ap_vpn_sessions
+        SET
+            sessiontime = TIMESTAMPDIFF(SECOND, starttime, :nowtime),
+            rx_bytes    = :rx_bytes,
+            tx_bytes    = :tx_bytes
+        WHERE id = :id
+    ");
+
+    // Close a session (set stoptime & sessiontime)
+    $sql_close_session = $conn->prepare("
+        UPDATE ap_vpn_sessions
+        SET
+            stoptime    = :stoptime,
+            sessiontime = TIMESTAMPDIFF(SECOND, starttime, :stoptime_calc)
+        WHERE id = :id
+    ");
+
+      foreach($data as $wg_stat){
+
+        $peer       = $wg_stat['peers'][0];
+        
+        // ---- Map your peer structure ----
+        $public_key = $peer['public_key'];
+
+        // "164.160.89.129:51820"
+        $endpoint = $peer['endpoint'];
+        [$ip, $port] = explode(':', $endpoint, 2);
+
+        $tx_bytes = (int)$peer['transfer_tx'];
+        $rx_bytes = (int)$peer['transfer_rx'];
+
+        // Use latest_handshake as the sample time if > 0, else now
+        $latest_handshake = (int)$peer['latest_handshake'];
+        if ($latest_handshake > 0) {
+            $sample_time = date('Y-m-d H:i:s', $latest_handshake);
+        } else {
+            $sample_time = date('Y-m-d H:i:s');
+        }
+
+        echo "===================\n";
+        print_r($peer);
+        echo "+++++++++++++++++\n";
+
+        // 1) Find connection by wg_public_key
+        $sql_find_conn->execute([':wg_public_key' => $public_key]);
+        $conn_row = $sql_find_conn->fetch(PDO::FETCH_ASSOC);
+
+        if (!$conn_row) {
+            echo "No ap_vpn_connections row for public_key: $public_key\n";
+            continue;
+        }
+
+        $connection_id = (int)$conn_row['id'];
+
+        // 2) Get last session for this connection
+        $sql_last_session->execute([':cid' => $connection_id]);
+        $last = $sql_last_session->fetch(PDO::FETCH_ASSOC);
+
+        // No previous session at all → create first (open) session
+        if (!$last) {
+            echo "No previous session, creating first session for connection $connection_id\n";
+
+            $sql_insert_session->execute([
+                ':cid'       => $connection_id,
+                ':starttime' => $sample_time,
+                ':rx_bytes'  => $rx_bytes,
+                ':tx_bytes'  => $tx_bytes,
+            ]);
+
+            continue;
+        }
+
+        $last_id       = (int)$last['id'];
+        $last_tx_bytes = (int)$last['tx_bytes'];
+        $last_stoptime = $last['stoptime']; // may be NULL
+
+        // If last session is already closed (stoptime NOT NULL),
+        // we ALWAYS start a new session with this sample.
+        if ($last_stoptime !== null) {
+            echo "Last session is closed, starting new session for connection $connection_id\n";
+
+            $sql_insert_session->execute([
+                ':cid'       => $connection_id,
+                ':starttime' => $sample_time,
+                ':rx_bytes'  => $rx_bytes,
+                ':tx_bytes'  => $tx_bytes,
+            ]);
+
+            continue;
+        }
+
+        // At this point, last session is ACTIVE (stoptime IS NULL)
+
+        // 3) Decide if same session or new one
+        if ($tx_bytes >= $last_tx_bytes) {
+            // Same session continues → update sessiontime + bytes
+            echo "Updating active session ID $last_id for connection $connection_id\n";
+
+            $sql_update_active->execute([
+                ':nowtime'  => $sample_time,
+                ':rx_bytes' => $rx_bytes,
+                ':tx_bytes' => $tx_bytes,
+                ':id'       => $last_id,
+            ]);
+
+        } else {
+            // TX counter reset → close old and start new
+
+            echo "TX reset detected, closing session ID $last_id and creating new session for connection $connection_id\n";
+
+            // 3a) Close old session; its stoptime should be the new session's starttime
+            $sql_close_session->execute([
+                ':stoptime'         => $sample_time,
+                ':stoptime_calc'    => $sample_time,   // same value, different param name
+                ':id'               => $last_id,
+            ]);
+
+            // 3b) Insert new OPEN session (stoptime NULL)
+            $sql_insert_session->execute([
+                ':cid'       => $connection_id,
+                ':starttime' => $sample_time,
+                ':rx_bytes'  => $rx_bytes,
+                ':tx_bytes'  => $tx_bytes,
+            ]);
+        }
+    }
+}
+
 
 function _row_to_assoc(array $row): array {
     $keys = ['family','proto','port','mac','ip','conns','rx_bytes','rx_pkts','tx_bytes','tx_pkts','layer7','l3if','l3dev','exit_id','exit_type'];

@@ -221,5 +221,6 @@ Rd.config = {
     'icnPlayAp'     : 'xf04b@FontAwesome',
     'icnPauseAp'    : 'xf04c@FontAwesome',
     'icnStopAp'     : 'xf04d@FontAwesome',
+    'icnShield'     : 'xf132@FontAwesome'
 }
 
