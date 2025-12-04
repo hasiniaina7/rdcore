@@ -64,7 +64,7 @@ create_env_file() {
   mkdir -p "$(dirname "${AGENT_ENV}")"
   cat > "${AGENT_ENV}" <<EOF
 # Base URL du backend CakePHP (adapter si reverse-proxy)
-WG_AGENT_BASE_URL=${WG_AGENT_BASE_URL:-https://127.0.0.1/cake4/rd_cake}
+WG_AGENT_BASE_URL=${WG_AGENT_BASE_URL:-http://127.0.0.1/cake4/rd_cake}
 # Interface à utiliser pour dériver la MAC (peut être surchargée)
 WG_AGENT_INTERFACE=${WG_AGENT_INTERFACE:-${def_iface}}
 # MAC enregistrée dans Wireguard Servers (format aa-bb-cc-dd-ee-ff)

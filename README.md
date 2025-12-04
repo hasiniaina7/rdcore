@@ -122,6 +122,71 @@ Sinon exemples manuels (HTTP‑01 / DNS‑01) loggés dans `70_tls_certbot.sh`.
 - Restreindre `RADIUS_CLIENT_NET` au strict nécessaire.
 - Activer HTTPS et redirections si exposé publiquement.
 
+## Dépannage – profils `time_cap`
+Deux correctifs manuels à connaître si des vouchers avec limite de temps sont rejetés malgré un quota disponible :
+
+1. **`Rd-Client-Timezone` facultatif**  
+   - Fichier : `cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk`
+   - Section : `RADIUSdesk_set_timezone` (vers les lignes 1 009‑1 020, juste après le commentaire `#Add-On May 2022` et avant `RADIUSdesk_logintime`).
+   - Remplacement exact :  
+     ```
+     Rd-Client-Timezone := "%{sql:SELECT IFNULL((SELECT tz.name FROM dynamic_clients c LEFT JOIN timezones tz ON tz.id = c.timezone where c.nasidentifier='%{request:NAS-Identifier}'),'timezone_not_found')}"
+     ```
+     doit être remplacé par :
+     ```
+     Rd-Client-Timezone := "%{sql:SELECT COALESCE(
+         (SELECT tz.name FROM dynamic_clients c LEFT JOIN timezones tz ON tz.id = c.timezone WHERE c.nasidentifier='%{request:NAS-Identifier}'),
+         (SELECT tz.name FROM user_settings us LEFT JOIN timezones tz ON tz.id = us.value WHERE us.name='timezone' AND us.user_id=-1 LIMIT 1),
+         'UTC')}"
+     ```
+     Même chose pour le bloc `else` (lignes 1 014‑1 020) : remplacer `IFNULL(...,'timezone_not_found')` par `COALESCE(...,'UTC')`. Ainsi, même si `dynamic_clients.timezone` est vide, le fuseau global (`user_settings`) ou `UTC` est appliqué.
+
+2. **`%{sql:...}` obligatoire pour le compteur temps**  
+   - Fichier : `cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk`
+   - Section : `RADIUSdesk_time_counter`, branche “reset type = never” (vers les lignes 630‑667, juste après le commentaire `#Asumes reset type = never` et avant `RADIUSdesk_voucher_check`).
+   - Remplacement exact :  
+     ```
+     Rd-Used-Time := "{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid='%{request:User-Name}'}"
+     ```
+     doit être remplacé par :
+     ```
+     Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid='%{request:User-Name}'}"
+     ```
+     puis faire la même substitution (`"{sql:` → `"%{sql:`) pour les deux lignes suivantes qui calculent `Rd-Used-Time` avec `username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'` puis uniquement `username='%{request:User-Name}'`. Le `%` est indispensable pour que FreeRADIUS exécute l’`xlat` SQL ; sinon, lorsqu’un profil a `Rd-Reset-Type-Time = "never"`, la policy retourne `fail` et la requête est rejetée.
+
+Après modification, regénérez `freeradius-radiusdesk.tar.gz` depuis `cake4/rd_cake/setup/radius/`, déployez-le sur `/etc/freeradius/3.0` (`sudo tar xzf … --directory /etc`) puis redémarrez le service (`sudo systemctl restart freeradius`). 
+
+Atention, la regeneration entrainera une reinitalisation , on copie avant
+```
+sudo -s
+cp /etc/freeradius/3.0/clients.conf /home/
+```
+Regenerer avec : 
+```
+cd /var/www/rdcore/cake4/rd_cake/setup/radius
+tar czf freeradius-radiusdesk.tar.gz freeradius
+```
+ou 
+```
+sudo systemctl stop freeradius
+sudo tar xzf /var/www/rdcore/cake4/rd_cake/setup/radius/freeradius-radiusdesk.tar.gz --directory /etc
+sudo chown -R freerad:freerad /etc/freeradius/3.0
+sudo systemctl start freeradius
+```
+
+
+Donc il faut restaurer le fichier avec sudo apres  regeneratio.
+```
+sudo -s
+cp /home/clients.conf  /etc/freeradius/3.0/clients.conf 
+``` 
+
+Validez enfin avec :
+```
+radtest afraidhot afraidhot 127.0.0.1 0 testing123
+```
+
+
 ---
 Ce guide s’adresse à des déploiements reproductibles et sûrs. Les scripts
 s’arrêtent en cas de configuration manquante critique et écrivent des logs
