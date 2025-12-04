@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html id='htmlMain' class="h-100" lang="en">
+<html id='htmlMain' class="h-100" lang="en" data-theme="tech-light">
 
     <head>
         <meta http-equiv="content-type" content="text/html; charset=UTF-8">
@@ -8,7 +8,6 @@
         <meta name="author" content="Dirk van der Walt">
         <meta name="generator" content="Gedit">
         <title>Wi-Fi Hotspot | Login</title>
-        
         <link rel="stylesheet" href="css/bootstrap-icons.css">
         <!--<link href="css/bootstrap.rtl.min.css" rel="stylesheet">-->
         <!--Comment the line below out if you are planning to implement languages including Arabic-->
@@ -88,13 +87,34 @@
         <div id='modalLogin' class="modal fade" data-bs-backdrop="static" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content"> 
-                    <div class="modal-header align-items-center">
-                        <h5 class="modal-title" id='hLogin'><i class="bi-plug"></i> <span data-translate="sConnect">Connect</span></h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <button class="btn btn-outline-light tz-theme-toggle" id="btnThemeToggle" type="button" aria-label="Toggle Theme">
-                                <i class="bi-moon"></i>
-                            </button>
-                            <button type="button" class="btn-close tz-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="modal-header flex-column gap-3 align-items-start tz-modal-header">
+                        <div class="d-flex align-items-center justify-content-between w-100 gap-3">
+                            <div class="tz-brand-title">
+                                <div class="tz-brand-icon">
+                                    <i class="bi bi-wifi"></i>
+                                </div>
+                                <div>
+                                    <small class="tz-brand-label text-uppercase" id="modalBrandNetwork">Wi-Fi Hotspot</small>
+                                    <h5 class="modal-title mb-0" id='hLogin'><i class="bi-plug"></i> <span data-translate="sConnect">Connect</span></h5>
+                                </div>
+                            </div>
+                            <div class="tz-theme-controls">
+                                <button class="tz-btn-icon" id="btnPaletteToggle" type="button" aria-label="Open Theme Palette">
+                                    <i class="bi bi-palette"></i>
+                                </button>
+                                <button class="tz-btn-icon tz-theme-toggle" id="btnThemeToggle" type="button" aria-label="Toggle Theme">
+                                    <i class="bi-moon"></i>
+                                </button>
+                                <button type="button" class="btn-close tz-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                        </div>
+                        <div class="tz-theme-palette" id="themePalette">
+                            <div class="tz-color-dot" data-theme-value="tech-light" style="--dot-color:#3b82f6;" title="Tech Light"></div>
+                            <div class="tz-color-dot" data-theme-value="cyber-dark" style="--dot-color:#0f172a;" title="Cyber Dark"></div>
+                            <div class="tz-color-dot" data-theme-value="nature" style="--dot-color:#059669;" title="Nature"></div>
+                            <div class="tz-color-dot" data-theme-value="sunset" style="--dot-color:#f97316;" title="Sunset"></div>
+                            <div class="tz-color-dot" data-theme-value="ocean" style="--dot-color:#0891b2;" title="Ocean"></div>
+                            <div class="tz-color-dot" data-theme-value="purple" style="--dot-color:#d946ef;" title="Purple"></div>
                         </div>
                     </div>
 
@@ -120,7 +140,7 @@
                                     </div>
                                 </div>
                                 <!--Login Screen-->
-                                <div class="row collapse show" id='pnlLogin'>            
+                                <div class="row collapse show g-3 tz-login-panel" id='pnlLogin'>            
                                        
                                 </div>
                                 <!-- END LOGIN SCREEN-->
@@ -199,29 +219,31 @@
                                 
                                 
                                 <!-- T&C-->
-                                <div class="row d-none" id='divTerms'>
-                                    <div class="form-check">
-                                      <input class="form-check-input" type="checkbox" id="chkTerms">
-                                      <label class="form-check-label" for="chkTerms">
-                                        <a id='aTerms' href="#" data-translate="sTerms_and_Conditions">Terms and Conditions</a>
-                                      </label>
+                                <div class="tz-extra-links d-flex flex-column gap-3">
+                                    <div class="row d-none" id='divTerms'>
+                                        <div class="form-check">
+                                          <input class="form-check-input" type="checkbox" id="chkTerms">
+                                          <label class="form-check-label" for="chkTerms">
+                                            <a id='aTerms' href="#" data-translate="sTerms_and_Conditions">Terms and Conditions</a>
+                                          </label>
+                                        </div>
+                                        <div class="p-0">
+                                        * <span data-translate="sBy_continuing_cm_you_agree_to_the_terms_and_conditions_fs"></span>
+                                        </div>
                                     </div>
-                                    <div class="p-0">
-                                    * <span data-translate="sBy_continuing_cm_you_agree_to_the_terms_and_conditions_fs"></span>
+                                    <!--END T&C--> 
+                                    <!-- Register -->
+                                    <div class="d-none p-0" id='divRegister'>
+                                        <a class="p-0" id='aRegister' href="#" data-translate='sSign_Up'>Sign Up</a>
                                     </div>
+                                    <!--END Register-->
+                                    <!-- Lost Password -->
+                                    <div class="d-flex flex-column flex-sm-row gap-2 p-0" id='divLostPassword'>
+                                        <a class="p-0" id='aLostPassword' href="#" data-translate='sLost_Password'>Lost Password</a>
+                                        <a class="p-0 text-decoration-underline" href="#" data-bs-toggle="modal" data-bs-target="#modalTerms" data-translate="sTermsQuickLink">Terms & Conditions</a>
+                                    </div>
+                                    <!--END Lost Password--> 
                                 </div>
-                                <!--END T&C--> 
-                                <!-- Register -->
-                                <div class="d-none p-0" id='divRegister'>
-                                    <a class="p-0" id='aRegister' href="#" data-translate='sSign_Up'>Sign Up</a>
-                                </div>
-                                <!--END Register-->
-                                <!-- Lost Password -->
-                                <div class="d-flex flex-column flex-sm-row gap-2 p-0" id='divLostPassword'>
-                                    <a class="p-0" id='aLostPassword' href="#" data-translate='sLost_Password'>Lost Password</a>
-                                    <a class="p-0 text-decoration-underline" href="#" data-bs-toggle="modal" data-bs-target="#modalTerms" data-translate="sTermsQuickLink">Terms & Conditions</a>
-                                </div>
-                                <!--END Lost Password-->                             
                 
                                 <div class="d-grid gap-2 pt-2">
                                     <button type="button" class="btn btn-warning btn-block btn-lg d-none" data-loading-text="sDisconnecting_User" id='btnDisconnect'>
@@ -241,7 +263,7 @@
                                     <small class="tz-hint" data-translate="sUsageHint">Opens the TECHZONE usage dashboard. You can fill missing info there if needed.</small>
                                 </div>
                   
-                                <div class="d-grid gap-2 pt-2" id='divSocial'>
+                                <div class="d-grid gap-2 pt-2 tz-social-block" id='divSocial'>
                                     <button type="submit" class="btn btn-outline-primary btn-block btn-sm d-none" id='btnFacebook' data-loading-text="sConnecting_User">
                                         <i class='bi-facebook'></i> <span data-translate="sConnect_With_Facebook">Connect With Facebook</span>
                                     </button>
@@ -611,23 +633,87 @@
                   }
                });
             }
-            var body = document.body;
-            var THEME_KEY = 'tz-theme';
+            var htmlEl = document.documentElement;
+            var palette = document.getElementById('themePalette');
+            var paletteToggle = document.getElementById('btnPaletteToggle');
             var toggleBtn = document.getElementById('btnThemeToggle');
-            var current = localStorage.getItem(THEME_KEY) || 'dark';
-            if(current === 'light'){
-               body.classList.add('tz-light');
+            var themeDots = document.querySelectorAll('[data-theme-value]');
+            var brandLabel = document.getElementById('modalBrandNetwork');
+            var navBrand = document.getElementById('aTitle');
+            var THEME_KEY = 'tz-theme';
+            var legacyMap = { light: 'tech-light', dark: 'cyber-dark' };
+            var defaultTheme = htmlEl.getAttribute('data-theme') || 'tech-light';
+            var storedTheme = localStorage.getItem(THEME_KEY);
+            if(storedTheme && legacyMap[storedTheme]){
+               storedTheme = legacyMap[storedTheme];
             }
-            function updateIcon(){
-               if(!toggleBtn) return;
-               toggleBtn.innerHTML = body.classList.contains('tz-light') ? '<i class="bi-moon"></i>' : '<i class="bi-sun"></i>';
+            applyTheme(storedTheme || defaultTheme);
+
+            function applyTheme(theme){
+               var nextTheme = theme || defaultTheme;
+               htmlEl.setAttribute('data-theme', nextTheme);
+               localStorage.setItem(THEME_KEY, nextTheme);
+               Array.prototype.forEach.call(themeDots, function(dot){
+                  var value = dot.getAttribute('data-theme-value');
+                  dot.classList.toggle('active', value === nextTheme);
+               });
+               updateToggleIcon(nextTheme);
             }
-            updateIcon();
-            toggleBtn?.addEventListener('click', function(){
-               body.classList.toggle('tz-light');
-               localStorage.setItem(THEME_KEY, body.classList.contains('tz-light') ? 'light' : 'dark');
-               updateIcon();
+
+            function updateToggleIcon(themeName){
+               if(!toggleBtn){ return; }
+               var darkThemes = ['cyber-dark', 'sunset', 'purple'];
+               var isDark = darkThemes.indexOf(themeName) !== -1;
+               toggleBtn.innerHTML = isDark ? '<i class="bi-sun"></i>' : '<i class="bi-moon"></i>';
+            }
+
+            paletteToggle?.addEventListener('click', function(evt){
+               evt.stopPropagation();
+               palette?.classList.toggle('active');
             });
+
+            document.addEventListener('click', function(evt){
+               if(!palette || !palette.classList.contains('active')){
+                  return;
+               }
+               var target = evt.target;
+               if(palette.contains(target)){
+                  return;
+               }
+               if(paletteToggle && (target === paletteToggle || paletteToggle.contains(target))){
+                  return;
+               }
+               palette.classList.remove('active');
+            });
+
+            Array.prototype.forEach.call(themeDots, function(dot){
+               dot.addEventListener('click', function(){
+                  var value = dot.getAttribute('data-theme-value');
+                  applyTheme(value);
+                  palette?.classList.remove('active');
+               });
+            });
+
+            toggleBtn?.addEventListener('click', function(){
+               var currentTheme = htmlEl.getAttribute('data-theme') || defaultTheme;
+               var nextTheme = currentTheme === 'cyber-dark' ? 'tech-light' : 'cyber-dark';
+               applyTheme(nextTheme);
+            });
+
+            function syncBrandLabel(){
+               if(!brandLabel || !navBrand){
+                  return;
+               }
+               var navText = navBrand.textContent.trim();
+               if(navText){
+                  brandLabel.textContent = navText;
+               }
+            }
+            syncBrandLabel();
+            if(navBrand && window.MutationObserver){
+               var brandObserver = new MutationObserver(syncBrandLabel);
+               brandObserver.observe(navBrand, { childList: true, characterData: true, subtree: true });
+            }
          })();
       </script>
     </body>
