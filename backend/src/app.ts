@@ -11,6 +11,7 @@ import socialRoutes from './routes/social';
 import docsRoutes from './routes/docs';
 import healthRoutes from './routes/health';
 import adminRoutes from './routes/admin';
+import consumptionRoutes from './routes/consumption';
 import errorHandler from './middleware/errorHandler';
 import config from './config';
 
@@ -55,6 +56,7 @@ app.use('/api', authRoutes);
 app.use('/api', usageRoutes);
 app.use('/api', socialRoutes);
 app.use('/api', adminRoutes);
+app.use('/api', consumptionRoutes);
 app.use('/', healthRoutes);
 
 app.use(errorHandler);

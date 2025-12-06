@@ -1,73 +1,75 @@
-# React + TypeScript + Vite
+# Portal Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface React/Vite qui affiche le portail captif Radiusdesk et consomme l'API du backend.
 
-Currently, two official plugins are available:
+## Prérequis
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 20+ et npm
+- Accès au backend (URL/API et variables d'environnement partagées)
 
-## React Compiler
+## Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd /home/mastershark-linux/dev/radiusdesk/captive-portail/frontend
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Configuration de l'environnement (.env)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Ce frontend lit ses variables dans `frontend/.env`. Créez-le à partir de l'exemple :
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.frontend.example .env
 ```
+
+Remplacez ensuite les valeurs par celles de votre environnement :
+
+| Variable | Description |
+| --- | --- |
+| `VITE_API_BASE_URL` | URL publique de l'API backend (ex : `https://portal.example.com/api`). |
+| `VITE_API_TIMEOUT_MS` | Timeout (ms) des requêtes HTTP vers l'API (15000 = 15 s par défaut). |
+| `VITE_DEFAULT_LANGUAGE` | Langue affichée par défaut (`fr`, `en`, ...). Doit correspondre aux traductions disponibles. |
+| `VITE_DEFAULT_DYNAMIC_KEY` | Clé de campagne/portail utilisée lorsqu'aucune donnée dynamique n'est fournie par Omada. |
+| `VITE_APP_BASENAME` | Chemin de base si l'app est servie sous un sous-dossier (laisser `/` pour la racine). |
+
+Le fichier `.env` n'est pas versionné : gardez vos secrets hors du dépôt.
+
+## Développement
+
+```bash
+npm run dev                    # serveur Vite (http://localhost:5173 par défaut)
+```
+
+## Tests et qualité
+
+```bash
+npm run lint
+npm test
+npm run test:e2e               # Playwright
+```
+
+## Build et prévisualisation
+
+```bash
+npm run build                  # génère frontend/dist
+npm run preview                # sert le build en local
+```
+
+## Déploiement (statique + PM2)
+
+1. S'assurer que `.env` contient les bonnes URLs du backend.
+2. Construire le bundle : `npm run build`.
+3. Servir les fichiers statiques générés dans `frontend/dist` (Nginx, CDN, etc.). Pour un test rapide :
+
+   ```bash
+   npx serve -s dist -l 3000
+   ```
+
+4. Pour garder ce serveur en ligne avec PM2 :
+
+   ```bash
+   pm2 start \"npx serve -s dist -l 3000\" --name portal-frontend
+   pm2 logs portal-frontend
+   ```
+
+Adaptez le port et la commande de service selon votre stack (reverse proxy, Docker, etc.). Pensez aussi à `pm2 save` pour la relance automatique.

@@ -614,3 +614,240 @@ a {
     border-radius: 18px;
   }
 }
+
+/* Simple tabs styling for Infoconso page */
+.cp-tabs {
+  width: 100%;
+}
+
+.cp-tabs__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 0.2rem;
+}
+
+.cp-tabs__trigger {
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--cp-text-secondary);
+  cursor: pointer;
+}
+
+.cp-tabs__trigger--active {
+  background: #ffffff;
+  color: var(--cp-text-primary);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.cp-tabs__content {
+  margin-top: 1.25rem;
+}
+
+.cp-infoconso-login-root,
+.cp-infoconso-root {
+  min-height: 100vh;
+  padding: 32px 16px;
+  background: #f5f7fb;
+  color: #0f172a;
+}
+
+/* Infoconso layout */
+.cp-infoconso-login-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-infoconso-login-card {
+  max-width: 480px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid var(--cp-border);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  padding: 2rem;
+}
+
+.cp-infoconso-login-header {
+  margin-bottom: 1.25rem;
+}
+
+.cp-infoconso-login-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cp-infoconso-tabs {
+  width: 100%;
+}
+
+.cp-infoconso-primary-btn {
+  width: 100%;
+  border-radius: 999px;
+}
+
+.cp-infoconso-help {
+  font-size: 0.75rem;
+  color: var(--cp-text-secondary);
+}
+
+.cp-infoconso-root {
+  padding-bottom: 3rem;
+}
+
+.cp-infoconso-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cp-infoconso-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.cp-infoconso-header-main {
+  max-width: 60%;
+}
+
+.cp-infoconso-header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.cp-infoconso-badges {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cp-infoconso-badge {
+  font-size: 0.75rem;
+  padding-inline: 0.9rem;
+}
+
+.cp-link-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--cp-primary);
+  cursor: pointer;
+}
+
+.cp-link-button:hover {
+  text-decoration: underline;
+}
+
+.cp-infoconso-summary .cp-card,
+.cp-infoconso-activity .cp-card,
+.cp-infoconso-sessions .cp-card {
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+}
+
+.cp-infoconso-sessions .cp-card {
+  overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+  .cp-infoconso-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cp-infoconso-header-main {
+    max-width: 100%;
+  }
+
+  .cp-infoconso-header-meta {
+    align-items: flex-start;
+  }
+
+  .cp-infoconso-container {
+    padding-inline: 0.25rem;
+  }
+}
+
+/* Force light cards and card spacing on Infoconso */
+.cp-infoconso-root .cp-card,
+.cp-infoconso-login-root .cp-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.cp-infoconso-root .cp-card__body,
+.cp-infoconso-login-root .cp-card__body {
+  padding: 20px 24px;
+}
+
+.cp-infoconso-root .cp-card__header,
+.cp-infoconso-login-root .cp-card__header {
+  padding: 18px 24px 0;
+}
+
+/* Typography & stats */
+.cp-infoconso-root .cp-title,
+.cp-infoconso-login-root .cp-title {
+  font-weight: 600;
+}
+
+.cp-stat-row {
+  font-size: 0.9rem;
+}
+
+.cp-stat-row__label {
+  font-weight: 500;
+}
+
+.cp-stat-row__value {
+  font-weight: 600;
+}
+
+/* Progress bar refinement */
+.cp-infoconso-root .cp-progress,
+.cp-infoconso-login-root .cp-progress {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.cp-infoconso-root .cp-progress__bar,
+.cp-infoconso-login-root .cp-progress__bar {
+  background: linear-gradient(120deg, #2563eb, #1d4ed8);
+}
+
+/* Badges light styles */
+.cp-infoconso-root .cp-badge--info,
+.cp-infoconso-login-root .cp-badge--info {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.cp-infoconso-root .cp-badge--success,
+.cp-infoconso-login-root .cp-badge--success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.cp-infoconso-root .cp-badge--muted,
+.cp-infoconso-login-root .cp-badge--muted {
+  background: #fee2e2;
+  color: #b91c1c;
+}

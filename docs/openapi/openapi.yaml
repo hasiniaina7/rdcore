@@ -14,6 +14,7 @@ tags:
   - name: dynamic
   - name: auth
   - name: usage
+  - name: consumption
   - name: social
   - name: omada
   - name: radiusdesk-proxy
@@ -291,6 +292,121 @@ components:
         lastUpdated:
           type: string
           format: date-time
+    ConsumptionSummary:
+      type: object
+      properties:
+        username: { type: string }
+        accountType:
+          type: string
+          enum: [permanent, voucher, unknown]
+        profile:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+          description: Voucher or permanent-user status/admin_state.
+        active:
+          type: boolean
+          nullable: true
+        adminState:
+          type: string
+          nullable: true
+        dataCap:
+          type: object
+          properties:
+            raw: { type: number, nullable: true }
+            formatted: { type: string, nullable: true }
+            unit: { type: string, nullable: true }
+        dataUsed:
+          type: object
+          properties:
+            raw: { type: number, nullable: true }
+            formatted: { type: string, nullable: true }
+            unit: { type: string, nullable: true }
+        dataRemaining:
+          type: object
+          properties:
+            raw: { type: number, nullable: true }
+            formatted: { type: string, nullable: true }
+            unit: { type: string, nullable: true }
+        percDataUsed:
+          type: number
+          nullable: true
+          description: Percentage of data cap used (0-100).
+        timeCap:
+          type: object
+          properties:
+            raw: { type: number, nullable: true }
+            formatted: { type: string, nullable: true }
+            unit: { type: string, nullable: true }
+        timeUsed:
+          type: object
+          properties:
+            raw: { type: number, nullable: true }
+            formatted: { type: string, nullable: true }
+            unit: { type: string, nullable: true }
+        timeRemaining:
+          type: object
+          properties:
+            raw: { type: number, nullable: true }
+            formatted: { type: string, nullable: true }
+            unit: { type: string, nullable: true }
+        percTimeUsed:
+          type: number
+          nullable: true
+          description: Percentage of time cap used (0-100).
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        isExpired:
+          type: boolean
+        daysRemaining:
+          type: integer
+          nullable: true
+        validFrom:
+          type: string
+          format: date-time
+          nullable: true
+        validTo:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+              nullable: true
+            updatedAt:
+              type: string
+              format: date-time
+              nullable: true
+    ConsumptionRecentActivity:
+      type: object
+      properties:
+        lastAcceptTime:
+          type: string
+          format: date-time
+          nullable: true
+        lastAcceptNas:
+          type: string
+          nullable: true
+        lastRejectTime:
+          type: string
+          format: date-time
+          nullable: true
+        lastRejectNas:
+          type: string
+          nullable: true
+        lastRejectMessage:
+          type: string
+          nullable: true
+        lastRejectReasonSimple:
+          type: string
+          nullable: true
     OmadaAuthPayload:
       type: object
       properties:
@@ -550,6 +666,156 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '500':
           description: RadiusDesk unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/consumption/login:
+    post:
+      tags: [consumption, usage]
+      summary: Login and retrieve detailed consumption information
+      description: >
+        Authenticate a hotspot user or voucher using `username` + `password` and return a full
+        consumption overview without issuing a frontend bearer token. The response normalises
+        quota metadata between permanent users and vouchers and aggregates sessions/activity
+        using RadiusDesk.
+      operationId: loginConsumption
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Consumption overview issued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          summary:
+                            $ref: '#/components/schemas/ConsumptionSummary'
+                          recentActivity:
+                            $ref: '#/components/schemas/ConsumptionRecentActivity'
+                          insights:
+                            $ref: '#/components/schemas/UsageByUsernameSummary'
+                          activeSessions:
+                            $ref: '#/components/schemas/SessionList'
+                          inactiveSessions:
+                            $ref: '#/components/schemas/SessionList'
+              examples:
+                voucher:
+                  value:
+                    success: true
+                    data:
+                      summary:
+                        username: "N001-ABCD"
+                        accountType: "voucher"
+                        profile: "Guest-2H-2GB"
+                        status: "online"
+                        dataCap: { raw: 2147483648, formatted: "2.00", unit: "GB" }
+                        dataUsed: { raw: 1073741824, formatted: "1.00", unit: "GB" }
+                        dataRemaining: { raw: 1073741824, formatted: "1.00", unit: "GB" }
+                        percDataUsed: 50
+                        timeCap: { raw: 7200, formatted: "2.0", unit: "hours" }
+                        timeUsed: { raw: 1800, formatted: "30.0", unit: "minutes" }
+                        timeRemaining: { raw: 5400, formatted: "1.5", unit: "hours" }
+                        percTimeUsed: 25
+                        expiresAt: "2025-01-31T23:59:59Z"
+                        isExpired: false
+                        daysRemaining: 7
+                        validFrom: "2025-01-01T00:00:00Z"
+                        validTo: "2025-01-31T23:59:59Z"
+                        metadata:
+                          createdAt: "2024-12-01T10:00:00Z"
+                          updatedAt: "2024-12-15T09:30:00Z"
+                      recentActivity:
+                        lastAcceptTime: "2024-12-29T09:00:00Z"
+                        lastAcceptNas: "ap-01"
+                        lastRejectTime: null
+                        lastRejectNas: null
+                        lastRejectMessage: null
+                        lastRejectReasonSimple: null
+        '400':
+          description: Invalid payload (missing username/password)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: RadiusDesk unreachable or internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/sessions/disconnect:
+    post:
+      tags: [consumption, usage]
+      summary: Disconnect sessions by radacctid using username/password
+      description: >
+        Disconnect one or more active RadiusDesk sessions after validating the supplied
+        `username` + `password`. This endpoint is designed for a frontend "disconnect" button
+        without exposing Radius tokens or admin credentials.
+      operationId: disconnectSessionsWithCredentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, radacctIds]
+              properties:
+                username: { type: string }
+                password:
+                  type: string
+                  format: password
+                radacctIds:
+                  type: array
+                  items: { type: string }
+                  minItems: 1
+      responses:
+        '200':
+          description: Sessions disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: RadiusDesk unreachable or internal error
           content:
             application/json:
               schema:
