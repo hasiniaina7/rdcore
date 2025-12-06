@@ -1,6 +1,7 @@
 import createError from 'http-errors';
 import { getUsage, getSessions, kickSessions, findPermanentUser, findVoucher } from './radiusdeskIntegration';
 import { UsageStats } from '../types';
+import config from '../config';
 
 type SessionsPayload = Awaited<ReturnType<typeof getSessions>>;
 type RadiusdeskCollection = {
@@ -194,6 +195,31 @@ export async function fetchUsage(
     const quota = await quotaPromise;
     if (hasQuotaMetadata(quota)) {
       return buildUsageFromQuota(normalizedUsername, quota, withSessions);
+    }
+    if (config.ALLOW_USAGE_WITHOUT_MAC) {
+      try {
+        const usage = await getUsage(normalizedUsername, {
+          password: normalizedPassword,
+        });
+        const timeUsedSeconds = usage?.data?.time_used ?? quota.timeUsedSeconds;
+        const timeCapSeconds = usage?.data?.time_cap ?? quota.timeCapSeconds ?? null;
+        const timeRemainingSeconds = computeRemainingSeconds(timeCapSeconds, timeUsedSeconds, quota.expiresAt);
+        const dataUsedBytes = quota.dataUsedBytes ?? usage?.data?.data_used ?? undefined;
+        const dataCapBytes = quota.dataCapBytes ?? usage?.data?.data_cap ?? null;
+        return {
+          username: normalizedUsername,
+          dataUsed: dataUsedBytes,
+          dataCap: dataCapBytes,
+          timeUsed: timeUsedSeconds,
+          timeCap: timeCapSeconds,
+          expiresAt: quota.expiresAt,
+          timeRemainingSeconds,
+          depleted: Boolean(usage?.data?.depleted),
+          sessions: withSessions ? sessions?.items ?? [] : [],
+        };
+      } catch {
+        // fall through
+      }
     }
     throw createError(404, 'Unable to determine MAC address for this user');
   }
