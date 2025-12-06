@@ -626,7 +626,7 @@ export default function InfoconsoFrontendPreview() {
   const [loginType, setLoginType] = useState<"voucher" | "user">("voucher");
 
   // Voucher login (single field)
-  const [voucherCode, setVoucherCode] = useState("ableexperience");
+  const [voucherCode, setVoucherCode] = useState("");
 
   // User login
   const [username, setUsername] = useState("");
@@ -694,7 +694,7 @@ export default function InfoconsoFrontendPreview() {
                       onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         setVoucherCode(e.target.value)
                       }
-                      placeholder="Entrez votre code"
+                      placeholder="Ex. fatherlymarble"
                     />
                     <div className="cp-infoconso-help">
                       Pour un voucher, le mot de passe est identique au username.
@@ -716,7 +716,7 @@ export default function InfoconsoFrontendPreview() {
                         onChange={(e: ChangeEvent<HTMLInputElement>) =>
                           setUsername(e.target.value)
                         }
-                        placeholder="ex: hasina"
+                        placeholder="Ex. utilisateur123"
                       />
                     </div>
                     <div className="space-y-2">
@@ -727,7 +727,7 @@ export default function InfoconsoFrontendPreview() {
                         onChange={(e: ChangeEvent<HTMLInputElement>) =>
                           setPassword(e.target.value)
                         }
-                        placeholder="••••••••"
+                        placeholder="Doit commencer par le nom d’utilisateur"
                       />
                     </div>
                   </div>

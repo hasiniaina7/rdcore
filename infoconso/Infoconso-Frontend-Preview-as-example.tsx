@@ -678,7 +678,7 @@ export default function InfoconsoFrontendPreview() {
                       <Input
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        placeholder="ex: hasina"
+                        placeholder="Nom d'utilisateur"
                       />
                     </div>
                     <div className="space-y-2">

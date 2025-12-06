@@ -26,7 +26,7 @@ export function UserLoginForm({ username, password, onUsernameChange, onPassword
           className="ic-input"
           value={username}
           onChange={(e) => onUsernameChange(e.target.value)}
-          placeholder="ex: hasina"
+          placeholder="Nom d'utilisateur"
           autoComplete="username"
         />
       </div>
