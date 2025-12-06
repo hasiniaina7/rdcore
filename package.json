@@ -10,6 +10,7 @@
     "test": "npm run test --workspaces --if-present",
     "start:backend": "npm --workspace backend run start",
     "start:frontend": "npm --workspace frontend run dev",
+    "start:infoconso": "npm --workspace infoconso run dev",
     "docs:serve": "redocly preview-docs docs/openapi/openapi.yaml",
     "docs:lint": "spectral lint docs/openapi/openapi.yaml",
     "docs:test": "npm run docs:dredd && npm run docs:newman",
@@ -19,7 +20,8 @@
   },
   "workspaces": [
     "backend",
-    "frontend"
+    "frontend",
+    "infoconso"
   ],
   "overrides": {
     "react": "18.3.1",
