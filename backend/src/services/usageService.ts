@@ -218,7 +218,8 @@ export async function fetchUsage(
           sessions: withSessions ? sessions?.items ?? [] : [],
         };
       } catch {
-        // fall through
+        // As a last resort, return a minimal payload when allowed (prevents 404 on missing MAC)
+        return buildUsageFromQuota(normalizedUsername, quota, withSessions);
       }
     }
     throw createError(404, 'Unable to determine MAC address for this user');
