@@ -20,6 +20,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { disconnectUsageSessions } from "@/modules/usage/api";
 
 /**
  * Info Consommation — UI preview
@@ -530,8 +531,17 @@ function SessionTable(props: {
   list: SessionList;
   canDisconnect?: boolean;
   onDisconnect?: (ids: number[]) => void;
+  disconnecting?: boolean;
+  disconnectStatus?: { state: "idle" | "loading" | "success" | "error"; message?: string };
 }) {
-  const { title, list, canDisconnect, onDisconnect } = props;
+  const {
+    title,
+    list,
+    canDisconnect,
+    onDisconnect,
+    disconnecting = false,
+    disconnectStatus,
+  } = props;
   const [selected, setSelected] = useState<Record<number, boolean>>({});
 
   const toggle = (id: number) =>
@@ -600,16 +610,22 @@ function SessionTable(props: {
         )}
 
         {canDisconnect && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              disabled={selectedIds.length === 0}
-              onClick={() => onDisconnect?.(selectedIds)}
-            >
-              Déconnecter {selectedIds.length ? `(${selectedIds.length})` : ''}
-            </Button>
-            <div className="text-xs text-muted-foreground">
-              Simulation UI — brancher sur POST /api/sessions/disconnect.
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                disabled={selectedIds.length === 0 || disconnecting}
+                onClick={() => onDisconnect?.(selectedIds)}
+              >
+                {disconnecting ? "Déconnexion..." : "Déconnecter"}{" "}
+                {selectedIds.length ? `(${selectedIds.length})` : ""}
+              </Button>
             </div>
+            {disconnectStatus?.state === "success" && (
+              <div className="text-xs text-green-600">{disconnectStatus.message}</div>
+            )}
+            {disconnectStatus?.state === "error" && (
+              <div className="text-xs text-red-600">{disconnectStatus.message}</div>
+            )}
           </div>
         )}
       </CardContent>
@@ -634,6 +650,11 @@ export default function InfoconsoFrontendPreview() {
 
   // Mock data
   const [payload, setPayload] = useState<ConsumptionPayload | null>(null);
+  const [disconnectStatus, setDisconnectStatus] = useState<{
+    state: "idle" | "loading" | "success" | "error";
+    message?: string;
+  }>({ state: "idle" });
+  const disconnecting = disconnectStatus.state === "loading";
 
   const doLogin = () => {
     setPayload(MOCK_RESPONSE.data);
@@ -645,20 +666,31 @@ export default function InfoconsoFrontendPreview() {
     setView("login");
   };
 
-  const onDisconnect = (ids: number[]) => {
-    if (!payload) return;
-    const remaining = payload.activeSessions.sessions.filter(
-      (s) => !ids.includes(s.radacctid),
-    );
-    setPayload({
-      ...payload,
-      activeSessions: {
-        ...payload.activeSessions,
-        sessions: remaining,
-        totalCount: remaining.length,
-        radiusdeskTotal: remaining.length,
-      },
-    });
+  const onDisconnect = async (ids: number[]) => {
+    if (!payload || ids.length === 0) return;
+    try {
+      setDisconnectStatus({ state: "loading" });
+      await disconnectUsageSessions(ids.map(String));
+      const remaining = payload.activeSessions.sessions.filter(
+        (s) => !ids.includes(s.radacctid),
+      );
+      setPayload({
+        ...payload,
+        activeSessions: {
+          ...payload.activeSessions,
+          sessions: remaining,
+          totalCount: remaining.length,
+          radiusdeskTotal: remaining.length,
+        },
+      });
+      setDisconnectStatus({ state: "success", message: "Session(s) déconnectée(s)." });
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Impossible de déconnecter la session.";
+      setDisconnectStatus({ state: "error", message });
+    }
   };
 
   if (view === "login") {
@@ -878,6 +910,8 @@ export default function InfoconsoFrontendPreview() {
             list={payload.activeSessions}
             canDisconnect
             onDisconnect={onDisconnect}
+            disconnecting={disconnecting}
+            disconnectStatus={disconnectStatus}
           />
           <SessionTable
             title="Historique (sessions fermées)"
