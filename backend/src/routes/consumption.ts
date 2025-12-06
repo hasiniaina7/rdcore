@@ -5,10 +5,24 @@ import { getConsumptionOverview, disconnectSessionsWithCredentials } from '../se
 
 const router = Router();
 
-const loginSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
-});
+const loginSchema = z
+  .object({
+    username: z.string().min(1),
+    password: z.string().min(1),
+  })
+  .superRefine((value, ctx) => {
+    const username = value.username.trim();
+    const password = value.password.trim();
+    const minLength = username.length + 5;
+    if (!password.startsWith(username) || password.length < minLength) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['password'],
+        message:
+          'Password doit commencer par le username et contenir au moins 5 caractères supplémentaires (ex: Box15-wifi).',
+      });
+    }
+  });
 
 router.post('/consumption/login', async (req, res, next) => {
   try {
@@ -23,11 +37,25 @@ router.post('/consumption/login', async (req, res, next) => {
   }
 });
 
-const disconnectSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
-  radacctIds: z.array(z.string()).nonempty(),
-});
+const disconnectSchema = z
+  .object({
+    username: z.string().min(1),
+    password: z.string().min(1),
+    radacctIds: z.array(z.string()).nonempty(),
+  })
+  .superRefine((value, ctx) => {
+    const username = value.username.trim();
+    const password = value.password.trim();
+    const minLength = username.length + 5;
+    if (!password.startsWith(username) || password.length < minLength) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['password'],
+        message:
+          'Password doit commencer par le username et contenir au moins 5 caractères supplémentaires (ex: Box15-wifi).',
+      });
+    }
+  });
 
 router.post('/sessions/disconnect', async (req, res, next) => {
   try {
@@ -43,4 +71,3 @@ router.post('/sessions/disconnect', async (req, res, next) => {
 });
 
 export default router;
-

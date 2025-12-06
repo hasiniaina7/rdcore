@@ -667,6 +667,7 @@ export default function InfoconsoFrontendPreview() {
   // User login
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Mock data
   const [payload, setPayload] = useState<ConsumptionPayload | null>(null);
@@ -678,8 +679,25 @@ export default function InfoconsoFrontendPreview() {
   const disconnecting = disconnectStatus.state === "loading";
 
   const doLogin = () => {
+    setLoginError(null);
     const credUsername = loginType === "voucher" ? voucherCode.trim() : username.trim();
     const credPassword = loginType === "voucher" ? voucherCode.trim() : password.trim();
+    if (loginType === "voucher") {
+      if (!credUsername) {
+        setLoginError("Code voucher requis.");
+        return;
+      }
+    } else {
+      if (!credUsername || !credPassword) {
+        setLoginError("Username et mot de passe requis.");
+        return;
+      }
+      const minLength = credUsername.length + 5;
+      if (!credPassword.startsWith(credUsername) || credPassword.length < minLength) {
+        setLoginError("Le mot de passe doit commencer par le username et contenir au moins 5 caractères supplémentaires (ex. Box15-wifi).");
+        return;
+      }
+    }
     setAuthCredentials(credUsername ? { username: credUsername, password: credPassword } : null);
     setPayload(MOCK_RESPONSE.data);
     setView("dashboard");
@@ -689,6 +707,7 @@ export default function InfoconsoFrontendPreview() {
   const logout = () => {
     setPayload(null);
     setView("login");
+    setLoginError(null);
   };
 
   const onDisconnect = async (ids: number[]) => {
@@ -799,6 +818,7 @@ export default function InfoconsoFrontendPreview() {
                   <Button className="cp-infoconso-primary-btn" onClick={doLogin}>
                     Se connecter
                   </Button>
+                  {loginError && <div className="text-sm text-red-600">{loginError}</div>}
                 </div>
               </TabsContent>
             </Tabs>
