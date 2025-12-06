@@ -178,7 +178,22 @@ const computeDaysRemaining = (expiresAt?: string): number | null => {
 
 const resolveAccountMetadata = async (
   username: string
-): Promise<{ accountType: AccountType; profile?: string; status?: string; active?: boolean; adminState?: string; validFrom?: string; validTo?: string; expiresAt?: string; createdAt?: string; updatedAt?: string; activity?: RecentActivity }> => {
+): Promise<{
+  accountType: AccountType;
+  profile?: string;
+  status?: string;
+  active?: boolean;
+  adminState?: string;
+  validFrom?: string;
+  validTo?: string;
+  expiresAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  activity?: RecentActivity;
+  percTimeUsed?: number | null;
+  timeCapSeconds?: number | null;
+  timeUsedSeconds?: number | null;
+}> => {
   const normalized = username.trim();
 
   // Try permanent user first
@@ -246,6 +261,15 @@ const resolveAccountMetadata = async (
     const voucherResponse = await findVoucher(normalized);
     const voucherRecord = extractFirstRecord(voucherResponse);
     if (voucherRecord) {
+      const voucherName = typeof voucherRecord.name === 'string' ? voucherRecord.name.trim() : undefined;
+      if (!voucherName || voucherName !== normalized) {
+        // exact match required
+        return { accountType: 'unknown', activity: {} };
+      }
+      const percTimeUsed =
+        toNumber((voucherRecord as any).perc_time_used) ?? toNumber((voucherRecord as any).time_used_percent) ?? null;
+      const timeCapSeconds = toNumber((voucherRecord as any).time_cap) ?? null;
+      const timeUsedSeconds = toNumber((voucherRecord as any).time_used) ?? null;
       const profile =
         (typeof voucherRecord.profile === 'string' && voucherRecord.profile) ||
         (typeof voucherRecord.profile_name === 'string' && voucherRecord.profile_name) ||
@@ -285,6 +309,9 @@ const resolveAccountMetadata = async (
         createdAt,
         updatedAt,
         activity,
+        percTimeUsed,
+        timeCapSeconds,
+        timeUsedSeconds,
       };
     }
   } catch {
@@ -331,15 +358,37 @@ export async function getConsumptionOverview(payload: { username: string; passwo
     ),
   ]);
 
+  const totalSessionSeconds =
+    (activeSessions?.sessions?.reduce((acc: number, s: any) => acc + (toNumber(s?.acctsessiontime) ?? 0), 0) ?? 0) +
+    (inactiveSessions?.sessions?.reduce((acc: number, s: any) => acc + (toNumber(s?.acctsessiontime) ?? 0), 0) ?? 0);
+
   const dataCapBytes = usage.dataCap ?? null;
   const dataUsedBytes = usage.dataUsed ?? 0;
   const dataRemainingBytes = dataCapBytes != null ? Math.max(0, dataCapBytes - dataUsedBytes) : null;
-  const timeCapSeconds = usage.timeCap ?? null;
-  const timeUsedSeconds = usage.timeUsed ?? 0;
+  let timeCapSeconds = usage.timeCap ?? account.timeCapSeconds ?? null;
+  let timeUsedSeconds = usage.timeUsed ?? account.timeUsedSeconds ?? null;
+
+  // Fallback: use aggregated session time when usage did not provide it
+  if (timeUsedSeconds == null && totalSessionSeconds > 0) {
+    timeUsedSeconds = totalSessionSeconds;
+  }
+
+  // Normalize bogus zeros from upstream when quota time is not provided
+  if (timeCapSeconds !== null && timeCapSeconds <= 0) {
+    timeCapSeconds = null;
+  }
+
+  // If we have a percentage but no cap, infer cap from used seconds
+  if (timeCapSeconds === null && account.percTimeUsed && account.percTimeUsed > 0 && timeUsedSeconds != null) {
+    const inferred = Math.round((timeUsedSeconds * 100) / account.percTimeUsed);
+    if (Number.isFinite(inferred) && inferred > 0) {
+      timeCapSeconds = inferred;
+    }
+  }
   const timeRemainingSeconds =
     typeof usage.timeRemainingSeconds === 'number'
       ? usage.timeRemainingSeconds
-      : timeCapSeconds != null
+      : timeCapSeconds != null && timeUsedSeconds != null
         ? Math.max(0, timeCapSeconds - timeUsedSeconds)
         : null;
 
@@ -360,7 +409,7 @@ export async function getConsumptionOverview(payload: { username: string; passwo
     timeCap: humanizeSeconds(timeCapSeconds),
     timeUsed: humanizeSeconds(timeUsedSeconds),
     timeRemaining: humanizeSeconds(timeRemainingSeconds),
-    percTimeUsed: computePercentage(timeUsedSeconds, timeCapSeconds),
+    percTimeUsed: computePercentage(timeUsedSeconds ?? undefined, timeCapSeconds ?? undefined) ?? account.percTimeUsed ?? null,
     expiresAt,
     isExpired: Boolean(expiresAt && Date.parse(expiresAt) <= Date.now()),
     daysRemaining,
@@ -373,12 +422,12 @@ export async function getConsumptionOverview(payload: { username: string; passwo
   };
 
   const recentActivity: RecentActivity = {
-    lastAcceptTime: account.activity.lastAcceptTime,
-    lastAcceptNas: account.activity.lastAcceptNas,
-    lastRejectTime: account.activity.lastRejectTime,
-    lastRejectNas: account.activity.lastRejectNas,
-    lastRejectMessage: account.activity.lastRejectMessage,
-    lastRejectReasonSimple: account.activity.lastRejectReasonSimple,
+    lastAcceptTime: account.activity?.lastAcceptTime,
+    lastAcceptNas: account.activity?.lastAcceptNas,
+    lastRejectTime: account.activity?.lastRejectTime,
+    lastRejectNas: account.activity?.lastRejectNas,
+    lastRejectMessage: account.activity?.lastRejectMessage,
+    lastRejectReasonSimple: account.activity?.lastRejectReasonSimple,
   };
 
   return {
@@ -414,4 +463,3 @@ export async function disconnectSessionsWithCredentials(payload: {
 
   return { success: true };
 }
-

@@ -183,7 +183,7 @@ export async function findVoucher(name: string) {
     const filter = JSON.stringify([
       {
         property: 'name',
-        operator: 'like',
+        operator: 'eq',
         value: name,
       },
     ]);
