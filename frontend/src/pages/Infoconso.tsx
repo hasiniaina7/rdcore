@@ -20,7 +20,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { disconnectUsageSessions } from "@/modules/usage/api";
+import { disconnectConsumptionSessions } from "@/modules/usage/api";
 
 /**
  * Info Consommation — UI preview
@@ -610,7 +610,27 @@ function SessionTable(props: {
         )}
 
         {canDisconnect && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start gap-2 text-xs text-amber-600">
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              </svg>
+              <div>
+                La déconnexion d’une session en cours peut interrompre la connexion et nécessiter une reconnexion.
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 disabled={selectedIds.length === 0 || disconnecting}
@@ -650,6 +670,7 @@ export default function InfoconsoFrontendPreview() {
 
   // Mock data
   const [payload, setPayload] = useState<ConsumptionPayload | null>(null);
+  const [authCredentials, setAuthCredentials] = useState<{ username: string; password: string } | null>(null);
   const [disconnectStatus, setDisconnectStatus] = useState<{
     state: "idle" | "loading" | "success" | "error";
     message?: string;
@@ -657,8 +678,12 @@ export default function InfoconsoFrontendPreview() {
   const disconnecting = disconnectStatus.state === "loading";
 
   const doLogin = () => {
+    const credUsername = loginType === "voucher" ? voucherCode.trim() : username.trim();
+    const credPassword = loginType === "voucher" ? voucherCode.trim() : password.trim();
+    setAuthCredentials(credUsername ? { username: credUsername, password: credPassword } : null);
     setPayload(MOCK_RESPONSE.data);
     setView("dashboard");
+    setDisconnectStatus({ state: "idle" });
   };
 
   const logout = () => {
@@ -668,9 +693,17 @@ export default function InfoconsoFrontendPreview() {
 
   const onDisconnect = async (ids: number[]) => {
     if (!payload || ids.length === 0) return;
+    if (!authCredentials?.username || !authCredentials?.password) {
+      setDisconnectStatus({ state: "error", message: "Reconnectez-vous pour déconnecter une session." });
+      return;
+    }
     try {
       setDisconnectStatus({ state: "loading" });
-      await disconnectUsageSessions(ids.map(String));
+      await disconnectConsumptionSessions({
+        username: authCredentials.username,
+        password: authCredentials.password,
+        radacctIds: ids.map(String),
+      });
       const remaining = payload.activeSessions.sessions.filter(
         (s) => !ids.includes(s.radacctid),
       );

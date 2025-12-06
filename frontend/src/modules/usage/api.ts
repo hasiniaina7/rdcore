@@ -82,3 +82,11 @@ export const fetchInactiveSessions = (options?: UsageSessionsOptions) =>
 export async function disconnectUsageSessions(radacctIds: string[]) {
   return client.post('/usage/disconnect', { radacctIds });
 }
+
+export async function disconnectConsumptionSessions(payload: {
+  username: string;
+  password: string;
+  radacctIds: string[];
+}) {
+  return client.post('/consumption/sessions/disconnect', payload);
+}
