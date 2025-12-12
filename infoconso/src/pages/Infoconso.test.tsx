@@ -11,7 +11,12 @@ vi.mock("../modules/usage/api/consumption.api", () => {
         if (!code) throw new Error("Veuillez saisir un code.");
         return consumptionMockData.data;
       }
-      if (!username || !password) throw new Error("Username et mot de passe requis.");
+      if (type === "user") {
+        if (username === "baduser") {
+          throw new Error("Nom d'utilisateur ou mot de passe incorrect.");
+        }
+        return consumptionMockData.data;
+      }
       return consumptionMockData.data;
     }),
     fetchConsumption: vi.fn(async () => consumptionMockData.data),
@@ -23,7 +28,7 @@ describe("InfoconsoPage login flows", () => {
     render(<InfoconsoPage />);
 
     const codeInput = await screen.findByLabelText(/Code voucher/i);
-    fireEvent.change(codeInput, { target: { value: "ableexperience" } });
+    fireEvent.change(codeInput, { target: { value: "demo-voucher" } });
 
     fireEvent.click(screen.getByRole("button", { name: /Consulter ma consommation/i }));
 
@@ -32,22 +37,34 @@ describe("InfoconsoPage login flows", () => {
     });
   });
 
-  it("rejects user password not starting with username", async () => {
+  it("rejects user login with empty credentials", async () => {
     render(<InfoconsoPage />);
 
     fireEvent.click(screen.getAllByRole("button", { name: /Utilisateur/i })[0]);
 
-    fireEvent.change(await screen.findByLabelText(/Nom d'utilisateur/i), { target: { value: "hasina" } });
-    fireEvent.change(screen.getByLabelText(/Mot de passe/i), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: /Se connecter/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Username et mot de passe requis\./i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows backend invalid-credentials message for user login", async () => {
+    render(<InfoconsoPage />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Utilisateur/i })[0]);
+
+    fireEvent.change(await screen.findByLabelText(/Nom d'utilisateur/i), { target: { value: "baduser" } });
+    fireEvent.change(screen.getByLabelText(/Mot de passe/i), { target: { value: "wrong-password" } });
 
     fireEvent.click(screen.getByRole("button", { name: /Se connecter/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Mot de passe incorrecte/i)).toBeInTheDocument();
+      expect(screen.getByText(/Nom d'utilisateur ou mot de passe incorrect\./i)).toBeInTheDocument();
     });
   });
 
-  it("accepts user credentials when password starts with username", async () => {
+  it("accepts user credentials and reaches dashboard", async () => {
     render(<InfoconsoPage />);
 
     fireEvent.click(screen.getAllByRole("button", { name: /Utilisateur/i })[0]);

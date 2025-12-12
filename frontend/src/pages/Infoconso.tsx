@@ -162,7 +162,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
   success: true,
   data: {
     summary: {
-      username: "ableexperience",
+      username: "demo-voucher",
       accountType: "voucher",
       profile: "003-Classique-10Go-5000Ar",
       status: "used",
@@ -186,7 +186,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
       lastAcceptNas: "Routeur_Antsorokavo",
     },
     insights: {
-      username: "ableexperience",
+      username: "demo-voucher",
       historyLimit: 200,
       macs: ["9A:E5:49:61:CB:4E", "9A-E5-49-61-CB-4E"],
       periods: [
@@ -240,7 +240,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
       },
     },
     activeSessions: {
-      username: "ableexperience",
+      username: "demo-voucher",
       totalCount: 2,
       radiusdeskTotal: 2,
       sessions: [
@@ -248,7 +248,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
           radacctid: 97853,
           acctsessionid: "8070001c",
           acctuniqueid: "e51b47b4cb5fcf839c7180c3c93c9403",
-          username: "ableexperience",
+          username: "demo-voucher",
           realm: "prod",
           nasipaddress: "10.5.0.7",
           nasidentifier: "Routeur_Antsorokavo",
@@ -272,7 +272,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
           radacctid: 97789,
           acctsessionid: "80700014",
           acctuniqueid: "18ee359172977b0d6ffd3f249a5684b2",
-          username: "ableexperience",
+          username: "demo-voucher",
           realm: "prod",
           nasipaddress: "10.5.0.7",
           nasidentifier: "Routeur_Antsorokavo",
@@ -295,7 +295,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
       ],
     },
     inactiveSessions: {
-      username: "ableexperience",
+      username: "demo-voucher",
       totalCount: 9,
       radiusdeskTotal: 9,
       sessions: [
@@ -303,7 +303,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
           radacctid: 94006,
           acctsessionid: "80600088",
           acctuniqueid: "f643affe213ff8389307bf2b18332440",
-          username: "ableexperience",
+          username: "demo-voucher",
           realm: "prod",
           nasidentifier: "Routeur_Antsorokavo",
           acctstarttime: "2025-11-11 12:43:53",
@@ -321,7 +321,7 @@ const MOCK_RESPONSE: { success: boolean; data: ConsumptionPayload } = {
           radacctid: 93968,
           acctsessionid: "80600087",
           acctuniqueid: "d71b0cf23f9f5e1a29ed92dba1a80cad",
-          username: "ableexperience",
+          username: "demo-voucher",
           realm: "prod",
           nasidentifier: "Routeur_Antsorokavo",
           acctstarttime: "2025-11-11 11:37:09",

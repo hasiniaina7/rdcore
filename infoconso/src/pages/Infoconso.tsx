@@ -37,7 +37,7 @@ const IconTime = () => (
 export default function InfoconsoPage() {
   const [view, setView] = useState<"login" | "dashboard">("login");
   const [loginType, setLoginType] = useState<LoginType>("voucher");
-  const [voucherCode, setVoucherCode] = useState("ableexperience");
+  const [voucherCode, setVoucherCode] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -104,12 +104,6 @@ export default function InfoconsoPage() {
       if (payload.type === "user") {
         if (!payload.username || !payload.password) {
           setError("Username et mot de passe requis.");
-          setLoading(false);
-          return;
-        }
-        if (!payload.password.startsWith(payload.username)) {
-          setError("Incorrecte");
-          setNotice({ type: "error", message: "Nom d'utilisateur ou mot de passe incorrecte - Verifiez" });
           setLoading(false);
           return;
         }
