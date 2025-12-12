@@ -2,7 +2,7 @@ import createError from 'http-errors';
 import { fetchUsage } from './usageService';
 import { fetchUsageByUsername } from './usageInsightsService';
 import { listActiveSessions, listInactiveSessions } from './sessionService';
-import { findPermanentUser, findVoucher, testRadiusCredentials } from './radiusdeskIntegration';
+import { findPermanentUser, findVoucher, getPermanentUserPassword } from './radiusdeskIntegration';
 
 type RadiusdeskCollection = {
   items?: Array<Record<string, unknown>>;
@@ -324,6 +324,64 @@ const resolveAccountMetadata = async (
   };
 };
 
+const verifyRadiusdeskCredentials = async (username: string, password: string): Promise<boolean> => {
+  const normalizedUsername = username.trim();
+  const normalizedPassword = password.trim();
+
+  // 1) PermanentUsers: comparer le mot de passe côté RadiusDesk
+  try {
+    const permanentResponse = await findPermanentUser(normalizedUsername);
+    const permanentRecord = extractFirstRecord(permanentResponse as any);
+    if (permanentRecord) {
+      const recordUsername =
+        typeof (permanentRecord as any).username === 'string'
+          ? ((permanentRecord as any).username as string).trim()
+          : undefined;
+      if (recordUsername && recordUsername === normalizedUsername) {
+        const userId = (permanentRecord as any).id;
+        if (userId != null) {
+          const passwordPayload = await getPermanentUserPassword(String(userId));
+          const storedPassword =
+            passwordPayload && typeof (passwordPayload as any).value === 'string'
+              ? ((passwordPayload as any).value as string).trim()
+              : undefined;
+          if (storedPassword && storedPassword === normalizedPassword) {
+            return true;
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore lookup issues and fall back to vouchers.
+  }
+
+  // 2) Vouchers: utiliser le champ password renvoyé par /vouchers/index.json
+  try {
+    const voucherResponse = await findVoucher(normalizedUsername);
+    const voucherRecord = extractFirstRecord(voucherResponse as any);
+    if (voucherRecord) {
+      const voucherName =
+        typeof (voucherRecord as any).name === 'string'
+          ? ((voucherRecord as any).name as string).trim()
+          : undefined;
+      if (!voucherName || voucherName !== normalizedUsername) {
+        return false;
+      }
+      const storedVoucherPassword =
+        typeof (voucherRecord as any).password === 'string'
+          ? ((voucherRecord as any).password as string).trim()
+          : undefined;
+      if (storedVoucherPassword && storedVoucherPassword === normalizedPassword) {
+        return true;
+      }
+    }
+  } catch {
+    // Ignore voucher lookup failures.
+  }
+
+  return false;
+};
+
 export async function getConsumptionOverview(payload: { username: string; password: string }) {
   const username = payload.username?.trim();
   const password = payload.password?.trim();
@@ -332,14 +390,9 @@ export async function getConsumptionOverview(payload: { username: string; passwo
     throw createError(400, 'username and password are required');
   }
 
-  // 1) Vérifier les identifiants via un test RADIUS (radclient côté RadiusDesk)
-  let authOk: boolean;
-  try {
-    authOk = await testRadiusCredentials(username, password);
-  } catch {
-    throw createError(502, 'Radius authentication failed');
-  }
-  if (!authOk) {
+  // 1) Vérifier les identifiants en s'appuyant sur les mots de passe RadiusDesk (PermanentUsers / Vouchers)
+  const credentialsOk = await verifyRadiusdeskCredentials(username, password);
+  if (!credentialsOk) {
     throw createError(401, 'Invalid username or password');
   }
 
@@ -465,14 +518,9 @@ export async function disconnectSessionsWithCredentials(payload: {
     throw createError(400, 'radacctIds required');
   }
 
-  // Vérifie d’abord les identifiants via un test RADIUS (radclient côté RadiusDesk)
-  let authOk: boolean;
-  try {
-    authOk = await testRadiusCredentials(username, password);
-  } catch {
-    throw createError(502, 'Radius authentication failed');
-  }
-  if (!authOk) {
+  // Vérifie d’abord les identifiants via les mots de passe RadiusDesk (PermanentUsers / Vouchers)
+  const credentialsOk = await verifyRadiusdeskCredentials(username, password);
+  if (!credentialsOk) {
     throw createError(401, 'Invalid username or password');
   }
 
