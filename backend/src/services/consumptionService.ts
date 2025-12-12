@@ -2,7 +2,7 @@ import createError from 'http-errors';
 import { fetchUsage } from './usageService';
 import { fetchUsageByUsername } from './usageInsightsService';
 import { listActiveSessions, listInactiveSessions } from './sessionService';
-import { findPermanentUser, findVoucher } from './radiusdeskIntegration';
+import { findPermanentUser, findVoucher, testRadiusCredentials } from './radiusdeskIntegration';
 
 type RadiusdeskCollection = {
   items?: Array<Record<string, unknown>>;
@@ -332,10 +332,21 @@ export async function getConsumptionOverview(payload: { username: string; passwo
     throw createError(400, 'username and password are required');
   }
 
-  // 1) Validate credentials and get aggregate usage + latest sessions for MAC detection
+  // 1) Vérifier les identifiants via un test RADIUS (radclient côté RadiusDesk)
+  let authOk: boolean;
+  try {
+    authOk = await testRadiusCredentials(username, password);
+  } catch {
+    throw createError(502, 'Radius authentication failed');
+  }
+  if (!authOk) {
+    throw createError(401, 'Invalid username or password');
+  }
+
+  // 2) Récupérer les usages/sessions RadiusDesk pour construire l’overview
   const usage = await fetchUsage(username, password, undefined, 20, true);
 
-  // 2) Enrich with account metadata (profile, status, validity period, activity)
+  // 3) Enrich with account metadata (profile, status, validity period, activity)
   const [account, insights, activeSessions, inactiveSessions] = await Promise.all([
     resolveAccountMetadata(usage.username),
     fetchUsageByUsername(usage.username, {
@@ -454,8 +465,16 @@ export async function disconnectSessionsWithCredentials(payload: {
     throw createError(400, 'radacctIds required');
   }
 
-  // Reutilise la logique du backend pour vérifier les identifiants avant de déconnecter
-  await fetchUsage(username, password, undefined, 1, false);
+  // Vérifie d’abord les identifiants via un test RADIUS (radclient côté RadiusDesk)
+  let authOk: boolean;
+  try {
+    authOk = await testRadiusCredentials(username, password);
+  } catch {
+    throw createError(502, 'Radius authentication failed');
+  }
+  if (!authOk) {
+    throw createError(401, 'Invalid username or password');
+  }
 
   // Utilise le endpoint existant via usageService
   const { disconnectSessions } = await import('./usageService');

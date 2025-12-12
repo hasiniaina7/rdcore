@@ -10,6 +10,8 @@ servers:
     description: Local dev
   - url: https://hotspot.techzone.lat
     description: Production
+  - url: https://info.techzone.lat
+    description: Production
 tags:
   - name: dynamic
   - name: auth

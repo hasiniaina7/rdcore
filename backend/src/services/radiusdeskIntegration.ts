@@ -30,6 +30,10 @@ type UsagePayload = {
   };
 };
 
+type RadiusAuthTestResponse = {
+  success?: boolean;
+};
+
 const normalizeUsagePayload = (payload: UsagePayload | undefined) => {
   if (!payload?.data) {
     return payload;
@@ -60,6 +64,18 @@ export async function fetchDynamicDetails(query: Record<string, unknown>): Promi
     });
     return data;
   }, 'dynamic-details');
+}
+
+export async function testRadiusCredentials(username: string, password: string): Promise<boolean> {
+  return timedRequest(async () => {
+    const payload = { username, password };
+    const { data } = await radiusClient.post<RadiusAuthTestResponse>(
+      '/third-party-radius/auth-test.json',
+      payload,
+      { params: withDefaults({}) }
+    );
+    return Boolean((data as RadiusAuthTestResponse | undefined)?.success);
+  }, 'auth-test');
 }
 
 export async function getUsage(
