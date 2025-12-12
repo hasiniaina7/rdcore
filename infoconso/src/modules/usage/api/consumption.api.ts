@@ -14,15 +14,36 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     const res = await fetch(`${API_BASE_URL}${path}`, { ...init, signal: controller.signal });
     if (!res.ok) {
+      let backendMessage: string | undefined;
+      try {
+        const errorBody = (await res.json()) as { message?: string } | undefined;
+        if (errorBody && typeof errorBody.message === "string" && errorBody.message.trim()) {
+          backendMessage = errorBody.message.trim();
+        }
+      } catch {
+        // ignore JSON parse errors on error responses
+      }
+
+      if (res.status === 400 || res.status === 401) {
+        throw new Error("Nom d'utilisateur ou mot de passe incorrect.");
+      }
       if (res.status === 404) {
         throw new Error("Compte introuvable ou identifiants incorrects.");
       }
       if (res.status >= 500) {
         throw new Error("Service indisponible, réessayez plus tard.");
       }
-      throw new Error(`Erreur API ${res.status}`);
+
+      throw new Error(
+        backendMessage ?? `Une erreur est survenue (code ${res.status}). Réessayez plus tard.`
+      );
     }
     return (await res.json()) as T;
+  } catch (err) {
+    if ((err as any)?.name === "AbortError") {
+      throw new Error("Délai d'attente dépassé, veuillez réessayer.");
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
