@@ -1,0 +1,88 @@
+========================================================================
+AUTOMATISATION DES PEERS WIREGUARD (172.16.x.0/24)
+========================================================================
+
+Ce script Python (update-wireguard-peers.py) automatise la configuration 
+reseau des clients WireGuard dans la base de donnees RadiusDesk.
+
+1. DESCRIPTION DU FONCTIONNEMENT
+--------------------------------
+Le script detecte les adresses IPv4 simples (ex: 10.0.0.5) dans la table 
+'wireguard_peers' et les transforme automatiquement au format attendu 
+par le systeme (ex: 172.16.5.0/24,10.0.0.5).
+
+Le script utilise le dernier octet de l'IP pour generer l'adresse reseau.
+Il utilise egalement un fichier cache pour ne pas traiter deux fois 
+le meme enregistrement.
+
+2. INSTALLATION DE LA BASE DE DONNEES
+-------------------------------------
+Executez ces commandes dans MySQL pour creer l'utilisateur dedie :
+
+CREATE USER IF NOT EXISTS 'wireguard_updater'@'localhost' 
+IDENTIFIED BY '<votre_mot_de_passe>';     ###DOIT CORRESPONDRE AU MOT DE PASSE CONTENU DANS LE SCRIPT.
+
+GRANT SELECT, UPDATE ON rd.wireguard_peers TO 'wireguard_updater'@'localhost';
+FLUSH PRIVILEGES;
+
+3. INSTALLATION DU SCRIPT
+-------------------------
+1. Emplacement du script : 
+   deploy/scripts/update-wireguard-peers.py
+
+2. Rendre le script executable :
+   chmod +x deploy/scripts/update-wireguard-peers.py
+
+3. Installer la dependance Python :
+   sudo apt update && sudo apt install python3-pip
+   pip3 install mysql-connector-python
+
+4. CONFIGURATION SYSTEMD (AUTOMATISATION)
+------------------------------------------
+Pour que le script tourne toutes les minutes, vous devez creer les 
+deux fichiers suivants :
+
+--- FICHIER 1 : /etc/systemd/system/update-wireguard-peers.service ---
+[Unit]
+Description=Mise a jour automatique des peers WireGuard
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/ubuntu/migration/deploy/scripts/update-wireguard-peers.py
+WorkingDirectory=/home/ubuntu/migration/deploy/scripts/
+User=ubuntu
+Group=ubuntu
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wireguard-updater
+Restart=on-failure
+RestartSec=10s
+
+--- FICHIER 2 : /etc/systemd/system/update-wireguard-peers.timer ---
+[Unit]
+Description=Execute la mise a jour des peers WireGuard toutes les minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=1s
+Unit=update-wireguard-peers.service
+
+[Install]
+WantedBy=timers.target
+
+5. ACTIVATION
+-------------
+Lancez les commandes suivantes pour demarrer l'automatisation :
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now update-wireguard-peers.timer
+
+6. VERIFICATION ET LOGS
+-----------------------
+- Verifier le statut du timer : systemctl status update-wireguard-peers.timer
+- Voir les logs du script : cat /home/ubuntu/logs/wireguard_updater.log
+- Voir les logs systeme : journalctl -u update-wireguard-peers.service
+========================================================================
