@@ -74,9 +74,9 @@ Rafraichir la page pour voir la mise à jour.
 s `0700`.
 
 #
-============================================================
+
 Script de correction d'adresses IP WireGuard pour RadiusDesk
-============================================================
+
 
 ##Problème identifié
 
