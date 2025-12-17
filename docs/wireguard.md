@@ -63,8 +63,78 @@
 L’agent appelle périodiquement `wireguard-servers/get-config-for-server.json` (avec la MAC), génère les fichiers `/etc/wireguard/<Name>.conf`, lève les interfaces via `wg-quick` puis remonte les statistiques avec `submit-report.json`. Pour un futur `80_wireguard.sh`, il suffira d’exécuter ce script puis d’approvisionner l’UI (via API ou migration).
 
 ## Points de vigilance
-- **Clés privées** : stockées dans `/var/lib/radiusdesk/wireguard`, permissions `0700`.
+- **Clés privées** : stockées dans `/var/lib/radiusdesk/wireguard`, permission
+
+Rafraichir la page pour voir la mise à jour.
 - **Rotation** : le GUI doit gérer la rotation des clés peers, mais la clé serveur est écrite dans le fichier lors de l’installation ; la rotation nécessite une action manuelle (wg set).
 - **Sauvegarde** : inclure `/etc/wireguard`, `/var/lib/radiusdesk/wireguard` et `/etc/radiusdesk/wireguard-agent.env` dans vos backups.
 - **NAT par interface** : lorsque “NAT Enabled” est coché, l’agent convertit automatiquement les hooks en règles `iptables/ip6tables` ciblant uniquement le sous-réseau WireGuard concerné et en règles `ufw route` `in on <wg> out on <uplink>`. Si la case est décochée, aucune règle n’est ajoutée et le trafic routé reste bloqué.
 - **Monitoring** : surveiller `wg show` pour détecter les peers inactifs et synchroniser avec le module GUI.
+
+s `0700`.
+
+#
+============================================================
+Script de correction d'adresses IP WireGuard pour RadiusDesk
+============================================================
+
+##Problème identifié
+
+La colonne ipv4_address de la table wireguard_peers contient désormais deux informations séparées par une virgule :
+
+L'adresse réseau PPPoE (ex : 172.16.2.0/24)
+
+L'adresse IP du pair (ex : 10.5.1.2)
+
+RadiusDesk ne parvient plus à extraire correctement l'adresse IP pour vérifier sa disponibilité, ce qui entraîne des doubles systématiques lors de la création de nouveaux comptes.
+
+##Solution
+Ce script Python permet de :
+
+Identifiant du dernier pair ajouté dans la table (ID le plus élevé).
+
+Vérifiez si son adresse IP est déjà utilisée par un autre homologue.
+
+Si c'est le cas, lui attribuer la première adresse IP disponible dans sa plage.
+
+Mettre à jour uniquement le champipv4_address du nouveau peer sans altérer les autres données.
+
+##Installation et configuration
+###Prérequis
+###Python 3.x
+
+MariaDB ou MySQL avec accès à la base de données RadiusDesk.
+
+Bibliothèque Pythonmysql-connector-python .
+
+##Installation des dependances
+
+pip install mysql-connector-python
+
+
+##Utilisation
+Ajouter un nouveau peer dans RadiusDesk : Via l'interface web, créez le peer normalement.
+
+Exécuter le script de correction :
+
+python3 deploy/scripts/add-ip-new-peers.py
+
+python3 add-ip-new-peers.py
+Vérification : Vérifiez dans l'interface RadiusDesk que le peer a bien reçu une adresse IP unique.
+
+###Processus détaillé
+Le script suit les étapes suivantes :
+
+Identification : Recherche du pair avec l'ID le plus élevé.
+
+Extraction : Isolation de l'adresse IP au sein de la chaîne ipv4_address.
+
+Vérification : Comparaison avec toutes les adresses IP déjà présentes en base de données.
+
+Attribution : Si un double est détecté, le script calcule la première IP libre :
+
+Instance 1 : Plage de 10.5.0.2 à 10.5.0.254
+
+Instance 2 : Plage de 10.5.1.2 à 10.5.1.254
+
+Mise à jour : Application de la nouvelle valeur dans la table wireguard_peers.
