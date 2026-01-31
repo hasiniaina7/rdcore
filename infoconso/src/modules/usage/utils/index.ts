@@ -26,7 +26,11 @@ export function formatDuration(seconds?: number | null): string {
 
 export function formatDateTime(value?: string | null): string {
   if (!value) return "—";
-  const date = new Date(value);
+  let date = new Date(value);
+  // Treat SQL strings "YYYY-MM-DD HH:MM:SS" as UTC by appending "Z"
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    date = new Date(value.replace(" ", "T") + "Z");
+  }
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("fr-FR", { timeZone: "Africa/Nairobi" });
 
