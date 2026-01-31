@@ -28,7 +28,8 @@ export function formatDateTime(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleString("fr-FR", { timeZone: "Africa/Nairobi" });
+
 }
 
 export function percentProgress(used?: number | null, cap?: number | null, fallback?: number | null): number | null {
@@ -61,7 +62,7 @@ export function combineSessions(list: SessionList): SessionRow[] {
       id: s.radacctid,
       nas: s.nasidentifier ?? "—",
       ip: s.framedipaddress ?? "—",
-      start: s.acctstarttime ?? "—",
+      start: formatDateTime(s.acctstarttime),
       duration: s.acctsessiontime != null ? formatDuration(s.acctsessiontime) : s.online_human ?? "—",
       data: formatBytes(totalBytes),
       active: !!s.active,

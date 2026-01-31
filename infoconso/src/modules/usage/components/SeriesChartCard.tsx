@@ -64,11 +64,11 @@ function formatBucketLabels(bucket: SeriesBucket) {
   }
 
   // On s'appuie sur un weekday EN stable pour mapper vers FR court.
-  const en = d.toLocaleDateString("en-US", { weekday: "short" }); // Mon, Tue...
+  const en = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "Africa/Nairobi" }); // Mon, Tue...
   const frDay = dayMap[en] ?? en;
 
-  const dayNum = d.toLocaleDateString("fr-FR", { day: "2-digit" });
-  const month = d.toLocaleDateString("fr-FR", { month: "short" }).replace(/\./g, "");
+  const dayNum = d.toLocaleDateString("fr-FR", { day: "2-digit", timeZone: "Africa/Nairobi" });
+  const month = d.toLocaleDateString("fr-FR", { month: "short", timeZone: "Africa/Nairobi" }).replace(/\./g, "");
 
   const dateLabel = `${dayNum} ${month}`;
   const fullLabel = `${frDay} ${dateLabel}`;
