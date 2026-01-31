@@ -63,12 +63,17 @@ function formatBucketLabels(bucket: SeriesBucket) {
     return { dayLabel: fallback, dateLabel: "—", fullLabel: fallback };
   }
 
-  // On s'appuie sur un weekday EN stable pour mapper vers FR court.
-  const en = d.toLocaleDateString("en-US", { weekday: "short", timeZone: "Africa/Nairobi" }); // Mon, Tue...
+  // Manual shift +3h to guarantee UTC+3 display
+  const offsetMs = 3 * 3600 * 1000;
+  // Use a new Date object shifted by offset
+  const shifted = new Date(d.getTime() + offsetMs);
+
+  // Use 'UTC' timezone on the shifted date so it prints the shifted time as-is
+  const en = shifted.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
   const frDay = dayMap[en] ?? en;
 
-  const dayNum = d.toLocaleDateString("fr-FR", { day: "2-digit", timeZone: "Africa/Nairobi" });
-  const month = d.toLocaleDateString("fr-FR", { month: "short", timeZone: "Africa/Nairobi" }).replace(/\./g, "");
+  const dayNum = shifted.toLocaleDateString("fr-FR", { day: "2-digit", timeZone: "UTC" });
+  const month = shifted.toLocaleDateString("fr-FR", { month: "short", timeZone: "UTC" }).replace(/\./g, "");
 
   const dateLabel = `${dayNum} ${month}`;
   const fullLabel = `${frDay} ${dateLabel}`;

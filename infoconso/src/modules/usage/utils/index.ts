@@ -32,7 +32,13 @@ export function formatDateTime(value?: string | null): string {
     date = new Date(value.replace(" ", "T") + "Z");
   }
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("fr-FR", { timeZone: "Africa/Nairobi" });
+  // Shift time by +3 hours (3 * 60 * 60 * 1000)
+  const offsetMs = 3 * 3600 * 1000;
+  const shiftedDate = new Date(date.getTime() + offsetMs);
+
+  // Format as French locale but forcefully in UTC timezone
+  // Since we shifted the time manually, 'UTC' display will effectively show 'UTC+3'
+  return shiftedDate.toLocaleString("fr-FR", { timeZone: "UTC" });
 
 }
 
