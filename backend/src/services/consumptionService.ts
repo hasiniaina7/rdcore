@@ -331,14 +331,20 @@ const verifyRadiusdeskCredentials = async (username: string, password: string): 
   // 1) PermanentUsers: comparer le mot de passe côté RadiusDesk
   try {
     const permanentResponse = await findPermanentUser(normalizedUsername);
-    const permanentRecord = extractFirstRecord(permanentResponse as any);
+
+    //Patch pour contourner collision de nom d'utilisateur
+    const permanentItems = (permanentResponse as any)?.items;
+    const permanentRecord = Array.isArray(permanentItems)
+      ? permanentItems.find(
+        (item: any) =>
+          typeof item?.username === 'string' &&
+          item.username.trim() === normalizedUsername
+    )
+      : undefined;
     if (permanentRecord) {
-      const recordUsername =
-        typeof (permanentRecord as any).username === 'string'
-          ? ((permanentRecord as any).username as string).trim()
-          : undefined;
+      const recordUsername = (permanentRecord as any).username?.trim();
       if (recordUsername && recordUsername === normalizedUsername) {
-        const userId = (permanentRecord as any).id;
+          const userId = (permanentRecord as any).id;
         if (userId != null) {
           const passwordPayload = await getPermanentUserPassword(String(userId));
           const storedPassword =
@@ -350,6 +356,11 @@ const verifyRadiusdeskCredentials = async (username: string, password: string): 
           }
         }
       }
+    
+    //Patch pour contourner collision de nom d'utilisateur
+
+
+
     }
   } catch {
     // Ignore lookup issues and fall back to vouchers.
