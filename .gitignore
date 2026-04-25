@@ -10,3 +10,23 @@ backups/
 
 # Ignore any files whose name starts with "important"
 important*
+
+# Secrets
+*.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+
+# Temp files
+*.bak
+*.tmp
+
+# Database
+tools/mikrotik-maintenance/data/*.db
+
+# Logs
+tools/mikrotik-maintenance/logs/*.log
