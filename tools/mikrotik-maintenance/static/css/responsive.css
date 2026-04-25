@@ -1,0 +1,24 @@
+﻿@media (max-width: 992px) {
+  .hero-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 576px) {
+  .hero-title {
+    font-size: 1.8rem;
+  }
+
+  .hero {
+    padding: 32px 0 20px;
+  }
+
+  .section-card {
+    border-radius: 12px;
+  }
+
+  .logs {
+    max-height: 220px;
+  }
+}

@@ -1,0 +1,167 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600&display=swap");
+
+:root {
+  --primary: #2c3e50;
+  --secondary: #3498db;
+  --success: #27ae60;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --light: #f8f9fa;
+  --dark: #343a40;
+  --shadow: 0 12px 30px rgba(44, 62, 80, 0.12);
+}
+
+body {
+  font-family: "IBM Plex Sans", sans-serif;
+  background: radial-gradient(circle at top, #f2f6ff 0%, #f8f9fa 45%, #eef2f7 100%);
+  color: var(--dark);
+}
+
+.navbar {
+  background: var(--primary) !important;
+}
+
+.hero {
+  padding: 40px 0 30px;
+  background: linear-gradient(120deg, rgba(44, 62, 80, 0.98), rgba(52, 152, 219, 0.92));
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  right: -120px;
+  top: -140px;
+}
+
+.hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.hero-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.hero-subtitle {
+  opacity: 0.85;
+  max-width: 560px;
+}
+
+.hero-status {
+  display: flex;
+  align-items: center;
+}
+
+.section-card {
+  border: none;
+  box-shadow: var(--shadow);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.section-card .card-header {
+  background: #fff;
+  font-weight: 600;
+}
+
+.progress {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.progress-bar {
+  background: var(--secondary);
+  transition: width 0.4s ease;
+}
+
+.timer {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.logs {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 16px;
+  border-radius: 12px;
+  min-height: 180px;
+  max-height: 260px;
+  overflow-y: auto;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.9rem;
+}
+
+.toast {
+  border-radius: 12px;
+}
+
+.badge.text-bg-warning {
+  background: var(--warning) !important;
+}
+
+.badge.text-bg-success {
+  background: var(--success) !important;
+}
+
+.badge.text-bg-danger {
+  background: var(--danger) !important;
+}
+
+.btn-primary {
+  background: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.btn-outline-primary {
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+
+.btn-outline-primary:hover {
+  background: var(--secondary);
+  color: white;
+}
+
+.card-header button {
+  font-size: 0.8rem;
+}
+
+.tooltip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(52, 152, 219, 0.15);
+  color: var(--secondary);
+  font-size: 0.75rem;
+  margin-left: 6px;
+  cursor: help;
+}
+
+.quick-steps {
+  padding-left: 1.2rem;
+  color: var(--dark);
+}
+
+.quick-steps li {
+  margin-bottom: 4px;
+}
+
+.btn .spinner-border {
+  vertical-align: middle;
+}
