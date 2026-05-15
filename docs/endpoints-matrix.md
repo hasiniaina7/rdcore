@@ -121,4 +121,4 @@ Error patterns expected by our backend:
 - RadiusDesk throttling or DB failure → backend returns `500`.
 - Omada controller errors bubble up through `/connect/{mode}` as `502` or `401`.
 
-These references complement `docs/openapi/openapi.yaml` and guarantee the frontend/backends align with genuine upstream behaviour (permanent user lookup, voucher validation, radacct kick, Omada login/auth flows).
+These references complement `docs/api/openapi.yaml` and guarantee the apps/frontend-portal-web-personalized/backends align with genuine upstream behaviour (permanent user lookup, voucher validation, radacct kick, Omada login/auth flows).

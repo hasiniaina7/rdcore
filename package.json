@@ -1,27 +1,28 @@
 {
   "name": "captive-portail",
   "private": true,
-  "version": "0.1.0",
-  "description": "Monorepo Captive Portal (frontend React + backend Node) pour Omada/Radiusdesk",
+  "version": "0.2.0",
+  "description": "Monorepo Captive Portal (portal-api + portal-web + usage-dashboard-web)",
   "scripts": {
     "bootstrap": "npm install --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "start:backend": "npm --workspace backend run start",
-    "start:frontend": "npm --workspace frontend run dev",
-    "start:infoconso": "npm --workspace infoconso run dev",
-    "docs:serve": "redocly preview-docs docs/openapi/openapi.yaml",
-    "docs:lint": "spectral lint docs/openapi/openapi.yaml",
+    "start:backend": "npm --workspace apps/backend-portal-api-rd-omada run start",
+    "start:frontend": "npm --workspace apps/frontend-portal-web-personalized run dev --",
+    "start:infoconso": "npm --workspace apps/frontend-infoconso-rd run dev --",
+    "docs:serve": "redocly preview-docs docs/api/openapi.yaml",
+    "docs:lint": "spectral lint docs/api/openapi.yaml",
     "docs:test": "npm run docs:dredd && npm run docs:newman",
-    "docs:dredd": "dredd docs/openapi/openapi.yaml http://localhost:4000 --no-color || true",
-    "docs:newman": "openapi2postmanv2 -s docs/openapi/openapi.yaml -o /tmp/postman.json && newman run /tmp/postman.json",
-    "docs:bundle": "redocly bundle docs/openapi/openapi.yaml -o docs/openapi/bundle.yaml"
+    "docs:dredd": "dredd docs/api/openapi.yaml http://localhost:4000 --no-color || true",
+    "docs:newman": "openapi2postmanv2 -s docs/api/openapi.yaml -o /tmp/postman.json && newman run /tmp/postman.json",
+    "docs:bundle": "redocly bundle docs/api/openapi.yaml -o docs/api/bundle.yaml",
+    "validate:structure": "node deployments/scripts/validate_structure.mjs"
   },
   "workspaces": [
-    "backend",
-    "frontend",
-    "infoconso"
+    "apps/backend-portal-api-rd-omada",
+    "apps/frontend-portal-web-personalized",
+    "apps/frontend-infoconso-rd"
   ],
   "overrides": {
     "react": "18.3.1",
