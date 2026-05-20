@@ -160,13 +160,19 @@ Atention, la regeneration entrainera une reinitalisation , on copie avant
 ```
 sudo -s
 cp /etc/freeradius/3.0/clients.conf /home/
+
+Utiliser la commande suivante pour redemaarer (sans regeneration)
 ```
-Regenerer avec : 
+sudo systemctl start freeradius
+```
+
+```
+Regenerer avec ceci s'il y a erreur: 
 ```
 cd /var/www/rdcore/cake4/rd_cake/setup/radius
 tar czf freeradius-radiusdesk.tar.gz freeradius
 ```
-ou 
+ou avec ceci s'il y a erreur 
 ```
 sudo systemctl stop freeradius
 sudo tar xzf /var/www/rdcore/cake4/rd_cake/setup/radius/freeradius-radiusdesk.tar.gz --directory /etc
