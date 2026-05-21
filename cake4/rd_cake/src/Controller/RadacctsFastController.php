@@ -335,12 +335,15 @@ class RadacctsFastController extends AppController {
 		
 		
 		$e_username = $this->{$this->main_model}->find()->where(['Radaccts.username' => $username,'Radaccts.acctstoptime IS NULL'])->all();
+        $results = [];
 		foreach($e_username as $ent){
 			$data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
+            $results[] = array_merge(['radacctid' => (int)$ent->radacctid], $data);
 		}	
 		$this->set([
             'success'       => true,
-            'data'          => $data
+            'data'          => $data,
+            'results'       => $results
         ]);
         $this->viewBuilder()->setOption('serialize', true);
 	
@@ -360,8 +363,20 @@ class RadacctsFastController extends AppController {
         $token 	= $q_data['token'];
 
         
-        $some_session_closed    = false;
         $count                  = 0;
+        $closedCount            = 0;
+        $stats                  = [
+            'ack' => 0,
+            'not_found' => 0,
+            'api_error' => 0,
+            'auth_error' => 0,
+            'timeout' => 0,
+            'nak' => 0,
+            'stderr' => 0,
+            'sent' => 0,
+            'not_supported' => 0
+        ];
+        $results                = [];
         $msg                    = 'Could not locate session';
         $data                   = ['title' => 'Session Not Found', 'message' => $msg, 'type' =>'warn'];
         $req_q      			= $this->request->getQuery();
@@ -369,32 +384,81 @@ class RadacctsFastController extends AppController {
         foreach(array_keys($req_q) as $key){
             if(preg_match('/^\d+/',$key)){
                 $ent = $this->{$this->main_model}->find()->where(['Radaccts.radacctid' => $key])->first();
+                if(!$ent){
+                    continue;
+                }
                 $count++;               
                 if($ent->acctstoptime !== null){
-                    $some_session_closed = true;
+                    $closedCount++;
+                    $results[] = [
+                        'radacctid' => (int)$key,
+                        'status'    => 'already_closed',
+                        'ack'       => false
+                    ];
                 }else{
-                    $data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
+                    $result = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
+                    $results[] = array_merge(['radacctid' => (int)$key], $result);
+                    $status = (string)($result['status'] ?? 'stderr');
+                    if(array_key_exists($status, $stats)){
+                        $stats[$status] = $stats[$status] + 1;
+                    }else{
+                        $stats['stderr'] = $stats['stderr'] + 1;
+                    }
                 }
             }
         }  
         
-        if($count >0){      
-            $data = ['title' => 'Disconnect Sent', 'message' => 'Disconnect Instructions Sent', 'type' =>'info'];
-        }   
-
-        if(($some_session_closed)&&($count>0)){
-            $msg = 'Sessions Is already Closed';
-            if($count > 1){
-                $msg = 'Some Sessions Are already Closed';
-            }
-            $data = ['title' => 'Session Closed Already', 'message' => $msg, 'type' =>'warn'];
-        }
+        $data = $this->buildKickActiveResponseData($count, $closedCount, $stats, $results);
     
         $this->set([
             'success'       => true,
             'data'          => $data
         ]);
         $this->viewBuilder()->setOption('serialize', true);
+    }
+
+    public function buildKickActiveResponseData(int $count, int $closedCount, array $stats, array $results): array
+    {
+        $default = ['title' => 'Session Not Found', 'message' => 'Could not locate session', 'type' =>'warn'];
+        if($count === 0){
+            return $default;
+        }
+
+        if($closedCount === $count){
+            $msg = 'Sessions Is already Closed';
+            if($count > 1){
+                $msg = 'Some Sessions Are already Closed';
+            }
+            return ['title' => 'Session Closed Already', 'message' => $msg, 'type' =>'warn'];
+        }
+
+        if(($stats['not_found'] + $stats['api_error'] + $stats['auth_error'] + $stats['timeout'] + $stats['nak'] + $stats['stderr'] + $stats['not_supported']) > 0){
+            return [
+                'title'      => 'Disconnect Partially Failed',
+                'message'    => "ACK {$stats['ack']}, not-found {$stats['not_found']}, auth {$stats['auth_error']}, timeout {$stats['timeout']}, api {$stats['api_error']}, unsupported {$stats['not_supported']}, errors {$stats['stderr']}",
+                'type'       => 'warn',
+                'kick_stats' => $stats,
+                'results'    => $results
+            ];
+        }
+
+        if($stats['ack'] === 0 && $stats['sent'] > 0){
+            return [
+                'title'      => 'Disconnect Sent',
+                'message'    => "Disconnect request sent {$stats['sent']} time(s)",
+                'type'       => 'info',
+                'kick_stats' => $stats,
+                'results'    => $results
+            ];
+        }
+
+        return [
+            'title'      => 'Disconnect Completed',
+            'message'    => "Disconnect acknowledged by target API/NAS (ACK {$stats['ack']})",
+            'type'       => 'info',
+            'kick_stats' => $stats,
+            'results'    => $results
+        ];
     }
 
     public function closeOpen(){

@@ -22,10 +22,12 @@
 #FUP Run every minute 
 * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake fup >> /dev/null 2>&1
 
+#Omada quota enforcement (hard cap) every minute for near-real-time disconnect attempts
+* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake omada:enforce-quota --window 180 --nas-filter TP-Link --retry-max 2 --cooldown 45 >> /dev/null 2>&1
+
 #OTP Cleanup  
 */5 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake otp_cleanup >> /dev/null 2>&1
 
 #* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats --server 127.0.0.1 --port 18121 --secret adminsecret --attrs /etc/freeradius/status-all.txt --tag main >> /var/log/freeradius-stats.log 2>&1
 * * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats >> /dev/null 2>&1
-
 

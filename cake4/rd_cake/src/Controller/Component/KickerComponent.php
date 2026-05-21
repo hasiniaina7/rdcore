@@ -8,15 +8,22 @@
 
 namespace App\Controller\Component;
 
+use App\Service\OmadaApiClient;
+use App\Service\OmadaApiSettingsService;
 use Cake\Controller\Component;
 use Cake\Core\Configure;
+use Cake\Log\Log;
 use Cake\ORM\TableRegistry;
 use Cake\Http\Client;
 
 
 class KickerComponent extends Component {
 
-    protected $radclient;
+    protected $radclient = 'radclient';
+    protected $coaSecret = 'testing123';
+    protected $coaPort = 3799;
+    protected $radclientTimeout = 8;
+    protected bool $omadaCoaFallbackEnabled = false;
     //protected $pod_command = '/etc/MESHdesk/pod.lua';
     protected $pod_command 	= 'chilli_query logout mac';
     protected $podMdHostapd = '/etc/MESHdesk/utils/hostapd_disconnect.lua';
@@ -47,14 +54,42 @@ class KickerComponent extends Component {
         $this->NodeActions              = TableRegistry::get('NodeActions');     
         //Accel
         $this->AccelServers             = TableRegistry::get('AccelServers');
-        $this->AccelSessions            = TableRegistry::get('AccelSessions');         
+        $this->AccelSessions            = TableRegistry::get('AccelSessions');
+
+        $this->radclient = (string)(Configure::read('RadiusDesk.radclient_bin') ?? $this->radclient);
+        $this->coaPort = (int)(Configure::read('RadiusDesk.coa_port') ?? $this->coaPort);
+        Configure::load('Omada', 'default');
+        $this->omadaCoaFallbackEnabled = (bool)(Configure::read('OmadaOpenApi.enable_coa_fallback') ?? false);
     }
 
     public function kick($ent,$token){
+        if(!$ent){
+            return [
+                'strategy'   => 'none',
+                'status'     => 'error',
+                'ack'        => false,
+                'stderr'     => 'Missing accounting entity',
+                'radacctid'  => null
+            ];
+        }
+
         //---Location of radclient----
         $nasidentifier  = $ent->nasidentifier;
         $radacctid      = $ent->radacctid;
         $nasipaddress   = $ent->nasipaddress;
+        $result = [
+            'strategy'       => 'none',
+            'status'         => 'not_supported',
+            'ack'            => false,
+            'stderr'         => null,
+            'radacctid'      => $radacctid,
+            'nasidentifier'  => $nasidentifier,
+            'nasipaddress'   => $nasipaddress,
+        ];
+
+        if($this->isOmadaNas($ent)){
+            return $this->kickOmadaSession($ent, 'nasidentifier');
+        }
                 
      	//First we try to locate the client under dynamic_clients
      	$dc = $this->DynamicClients->find()
@@ -63,9 +98,21 @@ class KickerComponent extends Component {
      		->first();
      		
      	if($dc){
+            if($this->isOmadaDynamicClient($dc, $ent)){
+                return $this->kickOmadaSession($ent, 'dynamic-client');
+            }
      	   	    
      	    if($dc->type == $this->typeAccel){ //It is type AccelRadiusdesk -> try to locate the session and set the disconnect flag of the session
      	        $this->kickAccelSession($ent);
+                return [
+                    'strategy'       => 'accel-flag',
+                    'status'         => 'sent',
+                    'ack'            => false,
+                    'stderr'         => null,
+                    'radacctid'      => $radacctid,
+                    'nasidentifier'  => $nasidentifier,
+                    'nasipaddress'   => $nasipaddress,
+                ];
      	    }
      	
      	    //--------------------
@@ -80,6 +127,15 @@ class KickerComponent extends Component {
      				$this->kickApUser($ent,$dc->cloud_id,$token); 			
      			}
      			sleep(1); //Give MQTT time to do its thing....  			
+                return [
+                    'strategy'       => 'coova-command',
+                    'status'         => 'sent',
+                    'ack'            => false,
+                    'stderr'         => null,
+                    'radacctid'      => $radacctid,
+                    'nasidentifier'  => $nasidentifier,
+                    'nasipaddress'   => $nasipaddress,
+                ];
      		}
      		
      		//-------------------
@@ -96,11 +152,20 @@ class KickerComponent extends Component {
      				$this->kickApHostaMac($ent,$dc->cloud_id,$token); 			
      			}
      			sleep(1); //Give MQTT time to do its thing....    		
+                return [
+                    'strategy'       => 'hostapd-command',
+                    'status'         => 'sent',
+                    'ack'            => false,
+                    'stderr'         => null,
+                    'radacctid'      => $radacctid,
+                    'nasidentifier'  => $nasidentifier,
+                    'nasipaddress'   => $nasipaddress,
+                ];
      		}
      	
      		
      		if($dc->type == $this->typeJuniper){ //SEND IT A POD
-     	        $this->kickJuniperSession($ent);
+     	        return $this->kickJuniperSession($ent);
      	    }
      		    		
      		if($dc->type == $this->typeMtApi){ 
@@ -126,7 +191,16 @@ class KickerComponent extends Component {
 					}
 				}         
 				unset($mt_data['proto']); 
-				$this->MikrotikApi->kickRadius($ent,$mt_data);   		   		
+				$this->MikrotikApi->kickRadius($ent,$mt_data);
+                return [
+                    'strategy'       => 'mikrotik-api',
+                    'status'         => 'sent',
+                    'ack'            => false,
+                    'stderr'         => null,
+                    'radacctid'      => $radacctid,
+                    'nasidentifier'  => $nasidentifier,
+                    'nasipaddress'   => $nasipaddress,
+                ];
      		}     		  		   	
      	}
      	
@@ -137,9 +211,12 @@ class KickerComponent extends Component {
      		->first();
      		
         if($nas){
+            if($this->isOmadaNas($nas)){
+                return $this->kickOmadaSession($ent, 'nas-table');
+            }
         
             if($nas->type == $this->typeJuniper){ //SEND IT A POD
-     	        $this->kickJuniperSession($ent);
+     	        return $this->kickJuniperSession($ent);
      	    }
      	    
      	    if($nas->type == $this->typeMtApi){ 
@@ -165,13 +242,22 @@ class KickerComponent extends Component {
 					}
 				}         
 				unset($mt_data['proto']); 
-				$this->MikrotikApi->kickRadius($ent,$mt_data);   		   		
+				$this->MikrotikApi->kickRadius($ent,$mt_data);
+                return [
+                    'strategy'       => 'mikrotik-api',
+                    'status'         => 'sent',
+                    'ack'            => false,
+                    'stderr'         => null,
+                    'radacctid'      => $radacctid,
+                    'nasidentifier'  => $nasidentifier,
+                    'nasipaddress'   => $nasipaddress,
+                ];
      		}
      	        
         }
         //--- END NAS TABLE ---
              
-        return $data = [];       
+        return $result;       
     }
     
     private function kickAccelSession($ent){
@@ -186,14 +272,17 @@ class KickerComponent extends Component {
     }
     
     private function kickJuniperSession($ent){  
-        //-- Sample Disconnect ---
-        //echo "Acct-​Session-​ID='2040',User-Name='zaguy@zarealm.co.za'" |radclient -c '1' -n '3' -r '3' -t '3' -x '127.0.0.1:3799' 'disconnect' 'testing123'       
-        $sessionid = $ent->acctsessionid;
-        $username  = $ent->username;
-        $ip        = $ent->nasipaddress;       
-        $fwd_ip    = $ip; // You can replace this with a central IP to forward it to       
-        $secret    = 'testing123';      
-        shell_exec("echo \"Acct-Session-ID='$sessionid',User-Name='$username',NAS-IP-Address='$ip'\" |radclient -c '1' -n '3' -r '3' -t '3' -x '$fwd_ip:3799' 'disconnect' '$secret'");
+        $attributes = [
+            'Acct-Session-Id' => (string)$ent->acctsessionid,
+            'User-Name'       => (string)$ent->username,
+            'NAS-IP-Address'  => (string)$ent->nasipaddress
+        ];
+        return $this->sendRadclientDisconnect(
+            (string)$ent->nasipaddress,
+            $attributes,
+            $this->coaSecret,
+            'juniper_disconnect'
+        );
     } 
          
     private function kickMeshNodeUser($ent,$cloud_id,$token){      
@@ -304,6 +393,319 @@ class KickerComponent extends Component {
 			  ['type' => 'json']
 			);   	
     	}   
+    }
+
+    public function isOmadaNas($nas): bool
+    {
+        $identifier = (string)($nas->nasidentifier ?? '');
+        $type = (string)($nas->type ?? '');
+        $name = (string)($nas->nasname ?? '');
+
+        return $this->isOmadaIdentifier($identifier)
+            || $this->isOmadaIdentifier($name)
+            || stripos($type, 'omada') !== false;
+    }
+
+    public function isOmadaDynamicClient($dc, $ent = null): bool
+    {
+        $type = (string)($dc->type ?? '');
+        $identifier = (string)($dc->nasidentifier ?? '');
+        if (stripos($type, 'omada') !== false || $this->isOmadaIdentifier($identifier)) {
+            return true;
+        }
+
+        if ($ent) {
+            return $this->isOmadaNas($ent);
+        }
+
+        return false;
+    }
+
+    public function buildOmadaDisconnectAttributes($ent): array
+    {
+        $attributes = [
+            'User-Name'          => (string)($ent->username ?? ''),
+            'Calling-Station-Id' => (string)($ent->callingstationid ?? ''),
+            'Acct-Session-Id'    => (string)($ent->acctsessionid ?? ''),
+        ];
+
+        $nasPort = $ent->nasportid ?? $ent->nasport ?? null;
+        if ($nasPort !== null && $nasPort !== '') {
+            $attributes['NAS-Port'] = (string)$nasPort;
+        }
+
+        return $attributes;
+    }
+
+    public function parseDisconnectResult(string $stdout, int $exitCode): array
+    {
+        $status = 'stderr';
+        $ack = false;
+
+        if (stripos($stdout, 'Disconnect-ACK') !== false) {
+            $status = 'ack';
+            $ack = true;
+        } elseif (stripos($stdout, 'Disconnect-NAK') !== false) {
+            $status = 'nak';
+        } elseif (
+            $exitCode === 124
+            || stripos($stdout, 'No reply from server') !== false
+            || stripos($stdout, 'no response') !== false
+            || stripos($stdout, 'timed out') !== false
+        ) {
+            $status = 'timeout';
+        }
+
+        return [
+            'status' => $status,
+            'ack'    => $ack
+        ];
+    }
+
+    private function kickOmadaSession($ent, string $route): array
+    {
+        $apiResult = $this->kickOmadaSessionViaApi($ent, $route);
+        if ($apiResult !== null) {
+            return $apiResult;
+        }
+
+        if (!$this->omadaCoaFallbackEnabled) {
+            return [
+                'strategy' => 'omada-openapi-v1',
+                'status' => 'api_error',
+                'ack' => false,
+                'stderr' => 'Omada API configuration missing or disabled',
+                'radacctid' => $ent->radacctid ?? null,
+                'nasidentifier' => $ent->nasidentifier ?? null,
+                'nasipaddress' => $ent->nasipaddress ?? null,
+                'route' => $route,
+                'omada' => [
+                    'endpoint' => null,
+                    'http_code' => null,
+                    'correlation' => null,
+                ],
+            ];
+        }
+
+        $nasIp = (string)($ent->nasipaddress ?? '');
+        $attributes = $this->buildOmadaDisconnectAttributes($ent);
+        $result = $this->sendRadclientDisconnect($nasIp, $attributes, $this->coaSecret, 'omada_disconnect_coa_fallback');
+        $legacyStatus = (string)($result['status'] ?? 'stderr');
+        if ($legacyStatus === 'ack') {
+            $result['status'] = 'ack';
+        } elseif ($legacyStatus === 'timeout') {
+            $result['status'] = 'timeout';
+        } else {
+            $result['status'] = 'api_error';
+        }
+        $result['route'] = $route;
+        $result['request'] = [
+            'target' => "{$nasIp}:{$this->coaPort}",
+            'attributes' => $attributes
+        ];
+        $result['omada'] = [
+            'fallback' => 'coa',
+            'endpoint' => null,
+            'http_code' => null,
+            'correlation' => null,
+        ];
+
+        return $result;
+    }
+
+    protected function kickOmadaSessionViaApi($ent, string $route): ?array
+    {
+        $settings = $this->resolveOmadaApiSettings();
+        if ($settings === null) {
+            return null;
+        }
+
+        if (empty($settings['base_url']) || empty($settings['omadac_id']) || empty($settings['site_id'])) {
+            return [
+                'strategy' => 'omada-openapi-v1',
+                'status' => 'api_error',
+                'ack' => false,
+                'stderr' => 'Omada API configuration incomplete (base_url/omadac_id/site_id)',
+                'radacctid' => $ent->radacctid ?? null,
+                'nasidentifier' => $ent->nasidentifier ?? null,
+                'nasipaddress' => $ent->nasipaddress ?? null,
+                'route' => $route,
+                'omada' => [
+                    'endpoint' => null,
+                    'http_code' => null,
+                    'correlation' => null,
+                ],
+            ];
+        }
+
+        $ctx = [
+            'client_mac' => (string)($ent->callingstationid ?? ''),
+            'username' => (string)($ent->username ?? ''),
+            'acct_session_id' => (string)($ent->acctsessionid ?? ''),
+        ];
+
+        $client = $this->buildOmadaApiClient($settings);
+        $result = $client->disconnectWithFallback($ctx);
+        $status = (string)($result['status'] ?? 'api_error');
+
+        $kick = [
+            'strategy' => 'omada-openapi-v1',
+            'status' => $status,
+            'ack' => ((bool)($result['ack'] ?? false) || $status === 'ack'),
+            'stderr' => $status === 'ack' ? null : (string)($result['error'] ?? 'Omada API request failed'),
+            'radacctid' => $ent->radacctid ?? null,
+            'nasidentifier' => $ent->nasidentifier ?? null,
+            'nasipaddress' => $ent->nasipaddress ?? null,
+            'latency_ms' => (int)($result['latency_ms'] ?? 0),
+            'route' => $route,
+            'omada' => [
+                'endpoint' => $result['endpoint'] ?? null,
+                'http_code' => $result['http_code'] ?? null,
+                'correlation' => $result['correlation'] ?? null,
+                'source' => $settings['source'] ?? 'unknown',
+            ],
+        ];
+
+        $this->logOmadaKickAudit($kick, $ent);
+
+        return $kick;
+    }
+
+    protected function resolveOmadaApiSettings(): ?array
+    {
+        $service = new OmadaApiSettingsService();
+        return $service->getActiveConfig();
+    }
+
+    protected function buildOmadaApiClient(array $settings): OmadaApiClient
+    {
+        return new OmadaApiClient($settings);
+    }
+
+    protected function logOmadaKickAudit(array $kick, $ent): void
+    {
+        $payload = [
+            'timestamp' => gmdate('c'),
+            'radacctid' => (int)($ent->radacctid ?? 0),
+            'username' => (string)($ent->username ?? ''),
+            'status' => (string)($kick['status'] ?? 'api_error'),
+            'strategy' => (string)($kick['strategy'] ?? 'omada-openapi-v1'),
+            'endpoint' => $kick['omada']['endpoint'] ?? null,
+            'http_code' => $kick['omada']['http_code'] ?? null,
+            'latency_ms' => (int)($kick['latency_ms'] ?? 0),
+            'correlation' => $kick['omada']['correlation'] ?? null,
+        ];
+        Log::info('[KickAudit] ' . json_encode($payload, JSON_UNESCAPED_SLASHES));
+    }
+
+    protected function sendRadclientDisconnect(string $nasIp, array $attributes, string $secret, string $strategy): array
+    {
+        $base = [
+            'strategy'      => $strategy,
+            'status'        => 'error',
+            'ack'           => false,
+            'stderr'        => null,
+            'nasipaddress'  => $nasIp,
+            'port'          => $this->coaPort,
+        ];
+
+        if ($nasIp === '') {
+            $base['stderr'] = 'Missing NAS IP';
+            return $base;
+        }
+
+        $payload = $this->buildRadclientPayload($attributes);
+        if ($payload === '') {
+            $base['stderr'] = 'Missing disconnect attributes';
+            return $base;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'rd-coa-');
+        if ($tmp === false) {
+            $base['stderr'] = 'Unable to create temporary request file';
+            return $base;
+        }
+
+        $start = microtime(true);
+        $output = '';
+        $exitCode = 1;
+
+        try {
+            file_put_contents($tmp, $payload . PHP_EOL);
+            $target = $nasIp . ':' . $this->coaPort;
+            $command = sprintf(
+                'timeout %d %s -x -r 1 -t 3 %s disconnect %s < %s 2>&1',
+                $this->radclientTimeout,
+                escapeshellcmd($this->radclient),
+                escapeshellarg($target),
+                escapeshellarg($secret),
+                escapeshellarg($tmp)
+            );
+
+            $lines = [];
+            exec($command, $lines, $exitCode);
+            $output = trim(implode("\n", $lines));
+        } finally {
+            @unlink($tmp);
+        }
+
+        $parsed = $this->parseDisconnectResult($output, $exitCode);
+        $latencyMs = (int)round((microtime(true) - $start) * 1000);
+
+        $audit = [
+            'timestamp'    => gmdate('c'),
+            'nas_target'   => $nasIp . ':' . $this->coaPort,
+            'session_id'   => (string)($attributes['Acct-Session-Id'] ?? ''),
+            'username'     => (string)($attributes['User-Name'] ?? ''),
+            'status'       => $parsed['status'],
+            'latency_ms'   => $latencyMs,
+            'exit_code'    => $exitCode,
+        ];
+        Log::info('[KickAudit] ' . json_encode($audit, JSON_UNESCAPED_SLASHES));
+
+        return [
+            'strategy'      => $strategy,
+            'status'        => $parsed['status'],
+            'ack'           => $parsed['ack'],
+            'stderr'        => ($parsed['status'] === 'stderr' || $parsed['status'] === 'timeout' || $parsed['status'] === 'nak')
+                ? $output
+                : null,
+            'stdout'        => $output,
+            'nasipaddress'  => $nasIp,
+            'port'          => $this->coaPort,
+            'latency_ms'    => $latencyMs,
+            'exit_code'     => $exitCode,
+        ];
+    }
+
+    protected function buildRadclientPayload(array $attributes): string
+    {
+        $lines = [];
+        foreach ($attributes as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+            if ($key === 'NAS-Port' && is_numeric($value)) {
+                $lines[] = $key . ' = ' . (int)$value;
+                continue;
+            }
+            $escaped = str_replace(['\\', '"'], ['\\\\', '\"'], (string)$value);
+            $lines[] = $key . ' = "' . $escaped . '"';
+        }
+
+        $lines[] = 'Message-Authenticator = 0x00';
+        return implode(PHP_EOL, $lines);
+    }
+
+    private function isOmadaIdentifier(string $value): bool
+    {
+        if ($value === '') {
+            return false;
+        }
+
+        return stripos($value, 'tp-link') !== false
+            || stripos($value, 'omada') !== false
+            || stripos($value, 'tplink') !== false;
     }
 
 }

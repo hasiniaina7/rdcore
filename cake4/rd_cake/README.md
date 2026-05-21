@@ -51,3 +51,27 @@ Other environment agnostic settings can be changed in `config/app.php`.
 The app skeleton uses [Milligram](https://milligram.io/) (v1.3) minimalist CSS
 framework by default. You can, however, replace it with any other library or
 custom styles.
+
+## Omada API Access (Secure Location Reference)
+
+Omada OpenAPI v1 credentials are stored in database table `omada_api_settings` (not in source files).
+
+- Storage location:
+`omada_api_settings.api_client_id` + encrypted `omada_api_settings.api_client_secret` (preferred OAuth client-credentials mode)
+`omada_api_settings.api_username` + encrypted `omada_api_settings.api_password` (authorization-code mode support)
+- Access control: read/write endpoints are admin-only (`OmadaApiSettingsController`)
+- Default controller endpoint: `https://167.86.71.186:8043`
+- Default `omadac_id`: `5b6a916cf5c6ddfd396f85560f0c4d96`
+
+Safe admin update workflow:
+
+1. Authenticate with an admin token.
+2. Read current state from `GET /omada-api-settings/view.json`.
+3. Update with `POST /omada-api-settings/edit.json` and send secret fields only when rotating/changing them (`api_password`, `api_client_secret`).
+4. Verify `enabled`, `site_id`, and connectivity before relying on quota enforcement.
+
+Security reminders:
+
+- Never commit cleartext Omada credentials to git, config files, logs, or CLI history.
+- Rotate OpenAPI secrets on a regular schedule (`api_password` / `api_client_secret`) and immediately after staff/vendor access changes.
+- Keep `OMADA_OPENAPI_ENABLE_COA_FALLBACK=false` unless temporary rollback is explicitly required.
