@@ -1,0 +1,13 @@
+diff --git a/cake4/rd_cake/vendor/cakephp/chronos/src/Traits/FactoryTrait.php b/cake4/rd_cake/vendor/cakephp/chronos/src/Traits/FactoryTrait.php
+index 4d14ca5f..caf8d8b8 100644
+--- a/cake4/rd_cake/vendor/cakephp/chronos/src/Traits/FactoryTrait.php
++++ b/cake4/rd_cake/vendor/cakephp/chronos/src/Traits/FactoryTrait.php
+@@ -336,7 +336,7 @@ trait FactoryTrait
+      * @param \DateTimeZone|string|null $tz The DateTimeZone object or timezone name the new instance should use.
+      * @return static
+      */
+-    public static function createFromTimestamp(int $timestamp, $tz = null): ChronosInterface
++    public static function createFromTimestamp(int|float $timestamp, $tz = null): static
+     {
+         $instance = static::now($tz)->setTimestamp($timestamp);
+         if (get_class($instance) === ChronosDate::class) {

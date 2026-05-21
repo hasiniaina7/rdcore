@@ -136,9 +136,8 @@ if (( DO_PATCHES )); then
   delete_patches
 fi
 
-if (( ! DO_ALL && -z "$PHASE" && ! DO_PATCHES )); then
+if (( ! DO_ALL && ! DO_PATCHES )) && [[ -z "$PHASE" ]]; then
   usage; exit 1
 fi
 
 exit 0
-

@@ -1,0 +1,685 @@
+diff --git a/cake4/rd_cake/src/Controller/Component/CountsComponent.php b/cake4/rd_cake/src/Controller/Component/CountsComponent.php
+index 3040fd32..63c9b1d0 100644
+--- a/cake4/rd_cake/src/Controller/Component/CountsComponent.php
++++ b/cake4/rd_cake/src/Controller/Component/CountsComponent.php
+@@ -13,6 +13,7 @@ use Cake\Controller\Component;
+ use Cake\Controller\ComponentRegistry; 
+ 
+ use Cake\Cache\Cache;
++use Cake\Datasource\ConnectionManager;
+ 
+ use Cake\ORM\Table;
+ use Cake\ORM\TableRegistry;
+@@ -106,7 +107,7 @@ class CountsComponent extends Component {
+ 
+         // Online = users with at least one open session
+         // Use DISTINCT to avoid double-counting users with multiple open sessions
+-        $online = (clone $base)
++        $onlineQ = (clone $base)
+             ->distinct(['PermanentUsers.id'])
+             ->innerJoin(
+                 ['Radaccts' => 'radacct'], // alias => table name
+@@ -114,8 +115,12 @@ class CountsComponent extends Component {
+                     'Radaccts.username = PermanentUsers.username',
+                     'Radaccts.acctstoptime IS' => null,
+                 ]
+-            )
+-            ->count();
++            );
++        $scopeExpr = $this->buildRadacctCloudScopeExpr('Radaccts', $cloudId);
++        if ($scopeExpr !== false) {
++            $onlineQ->where($scopeExpr);
++        }
++        $online = $onlineQ->count();
+             
+         // Suspended users
+         $suspended = (clone $base)
+@@ -151,7 +156,7 @@ class CountsComponent extends Component {
+         // Total users (under scope)
+         $total = (clone $base)->count();
+ 
+-        $online = (clone $base)
++        $onlineQ = (clone $base)
+             ->distinct(['Vouchers.id'])
+             ->innerJoin(
+                 ['Radaccts' => 'radacct'], // alias => table name
+@@ -159,8 +164,12 @@ class CountsComponent extends Component {
+                     'Radaccts.username = Vouchers.name',
+                     'Radaccts.acctstoptime IS' => null,
+                 ]
+-            )
+-            ->count();
++            );
++        $scopeExpr = $this->buildRadacctCloudScopeExpr('Radaccts', $cloudId);
++        if ($scopeExpr !== false) {
++            $onlineQ->where($scopeExpr);
++        }
++        $online = $onlineQ->count();
+             
+         return [
+             'total'      => (int)$total,
+@@ -170,36 +179,89 @@ class CountsComponent extends Component {
+     }
+     
+     public function countRadaccts(int $cloudId): int {
+-    
+-        $where = [];
+-    
+-        //====== CLOUD's Realms FILTER =====  
+-      	$Realms       = TableRegistry::getTableLocator()->get('Realms');	
+-      	$realm_list   = [];
+-      	$found_realm  = false;
+-     	$realms       = $Realms->find()->where(['Realms.cloud_id' => $cloudId])->all();
+-      	foreach($realms as $realm){
+-      		$found_realm  = true;
+-          	$realm_list[] = $realm->name;
+-          	$apRealmList  = $this->Aa->realmCheck(true);
+-          	if($apRealmList){
+-          	    $realm_list = $apRealmList;
+-          	}        	
+-     	}
+-    	if($found_realm){ 	
+-     		array_push($where, ["Radaccts.realm IN" => $realm_list]);
+-     	}else{
+-     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
+-        	return 0;
+-     	}      
+-        //====== END Realm FILTER =====  
+-        array_push($where,"Radaccts.acctstoptime IS NULL");
+-    
++
++        $where = ['Radaccts.acctstoptime IS NULL'];
++        $scopeExpr = $this->buildRadacctCloudScopeExpr('Radaccts', $cloudId);
++        if ($scopeExpr === false) {
++            return 0;
++        }
++        $where[] = $scopeExpr;
++
+         $Radaccts   = TableRegistry::getTableLocator()->get('Radaccts');
+         $base       = $Radaccts->find();
+         $base->where($where);      
+         $total      = (clone $base)->count();       
+         return $total;  
+     }
++
++    private function buildRadacctCloudScopeExpr(string $radacctAlias, int $cloudId): string|false
++    {
++        $Realms = TableRegistry::getTableLocator()->get('Realms');
++        $realmRows = $Realms->find()
++            ->select(['id', 'name'])
++            ->where(['Realms.cloud_id' => $cloudId])
++            ->all();
++
++        if ($realmRows->count() === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $realmNames = [];
++        $realmIdByName = [];
++        foreach ($realmRows as $row) {
++            $name = (string)$row->name;
++            $realmNames[] = $name;
++            $realmIdByName[$name] = (int)$row->id;
++        }
++
++        $apRealmList = $this->Aa->realmCheck(true);
++        if ($apRealmList) {
++            $realmNames = array_values(array_intersect($realmNames, $apRealmList));
++        }
++        if (count($realmNames) === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $realmIds = [];
++        foreach ($realmNames as $realmName) {
++            if (array_key_exists($realmName, $realmIdByName)) {
++                $realmIds[] = $realmIdByName[$realmName];
++            }
++        }
++        if (count($realmIds) === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $conn = ConnectionManager::get('default');
++        $quotedRealmNames = array_map(fn($name) => $conn->quote($name), $realmNames);
++        $realmNameIn = implode(',', $quotedRealmNames);
++        $realmIdIn = implode(',', array_map('intval', $realmIds));
++
++        return "(
++            {$radacctAlias}.realm IN ({$realmNameIn})
++            OR {$radacctAlias}.username IN (
++                SELECT pu.username
++                FROM permanent_users pu
++                WHERE pu.cloud_id = {$cloudId}
++                  AND pu.realm_id IN ({$realmIdIn})
++            )
++            OR {$radacctAlias}.username IN (
++                SELECT v.name
++                FROM vouchers v
++                WHERE v.cloud_id = {$cloudId}
++                  AND v.realm_id IN ({$realmIdIn})
++            )
++            OR {$radacctAlias}.username IN (
++                SELECT d.name
++                FROM devices d
++                INNER JOIN permanent_users pu2 ON pu2.id = d.permanent_user_id
++                WHERE pu2.cloud_id = {$cloudId}
++                  AND pu2.realm_id IN ({$realmIdIn})
++            )
++        )";
++    }
+         
+ }
+diff --git a/cake4/rd_cake/src/Controller/PermanentUsersController.php b/cake4/rd_cake/src/Controller/PermanentUsersController.php
+index 79428151..15ee39a4 100644
+--- a/cake4/rd_cake/src/Controller/PermanentUsersController.php
++++ b/cake4/rd_cake/src/Controller/PermanentUsersController.php
+@@ -192,6 +192,14 @@ class PermanentUsersController extends AppController{
+             //Unset password and token fields
+             unset($row["password"]);
+             unset($row["token"]);
++
++            // Backfill percentages for legacy rows where caps/usages exist but percentages stayed null.
++            if (($row['perc_time_used'] === null) && !empty($row['time_cap']) && ($row['time_used'] !== null)) {
++                $row['perc_time_used'] = max(0, min(100, intval(($row['time_used'] / $row['time_cap']) * 100)));
++            }
++            if (($row['perc_data_used'] === null) && !empty($row['data_cap']) && ($row['data_used'] !== null)) {
++                $row['perc_data_used'] = max(0, min(100, intval(($row['data_used'] / $row['data_cap']) * 100)));
++            }
+             
+             //Get more detail on the activity           
+             //select acctstarttime,acctstoptime,framedipaddress from radacct where username='ord9555@superfibre' order by acctstarttime DESC LIMIT 1;          
+diff --git a/cake4/rd_cake/src/Controller/RadacctsController.php b/cake4/rd_cake/src/Controller/RadacctsController.php
+index dbefca30..79f4eb1b 100644
+--- a/cake4/rd_cake/src/Controller/RadacctsController.php
++++ b/cake4/rd_cake/src/Controller/RadacctsController.php
+@@ -813,32 +813,91 @@ class RadacctsController extends AppController {
+             }
+          }
+            
+-        //====== CLOUD's Realms FILTER =====  
+-      	$this->loadModel('Realms'); 	
+-      	$realm_list = [];
+-      	$found_realm  = false;
+-     	$q_realms  = $this->{'Realms'}->find()->where(['Realms.cloud_id' => $req_q['cloud_id']])->all();
+-      	foreach($q_realms as $r){
+-      		$found_realm  = true;
+-          	$realm_list[] = $r->name;
+-          	$apRealmList  = $this->Aa->realmCheck(true);
+-          	if($apRealmList){
+-          	    $realm_list = $apRealmList;
+-          	}        	
+-     	}
+-     	if($found_realm){ 	
+-     		array_push($where, ["$this->workingModel.realm IN" => $realm_list]);
+-     	}else{
+-     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
+-        	return false;
+-     	}      
+-        //====== END Realm FILTER =====        
++        //====== CLOUD FILTER =====
++        $scopeExpr = $this->_buildRadacctCloudScopeExpr((int)$req_q['cloud_id']);
++        if ($scopeExpr === false) {
++            return false;
++        }
++        array_push($where, $scopeExpr);
++        //====== END CLOUD FILTER =====
+         
+         $query->where($where);  
+                 
+         return true;
+     }
+ 
++    private function _buildRadacctCloudScopeExpr(int $cloudId): string|false
++    {
++        $this->loadModel('Realms');
++
++        $qRealms = $this->Realms->find()
++            ->select(['id', 'name'])
++            ->where(['Realms.cloud_id' => $cloudId])
++            ->all();
++
++        if ($qRealms->count() === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $realmNames = [];
++        $realmIdByName = [];
++        foreach ($qRealms as $realm) {
++            $name = (string)$realm->name;
++            $realmNames[] = $name;
++            $realmIdByName[$name] = (int)$realm->id;
++        }
++
++        $apRealmList = $this->Aa->realmCheck(true);
++        if ($apRealmList) {
++            $realmNames = array_values(array_intersect($realmNames, $apRealmList));
++        }
++        if (count($realmNames) === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $realmIds = [];
++        foreach ($realmNames as $realmName) {
++            if (array_key_exists($realmName, $realmIdByName)) {
++                $realmIds[] = $realmIdByName[$realmName];
++            }
++        }
++        if (count($realmIds) === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $conn = $this->Radaccts->getConnection();
++        $quotedRealmNames = array_map(fn($name) => $conn->quote($name), $realmNames);
++        $realmNameIn = implode(',', $quotedRealmNames);
++        $realmIdIn = implode(',', array_map('intval', $realmIds));
++        $alias = $this->workingModel;
++
++        return "(
++            {$alias}.realm IN ({$realmNameIn})
++            OR {$alias}.username IN (
++                SELECT pu.username
++                FROM permanent_users pu
++                WHERE pu.cloud_id = {$cloudId}
++                  AND pu.realm_id IN ({$realmIdIn})
++            )
++            OR {$alias}.username IN (
++                SELECT v.name
++                FROM vouchers v
++                WHERE v.cloud_id = {$cloudId}
++                  AND v.realm_id IN ({$realmIdIn})
++            )
++            OR {$alias}.username IN (
++                SELECT d.name
++                FROM devices d
++                INNER JOIN permanent_users pu2 ON pu2.id = d.permanent_user_id
++                WHERE pu2.cloud_id = {$cloudId}
++                  AND pu2.realm_id IN ({$realmIdIn})
++            )
++        )";
++    }
++
+    
+     private function _voucher_status_check($id){
+ 
+diff --git a/cake4/rd_cake/src/Controller/RadacctsFastController.php b/cake4/rd_cake/src/Controller/RadacctsFastController.php
+index 93a9fb52..eeada14a 100644
+--- a/cake4/rd_cake/src/Controller/RadacctsFastController.php
++++ b/cake4/rd_cake/src/Controller/RadacctsFastController.php
+@@ -41,29 +41,20 @@ class RadacctsFastController extends AppController {
+         }
+ 
+         $user_id    = $user['id'];
+-        
+-         $req_q = $this->request->getQuery();
+-         
+-        $this->loadModel('Realms');    	
+-      	$realm_clause = [];
+-      	$found_realm  = false;
+-     	$q_realms  = $this->Realms->find()->where(['Realms.cloud_id' => $req_q['cloud_id']])->all();
+-      	foreach($q_realms as $r){
+-      		$found_realm = true;
+-          	$realm_clause[] = $r->name;
+-     	}
+-     	if(!$found_realm){
+-     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
+-        	return false;
+-     	}
+-     	
+-     	$where[] = ['realm IN' => $realm_clause]; 
+-        
++        $req_q      = $this->request->getQuery();
++        $where      = [];
++
+         //Make sure there is a cloud id
+         if(!isset($req_q['cloud_id'])){
+         	$this->Aa->fail_no_rights("Required Cloud ID Missing");
+         	return false;
+        	}
++
++        $scopeExpr = $this->_buildRadacctCloudScopeExpr((int)$req_q['cloud_id']);
++        if ($scopeExpr === false) {
++            return false;
++        }
++        $where[] = $scopeExpr;
+        	
+        	//====== Only_connectd filter ==========
+         $only_connected = false;
+@@ -106,7 +97,78 @@ class RadacctsFastController extends AppController {
+         ]);
+         $this->viewBuilder()->setOption('serialize', true);
+     } 
+-	 
++
++    private function _buildRadacctCloudScopeExpr(int $cloudId): string|false
++    {
++        $this->loadModel('Realms');
++
++        $qRealms = $this->Realms->find()
++            ->select(['id', 'name'])
++            ->where(['Realms.cloud_id' => $cloudId])
++            ->all();
++
++        if ($qRealms->count() === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $realmNames = [];
++        $realmIdByName = [];
++        foreach ($qRealms as $realm) {
++            $name = (string)$realm->name;
++            $realmNames[] = $name;
++            $realmIdByName[$name] = (int)$realm->id;
++        }
++
++        $apRealmList = $this->Aa->realmCheck(true);
++        if ($apRealmList) {
++            $realmNames = array_values(array_intersect($realmNames, $apRealmList));
++        }
++        if (count($realmNames) === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $realmIds = [];
++        foreach ($realmNames as $realmName) {
++            if (array_key_exists($realmName, $realmIdByName)) {
++                $realmIds[] = $realmIdByName[$realmName];
++            }
++        }
++        if (count($realmIds) === 0) {
++            $this->Aa->fail_no_rights("No Realms owned by this cloud");
++            return false;
++        }
++
++        $conn = $this->Radaccts->getConnection();
++        $quotedRealmNames = array_map(fn($name) => $conn->quote($name), $realmNames);
++        $realmNameIn = implode(',', $quotedRealmNames);
++        $realmIdIn = implode(',', array_map('intval', $realmIds));
++
++        return "(
++            Radaccts.realm IN ({$realmNameIn})
++            OR Radaccts.username IN (
++                SELECT pu.username
++                FROM permanent_users pu
++                WHERE pu.cloud_id = {$cloudId}
++                  AND pu.realm_id IN ({$realmIdIn})
++            )
++            OR Radaccts.username IN (
++                SELECT v.name
++                FROM vouchers v
++                WHERE v.cloud_id = {$cloudId}
++                  AND v.realm_id IN ({$realmIdIn})
++            )
++            OR Radaccts.username IN (
++                SELECT d.name
++                FROM devices d
++                INNER JOIN permanent_users pu2 ON pu2.id = d.permanent_user_id
++                WHERE pu2.cloud_id = {$cloudId}
++                  AND pu2.realm_id IN ({$realmIdIn})
++            )
++        )";
++    }
++		 
+     public function indexZ(){
+         //-- Required query attributes: token;
+         //-- Optional query attribute: sel_language (for i18n error messages)
+diff --git a/cake4/rd_cake/src/Controller/VouchersController.php b/cake4/rd_cake/src/Controller/VouchersController.php
+index cc042f20..7a489bb9 100644
+--- a/cake4/rd_cake/src/Controller/VouchersController.php
++++ b/cake4/rd_cake/src/Controller/VouchersController.php
+@@ -270,7 +270,7 @@ class VouchersController extends AppController{
+         foreach($q_r as $i){
+                                     
+             $row        = [];
+-            $fields    = $this->{$this->main_model}->getSchema()->columns();
++            $fields     = $this->{$this->main_model}->getSchema()->columns();
+             foreach($fields as $field){
+                 $row["$field"]= $i->{"$field"};
+                 
+@@ -334,6 +334,24 @@ class VouchersController extends AppController{
+                     }
+                 }        
+             }
++
++            // Backfill percentages for legacy rows where caps/usages exist but percentages stayed null.
++            if (($row['perc_time_used'] === null) && !empty($row['time_cap']) && ($row['time_used'] !== null)) {
++                $row['perc_time_used'] = max(0, min(100, intval(($row['time_used'] / $row['time_cap']) * 100)));
++            }
++            if (($row['perc_data_used'] === null) && !empty($row['data_cap']) && ($row['data_used'] !== null)) {
++                $row['perc_data_used'] = max(0, min(100, intval(($row['data_used'] / $row['data_cap']) * 100)));
++            }
++            if (
++                ($row['status'] === 'new') &&
++                (
++                    (!empty($row['last_accept_time'])) ||
++                    (($row['time_used'] ?? 0) > 0) ||
++                    (($row['data_used'] ?? 0) > 0)
++                )
++            ) {
++                $row['status'] = 'used';
++            }
+             
+             //Get more detail on the activity
+             //select acctstarttime,acctstoptime,framedipaddress from radacct where username='ord9555@superfibre' order by acctstarttime DESC LIMIT 1;          
+diff --git a/cake4/rd_cake/src/Controller/WireguardPeersController.php b/cake4/rd_cake/src/Controller/WireguardPeersController.php
+index 733d8105..90f7bdfb 100644
+--- a/cake4/rd_cake/src/Controller/WireguardPeersController.php
++++ b/cake4/rd_cake/src/Controller/WireguardPeersController.php
+@@ -274,19 +274,7 @@ class WireguardPeersController extends AppController{
+             throw new \Cake\Http\Exception\NotFoundException(__('Invalid peer/token'));
+         }
+         
+-        $ip_address = '';
+-        
+-        if($peer->ipv4_enabled){
+-            $ip_address = $peer->ipv4_address.'/32';//.$peer->ipv4_mask;
+-        }
+-        
+-        if(strlen($ip_address)>0){
+-            $ip_address = $ip_address.',';
+-        }
+-                
+-        if($peer->ipv6_enabled){
+-            $ip_address = $ip_address.$peer->ipv6_address.'/'.$peer->ipv6_prefix;
+-        }     
++        $ip_address = $this->_buildInterfaceAddress($peer);
+ 
+         // Example build of config body
+         $cfg = "[Interface]
+@@ -331,19 +319,7 @@ PersistentKeepalive = {$peer->persistent_keepalive}
+             throw new \Cake\Http\Exception\NotFoundException(__('Invalid peer/token'));
+         }
+         
+-        $ip_address = '';
+-        
+-        if($peer->ipv4_enabled){
+-            $ip_address = $peer->ipv4_address.'/32';//.$peer->ipv4_mask;
+-        }
+-        
+-        if(strlen($ip_address)>0){
+-            $ip_address = $ip_address.',';
+-        }
+-                
+-        if($peer->ipv6_enabled){
+-            $ip_address = $ip_address.$peer->ipv6_address.'/'.$peer->ipv6_prefix;
+-        }
++        $ip_address = $this->_buildInterfaceAddress($peer);
+         
+         $cfg = "[Interface]
+ PrivateKey = {$peer->private_key}
+@@ -369,11 +345,53 @@ PersistentKeepalive = {$peer->persistent_keepalive}
+             'success'       => true
+         ]);
+         $this->viewBuilder()->setOption('serialize', true);	
++			
++		}
++
++    private function _buildInterfaceAddress(object $peer): string
++    {
++        $addresses = [];
++        if ($peer->ipv4_enabled) {
++            $v4 = $this->_normalizeAddressList($peer->ipv4_address, '/32');
++            if (count($v4) > 0) {
++                $addresses[] = $v4[0];
++            }
++        }
++        if ($peer->ipv6_enabled) {
++            $v6 = $this->_normalizeAddressList($peer->ipv6_address, '/128');
++            if (count($v6) > 0) {
++                $addresses[] = $v6[0];
++            }
++        }
++        return implode(',', $addresses);
++    }
++
++    private function _normalizeAddressList(?string $raw, string $hostMask): array
++    {
++        if ($raw === null) {
++            return [];
++        }
++        $values = preg_split('/\s*,\s*/', trim($raw));
++        if (!is_array($values)) {
++            return [];
++        }
++        $out = [];
++        foreach ($values as $value) {
++            $value = trim((string)$value);
++            if ($value === '') {
++                continue;
++            }
++            if (str_contains($value, '/')) {
++                $out[] = $value;
++            } else {
++                $out[] = $value.$hostMask;
++            }
++        }
++        return array_values(array_unique($out));
++    }
+ 		
+-	}
+-	
+-   
+-    public function menuForGrid(){
++	   
++	    public function menuForGrid(){
+     
+     	$user = $this->_ap_right_check();
+         if(!$user){
+diff --git a/cake4/rd_cake/src/Controller/WireguardServersController.php b/cake4/rd_cake/src/Controller/WireguardServersController.php
+index 2d709eb8..61e6eebc 100644
+--- a/cake4/rd_cake/src/Controller/WireguardServersController.php
++++ b/cake4/rd_cake/src/Controller/WireguardServersController.php
+@@ -426,10 +426,16 @@ class WireguardServersController extends AppController{
+                 $peer['PublicKey']  = $wireguardPeer->public_key;
+                 $allowed_ips = [];
+                 if($wireguardPeer->ipv4_enabled){
+-                    $allowed_ips[] = $wireguardPeer->ipv4_address."/32";
++                    $allowed_ips = array_merge(
++                        $allowed_ips,
++                        $this->_normalizeAllowedIps($wireguardPeer->ipv4_address, '/32')
++                    );
+                 }
+                 if($wireguardPeer->ipv6_enabled){
+-                    $allowed_ips[] = $wireguardPeer->ipv6_address."/128";
++                    $allowed_ips = array_merge(
++                        $allowed_ips,
++                        $this->_normalizeAllowedIps($wireguardPeer->ipv6_address, '/128')
++                    );
+                 } 
+                 $peer['AllowedIps'] = $allowed_ips;
+                 $peers[] = $peer;
+@@ -448,6 +454,30 @@ class WireguardServersController extends AppController{
+         }   
+         return $config;   
+     }
++
++    private function _normalizeAllowedIps(?string $raw, string $hostMask): array
++    {
++        if ($raw === null) {
++            return [];
++        }
++        $values = preg_split('/\s*,\s*/', trim($raw));
++        if (!is_array($values)) {
++            return [];
++        }
++        $out = [];
++        foreach ($values as $value) {
++            $value = trim((string)$value);
++            if ($value === '') {
++                continue;
++            }
++            if (str_contains($value, '/')) {
++                $out[] = $value;
++            } else {
++                $out[] = $value.$hostMask;
++            }
++        }
++        return array_values(array_unique($out));
++    }
+     
+ }
+ 
+diff --git a/cake4/rd_cake/src/Shell/AccountingShell.php b/cake4/rd_cake/src/Shell/AccountingShell.php
+index 526fbe9c..949297c0 100644
+--- a/cake4/rd_cake/src/Shell/AccountingShell.php
++++ b/cake4/rd_cake/src/Shell/AccountingShell.php
+@@ -118,8 +118,9 @@ class AccountingShell extends Shell {
+                             $d['perc_time_used'] = $perc_time_used;
+                             $d['status']         = 'used';
+ 							if($time_avail){
++								$time_used = $time_avail - $time_left;
+ 								$d['time_cap']       = $time_avail;
+-								$d['time_used']      = $time_left; //Make them equal
++								$d['time_used']      = $time_used;
+ 							}
+                             $this->{'Vouchers'}->patchEntity($q_r,$d);
+                             $this->{'Vouchers'}->save($q_r);
+@@ -139,7 +140,7 @@ class AccountingShell extends Shell {
+ 					//END FIXME
+ 
+                     //print_r($perc_used_from_login);
+-                    if($perc_used_from_login){
++                    if($perc_used_from_login !== false){
+                         if($perc_used_from_login == 'depleted'){
+                             //Mark time usage as 100% and voucher as depleted
+                             $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
+diff --git a/cake4/rd_cake/src/Shell/VoucherShell.php b/cake4/rd_cake/src/Shell/VoucherShell.php
+index 704ce824..92629acf 100644
+--- a/cake4/rd_cake/src/Shell/VoucherShell.php
++++ b/cake4/rd_cake/src/Shell/VoucherShell.php
+@@ -42,7 +42,7 @@ class VoucherShell extends Shell {
+ 		$time_left_from_login 	= $ret_val[0];
+ 		$time_avail 			= $ret_val[1];
+ 
+-        if($time_left_from_login){
++		if($time_left_from_login){
+             if($time_left_from_login == 'depleted'){
+                 //Mark time usage as 100% and voucher as depleted
+                 $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
+@@ -60,11 +60,17 @@ class VoucherShell extends Shell {
+             }else{
+ 				if($time_avail){
+ 					$time_used 	= $time_avail - $time_left_from_login;
++					$perc_time_used = 0;
++					if($time_avail > 0){
++					    $perc_time_used = intval(($time_used / $time_avail) * 100);
++					}
+ 					$q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
+ 				    if($q_r){
+ 				        $d = [];
+ 						$d['time_cap']       = $time_avail;
+-						$d['time_used']      = $time_used; //Make them equal
++						$d['time_used']      = $time_used;
++						$d['perc_time_used'] = $perc_time_used;
++						$d['status']         = 'used';
+ 				        $this->{'Vouchers'}->patchEntity($q_r,$d);
+                         $this->{'Vouchers'}->save($q_r);
+ 				    }
