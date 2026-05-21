@@ -274,19 +274,7 @@ class WireguardPeersController extends AppController{
             throw new \Cake\Http\Exception\NotFoundException(__('Invalid peer/token'));
         }
         
-        $ip_address = '';
-        
-        if($peer->ipv4_enabled){
-            $ip_address = $peer->ipv4_address.'/32';//.$peer->ipv4_mask;
-        }
-        
-        if(strlen($ip_address)>0){
-            $ip_address = $ip_address.',';
-        }
-                
-        if($peer->ipv6_enabled){
-            $ip_address = $ip_address.$peer->ipv6_address.'/'.$peer->ipv6_prefix;
-        }     
+        $ip_address = $this->_buildInterfaceAddress($peer);
 
         // Example build of config body
         $cfg = "[Interface]
@@ -331,19 +319,7 @@ PersistentKeepalive = {$peer->persistent_keepalive}
             throw new \Cake\Http\Exception\NotFoundException(__('Invalid peer/token'));
         }
         
-        $ip_address = '';
-        
-        if($peer->ipv4_enabled){
-            $ip_address = $peer->ipv4_address.'/32';//.$peer->ipv4_mask;
-        }
-        
-        if(strlen($ip_address)>0){
-            $ip_address = $ip_address.',';
-        }
-                
-        if($peer->ipv6_enabled){
-            $ip_address = $ip_address.$peer->ipv6_address.'/'.$peer->ipv6_prefix;
-        }
+        $ip_address = $this->_buildInterfaceAddress($peer);
         
         $cfg = "[Interface]
 PrivateKey = {$peer->private_key}
@@ -369,11 +345,53 @@ PersistentKeepalive = {$peer->persistent_keepalive}
             'success'       => true
         ]);
         $this->viewBuilder()->setOption('serialize', true);	
+			
+		}
+
+    private function _buildInterfaceAddress(object $peer): string
+    {
+        $addresses = [];
+        if ($peer->ipv4_enabled) {
+            $v4 = $this->_normalizeAddressList($peer->ipv4_address, '/32');
+            if (count($v4) > 0) {
+                $addresses[] = $v4[0];
+            }
+        }
+        if ($peer->ipv6_enabled) {
+            $v6 = $this->_normalizeAddressList($peer->ipv6_address, '/128');
+            if (count($v6) > 0) {
+                $addresses[] = $v6[0];
+            }
+        }
+        return implode(',', $addresses);
+    }
+
+    private function _normalizeAddressList(?string $raw, string $hostMask): array
+    {
+        if ($raw === null) {
+            return [];
+        }
+        $values = preg_split('/\s*,\s*/', trim($raw));
+        if (!is_array($values)) {
+            return [];
+        }
+        $out = [];
+        foreach ($values as $value) {
+            $value = trim((string)$value);
+            if ($value === '') {
+                continue;
+            }
+            if (str_contains($value, '/')) {
+                $out[] = $value;
+            } else {
+                $out[] = $value.$hostMask;
+            }
+        }
+        return array_values(array_unique($out));
+    }
 		
-	}
-	
-   
-    public function menuForGrid(){
+	   
+	    public function menuForGrid(){
     
     	$user = $this->_ap_right_check();
         if(!$user){

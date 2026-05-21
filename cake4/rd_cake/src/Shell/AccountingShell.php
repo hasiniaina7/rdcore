@@ -118,8 +118,9 @@ class AccountingShell extends Shell {
                             $d['perc_time_used'] = $perc_time_used;
                             $d['status']         = 'used';
 							if($time_avail){
+								$time_used = $time_avail - $time_left;
 								$d['time_cap']       = $time_avail;
-								$d['time_used']      = $time_left; //Make them equal
+								$d['time_used']      = $time_used;
 							}
                             $this->{'Vouchers'}->patchEntity($q_r,$d);
                             $this->{'Vouchers'}->save($q_r);
@@ -139,7 +140,7 @@ class AccountingShell extends Shell {
 					//END FIXME
 
                     //print_r($perc_used_from_login);
-                    if($perc_used_from_login){
+                    if($perc_used_from_login !== false){
                         if($perc_used_from_login == 'depleted'){
                             //Mark time usage as 100% and voucher as depleted
                             $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();

@@ -192,6 +192,14 @@ class PermanentUsersController extends AppController{
             //Unset password and token fields
             unset($row["password"]);
             unset($row["token"]);
+
+            // Backfill percentages for legacy rows where caps/usages exist but percentages stayed null.
+            if (($row['perc_time_used'] === null) && !empty($row['time_cap']) && ($row['time_used'] !== null)) {
+                $row['perc_time_used'] = max(0, min(100, intval(($row['time_used'] / $row['time_cap']) * 100)));
+            }
+            if (($row['perc_data_used'] === null) && !empty($row['data_cap']) && ($row['data_used'] !== null)) {
+                $row['perc_data_used'] = max(0, min(100, intval(($row['data_used'] / $row['data_cap']) * 100)));
+            }
             
             //Get more detail on the activity           
             //select acctstarttime,acctstoptime,framedipaddress from radacct where username='ord9555@superfibre' order by acctstarttime DESC LIMIT 1;          

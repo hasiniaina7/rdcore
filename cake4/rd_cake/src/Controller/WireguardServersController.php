@@ -426,10 +426,16 @@ class WireguardServersController extends AppController{
                 $peer['PublicKey']  = $wireguardPeer->public_key;
                 $allowed_ips = [];
                 if($wireguardPeer->ipv4_enabled){
-                    $allowed_ips[] = $wireguardPeer->ipv4_address."/32";
+                    $allowed_ips = array_merge(
+                        $allowed_ips,
+                        $this->_normalizeAllowedIps($wireguardPeer->ipv4_address, '/32')
+                    );
                 }
                 if($wireguardPeer->ipv6_enabled){
-                    $allowed_ips[] = $wireguardPeer->ipv6_address."/128";
+                    $allowed_ips = array_merge(
+                        $allowed_ips,
+                        $this->_normalizeAllowedIps($wireguardPeer->ipv6_address, '/128')
+                    );
                 } 
                 $peer['AllowedIps'] = $allowed_ips;
                 $peers[] = $peer;
@@ -447,6 +453,30 @@ class WireguardServersController extends AppController{
             return $config['wireguardInstances'] = $instances;
         }   
         return $config;   
+    }
+
+    private function _normalizeAllowedIps(?string $raw, string $hostMask): array
+    {
+        if ($raw === null) {
+            return [];
+        }
+        $values = preg_split('/\s*,\s*/', trim($raw));
+        if (!is_array($values)) {
+            return [];
+        }
+        $out = [];
+        foreach ($values as $value) {
+            $value = trim((string)$value);
+            if ($value === '') {
+                continue;
+            }
+            if (str_contains($value, '/')) {
+                $out[] = $value;
+            } else {
+                $out[] = $value.$hostMask;
+            }
+        }
+        return array_values(array_unique($out));
     }
     
 }

@@ -41,29 +41,20 @@ class RadacctsFastController extends AppController {
         }
 
         $user_id    = $user['id'];
-        
-         $req_q = $this->request->getQuery();
-         
-        $this->loadModel('Realms');    	
-      	$realm_clause = [];
-      	$found_realm  = false;
-     	$q_realms  = $this->Realms->find()->where(['Realms.cloud_id' => $req_q['cloud_id']])->all();
-      	foreach($q_realms as $r){
-      		$found_realm = true;
-          	$realm_clause[] = $r->name;
-     	}
-     	if(!$found_realm){
-     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
-        	return false;
-     	}
-     	
-     	$where[] = ['realm IN' => $realm_clause]; 
-        
+        $req_q      = $this->request->getQuery();
+        $where      = [];
+
         //Make sure there is a cloud id
         if(!isset($req_q['cloud_id'])){
         	$this->Aa->fail_no_rights("Required Cloud ID Missing");
         	return false;
        	}
+
+        $scopeExpr = $this->_buildRadacctCloudScopeExpr((int)$req_q['cloud_id']);
+        if ($scopeExpr === false) {
+            return false;
+        }
+        $where[] = $scopeExpr;
        	
        	//====== Only_connectd filter ==========
         $only_connected = false;
@@ -106,7 +97,78 @@ class RadacctsFastController extends AppController {
         ]);
         $this->viewBuilder()->setOption('serialize', true);
     } 
-	 
+
+    private function _buildRadacctCloudScopeExpr(int $cloudId): string|false
+    {
+        $this->loadModel('Realms');
+
+        $qRealms = $this->Realms->find()
+            ->select(['id', 'name'])
+            ->where(['Realms.cloud_id' => $cloudId])
+            ->all();
+
+        if ($qRealms->count() === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $realmNames = [];
+        $realmIdByName = [];
+        foreach ($qRealms as $realm) {
+            $name = (string)$realm->name;
+            $realmNames[] = $name;
+            $realmIdByName[$name] = (int)$realm->id;
+        }
+
+        $apRealmList = $this->Aa->realmCheck(true);
+        if ($apRealmList) {
+            $realmNames = array_values(array_intersect($realmNames, $apRealmList));
+        }
+        if (count($realmNames) === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $realmIds = [];
+        foreach ($realmNames as $realmName) {
+            if (array_key_exists($realmName, $realmIdByName)) {
+                $realmIds[] = $realmIdByName[$realmName];
+            }
+        }
+        if (count($realmIds) === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $conn = $this->Radaccts->getConnection();
+        $quotedRealmNames = array_map(fn($name) => $conn->quote($name), $realmNames);
+        $realmNameIn = implode(',', $quotedRealmNames);
+        $realmIdIn = implode(',', array_map('intval', $realmIds));
+
+        return "(
+            Radaccts.realm IN ({$realmNameIn})
+            OR Radaccts.username IN (
+                SELECT pu.username
+                FROM permanent_users pu
+                WHERE pu.cloud_id = {$cloudId}
+                  AND pu.realm_id IN ({$realmIdIn})
+            )
+            OR Radaccts.username IN (
+                SELECT v.name
+                FROM vouchers v
+                WHERE v.cloud_id = {$cloudId}
+                  AND v.realm_id IN ({$realmIdIn})
+            )
+            OR Radaccts.username IN (
+                SELECT d.name
+                FROM devices d
+                INNER JOIN permanent_users pu2 ON pu2.id = d.permanent_user_id
+                WHERE pu2.cloud_id = {$cloudId}
+                  AND pu2.realm_id IN ({$realmIdIn})
+            )
+        )";
+    }
+		 
     public function indexZ(){
         //-- Required query attributes: token;
         //-- Optional query attribute: sel_language (for i18n error messages)

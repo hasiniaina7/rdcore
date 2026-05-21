@@ -270,7 +270,7 @@ class VouchersController extends AppController{
         foreach($q_r as $i){
                                     
             $row        = [];
-            $fields    = $this->{$this->main_model}->getSchema()->columns();
+            $fields     = $this->{$this->main_model}->getSchema()->columns();
             foreach($fields as $field){
                 $row["$field"]= $i->{"$field"};
                 
@@ -333,6 +333,24 @@ class VouchersController extends AppController{
                         $row['last_reject_time_in_words'] = __("Never");
                     }
                 }        
+            }
+
+            // Backfill percentages for legacy rows where caps/usages exist but percentages stayed null.
+            if (($row['perc_time_used'] === null) && !empty($row['time_cap']) && ($row['time_used'] !== null)) {
+                $row['perc_time_used'] = max(0, min(100, intval(($row['time_used'] / $row['time_cap']) * 100)));
+            }
+            if (($row['perc_data_used'] === null) && !empty($row['data_cap']) && ($row['data_used'] !== null)) {
+                $row['perc_data_used'] = max(0, min(100, intval(($row['data_used'] / $row['data_cap']) * 100)));
+            }
+            if (
+                ($row['status'] === 'new') &&
+                (
+                    (!empty($row['last_accept_time'])) ||
+                    (($row['time_used'] ?? 0) > 0) ||
+                    (($row['data_used'] ?? 0) > 0)
+                )
+            ) {
+                $row['status'] = 'used';
             }
             
             //Get more detail on the activity

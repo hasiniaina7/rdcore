@@ -13,6 +13,7 @@ use Cake\Controller\Component;
 use Cake\Controller\ComponentRegistry; 
 
 use Cake\Cache\Cache;
+use Cake\Datasource\ConnectionManager;
 
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
@@ -106,7 +107,7 @@ class CountsComponent extends Component {
 
         // Online = users with at least one open session
         // Use DISTINCT to avoid double-counting users with multiple open sessions
-        $online = (clone $base)
+        $onlineQ = (clone $base)
             ->distinct(['PermanentUsers.id'])
             ->innerJoin(
                 ['Radaccts' => 'radacct'], // alias => table name
@@ -114,8 +115,12 @@ class CountsComponent extends Component {
                     'Radaccts.username = PermanentUsers.username',
                     'Radaccts.acctstoptime IS' => null,
                 ]
-            )
-            ->count();
+            );
+        $scopeExpr = $this->buildRadacctCloudScopeExpr('Radaccts', $cloudId);
+        if ($scopeExpr !== false) {
+            $onlineQ->where($scopeExpr);
+        }
+        $online = $onlineQ->count();
             
         // Suspended users
         $suspended = (clone $base)
@@ -151,7 +156,7 @@ class CountsComponent extends Component {
         // Total users (under scope)
         $total = (clone $base)->count();
 
-        $online = (clone $base)
+        $onlineQ = (clone $base)
             ->distinct(['Vouchers.id'])
             ->innerJoin(
                 ['Radaccts' => 'radacct'], // alias => table name
@@ -159,8 +164,12 @@ class CountsComponent extends Component {
                     'Radaccts.username = Vouchers.name',
                     'Radaccts.acctstoptime IS' => null,
                 ]
-            )
-            ->count();
+            );
+        $scopeExpr = $this->buildRadacctCloudScopeExpr('Radaccts', $cloudId);
+        if ($scopeExpr !== false) {
+            $onlineQ->where($scopeExpr);
+        }
+        $online = $onlineQ->count();
             
         return [
             'total'      => (int)$total,
@@ -170,36 +179,89 @@ class CountsComponent extends Component {
     }
     
     public function countRadaccts(int $cloudId): int {
-    
-        $where = [];
-    
-        //====== CLOUD's Realms FILTER =====  
-      	$Realms       = TableRegistry::getTableLocator()->get('Realms');	
-      	$realm_list   = [];
-      	$found_realm  = false;
-     	$realms       = $Realms->find()->where(['Realms.cloud_id' => $cloudId])->all();
-      	foreach($realms as $realm){
-      		$found_realm  = true;
-          	$realm_list[] = $realm->name;
-          	$apRealmList  = $this->Aa->realmCheck(true);
-          	if($apRealmList){
-          	    $realm_list = $apRealmList;
-          	}        	
-     	}
-    	if($found_realm){ 	
-     		array_push($where, ["Radaccts.realm IN" => $realm_list]);
-     	}else{
-     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
-        	return 0;
-     	}      
-        //====== END Realm FILTER =====  
-        array_push($where,"Radaccts.acctstoptime IS NULL");
-    
+
+        $where = ['Radaccts.acctstoptime IS NULL'];
+        $scopeExpr = $this->buildRadacctCloudScopeExpr('Radaccts', $cloudId);
+        if ($scopeExpr === false) {
+            return 0;
+        }
+        $where[] = $scopeExpr;
+
         $Radaccts   = TableRegistry::getTableLocator()->get('Radaccts');
         $base       = $Radaccts->find();
         $base->where($where);      
         $total      = (clone $base)->count();       
         return $total;  
+    }
+
+    private function buildRadacctCloudScopeExpr(string $radacctAlias, int $cloudId): string|false
+    {
+        $Realms = TableRegistry::getTableLocator()->get('Realms');
+        $realmRows = $Realms->find()
+            ->select(['id', 'name'])
+            ->where(['Realms.cloud_id' => $cloudId])
+            ->all();
+
+        if ($realmRows->count() === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $realmNames = [];
+        $realmIdByName = [];
+        foreach ($realmRows as $row) {
+            $name = (string)$row->name;
+            $realmNames[] = $name;
+            $realmIdByName[$name] = (int)$row->id;
+        }
+
+        $apRealmList = $this->Aa->realmCheck(true);
+        if ($apRealmList) {
+            $realmNames = array_values(array_intersect($realmNames, $apRealmList));
+        }
+        if (count($realmNames) === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $realmIds = [];
+        foreach ($realmNames as $realmName) {
+            if (array_key_exists($realmName, $realmIdByName)) {
+                $realmIds[] = $realmIdByName[$realmName];
+            }
+        }
+        if (count($realmIds) === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $conn = ConnectionManager::get('default');
+        $quotedRealmNames = array_map(fn($name) => $conn->quote($name), $realmNames);
+        $realmNameIn = implode(',', $quotedRealmNames);
+        $realmIdIn = implode(',', array_map('intval', $realmIds));
+
+        return "(
+            {$radacctAlias}.realm IN ({$realmNameIn})
+            OR {$radacctAlias}.username IN (
+                SELECT pu.username
+                FROM permanent_users pu
+                WHERE pu.cloud_id = {$cloudId}
+                  AND pu.realm_id IN ({$realmIdIn})
+            )
+            OR {$radacctAlias}.username IN (
+                SELECT v.name
+                FROM vouchers v
+                WHERE v.cloud_id = {$cloudId}
+                  AND v.realm_id IN ({$realmIdIn})
+            )
+            OR {$radacctAlias}.username IN (
+                SELECT d.name
+                FROM devices d
+                INNER JOIN permanent_users pu2 ON pu2.id = d.permanent_user_id
+                WHERE pu2.cloud_id = {$cloudId}
+                  AND pu2.realm_id IN ({$realmIdIn})
+            )
+        )";
     }
         
 }

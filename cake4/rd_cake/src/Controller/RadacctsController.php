@@ -813,30 +813,89 @@ class RadacctsController extends AppController {
             }
          }
            
-        //====== CLOUD's Realms FILTER =====  
-      	$this->loadModel('Realms'); 	
-      	$realm_list = [];
-      	$found_realm  = false;
-     	$q_realms  = $this->{'Realms'}->find()->where(['Realms.cloud_id' => $req_q['cloud_id']])->all();
-      	foreach($q_realms as $r){
-      		$found_realm  = true;
-          	$realm_list[] = $r->name;
-          	$apRealmList  = $this->Aa->realmCheck(true);
-          	if($apRealmList){
-          	    $realm_list = $apRealmList;
-          	}        	
-     	}
-     	if($found_realm){ 	
-     		array_push($where, ["$this->workingModel.realm IN" => $realm_list]);
-     	}else{
-     		$this->Aa->fail_no_rights("No Realms owned by this cloud"); //If the list of realms for this cloud is empty reject the request
-        	return false;
-     	}      
-        //====== END Realm FILTER =====        
+        //====== CLOUD FILTER =====
+        $scopeExpr = $this->_buildRadacctCloudScopeExpr((int)$req_q['cloud_id']);
+        if ($scopeExpr === false) {
+            return false;
+        }
+        array_push($where, $scopeExpr);
+        //====== END CLOUD FILTER =====
         
         $query->where($where);  
                 
         return true;
+    }
+
+    private function _buildRadacctCloudScopeExpr(int $cloudId): string|false
+    {
+        $this->loadModel('Realms');
+
+        $qRealms = $this->Realms->find()
+            ->select(['id', 'name'])
+            ->where(['Realms.cloud_id' => $cloudId])
+            ->all();
+
+        if ($qRealms->count() === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $realmNames = [];
+        $realmIdByName = [];
+        foreach ($qRealms as $realm) {
+            $name = (string)$realm->name;
+            $realmNames[] = $name;
+            $realmIdByName[$name] = (int)$realm->id;
+        }
+
+        $apRealmList = $this->Aa->realmCheck(true);
+        if ($apRealmList) {
+            $realmNames = array_values(array_intersect($realmNames, $apRealmList));
+        }
+        if (count($realmNames) === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $realmIds = [];
+        foreach ($realmNames as $realmName) {
+            if (array_key_exists($realmName, $realmIdByName)) {
+                $realmIds[] = $realmIdByName[$realmName];
+            }
+        }
+        if (count($realmIds) === 0) {
+            $this->Aa->fail_no_rights("No Realms owned by this cloud");
+            return false;
+        }
+
+        $conn = $this->Radaccts->getConnection();
+        $quotedRealmNames = array_map(fn($name) => $conn->quote($name), $realmNames);
+        $realmNameIn = implode(',', $quotedRealmNames);
+        $realmIdIn = implode(',', array_map('intval', $realmIds));
+        $alias = $this->workingModel;
+
+        return "(
+            {$alias}.realm IN ({$realmNameIn})
+            OR {$alias}.username IN (
+                SELECT pu.username
+                FROM permanent_users pu
+                WHERE pu.cloud_id = {$cloudId}
+                  AND pu.realm_id IN ({$realmIdIn})
+            )
+            OR {$alias}.username IN (
+                SELECT v.name
+                FROM vouchers v
+                WHERE v.cloud_id = {$cloudId}
+                  AND v.realm_id IN ({$realmIdIn})
+            )
+            OR {$alias}.username IN (
+                SELECT d.name
+                FROM devices d
+                INNER JOIN permanent_users pu2 ON pu2.id = d.permanent_user_id
+                WHERE pu2.cloud_id = {$cloudId}
+                  AND pu2.realm_id IN ({$realmIdIn})
+            )
+        )";
     }
 
    

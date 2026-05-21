@@ -1,0 +1,4 @@
+interface:
+  display_name: "RadiusDesk Project Ops"
+  short_description: "rdcore production debugging and safe deployment workflow."
+  default_prompt: "Use this skill when working on this rdcore repository to debug production inconsistencies, verify data in MySQL safely, apply durable code fixes, and deploy via installation-script run-phase."
