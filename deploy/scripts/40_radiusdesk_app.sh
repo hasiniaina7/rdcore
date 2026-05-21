@@ -207,7 +207,7 @@ fi
 
 log INFO "Installation des dépendances Composer de RADIUSdesk."
 if [[ -f ${RDCORE_PATH}/cake4/rd_cake/composer.json ]]; then
-  sudo -H -u www-data composer install --no-dev --prefer-dist --no-interaction --working-dir="${RDCORE_PATH}/cake4/rd_cake"
+  sudo -H -u www-data composer install --no-dev --prefer-dist --no-interaction --ignore-platform-req=php+ --working-dir="${RDCORE_PATH}/cake4/rd_cake"
 else
   log WARN "composer.json introuvable, saut de composer install."
 fi
