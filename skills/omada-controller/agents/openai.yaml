@@ -1,0 +1,4 @@
+interface:
+  display_name: "Omada RADIUS Portal"
+  short_description: "Omada portal RADIUS auth, quota, and disconnect ops"
+  default_prompt: "Use this skill to configure and troubleshoot Omada captive portal with FreeRADIUS authentication, accounting quotas, and manual/automatic disconnect workflows."
