@@ -606,9 +606,10 @@ sub formulate_reply{
         $component_id = $row->{'id'};        
     }
     
-    #Send this one regardless (The NAS should ignore it if not used by it)
-    $RAD_REPLY{'WISPr-Bandwidth-Max-Up'}  = int($up_value / 1024);
-    $RAD_REPLY{'WISPr-Bandwidth-Max-Down'} = int($down_value / 1024);
+    # Keep WISPr in bps to match simple profile behavior and Omada expectations.
+    # Rd-Fup-Bw-Up/Down are already stored in bps in Radgroupcheck.
+    $RAD_REPLY{'WISPr-Bandwidth-Max-Up'}  = int($up_value);
+    $RAD_REPLY{'WISPr-Bandwidth-Max-Down'} = int($down_value);
 
 
     #FOR Mikrotik devices FIXME Add support for IP Pools
@@ -707,4 +708,3 @@ sub formulate_reply{
         $stmt_del_appl->execute($RAD_REQUEST{'User-Name'}); #Clear any applied_components should there happen to be
     }
 }
-
