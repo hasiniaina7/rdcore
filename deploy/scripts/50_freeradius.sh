@@ -95,6 +95,30 @@ update_sql_conf() {
   perl -0pi -e "s/${pattern}/${replacement}/" "${SQL_CONF}"
 }
 
+ensure_radiusdesk_dynamic_expiration_attrs() {
+  local dict_file="/etc/freeradius/3.0/dictionary_overrides/dictionary.radiusdesk"
+  if [[ ! -f "${dict_file}" ]]; then
+    log WARN "Dictionnaire RadiusDesk introuvable (${dict_file}), saut du durcissement dynamic expiration."
+    return
+  fi
+
+  if ! grep -q '^ATTRIBUTE[[:space:]]\+Rd-Dynamic-Expiration[[:space:]]\+84[[:space:]]\+integer$' "${dict_file}"; then
+    log INFO "Ajout de l'attribut Rd-Dynamic-Expiration dans ${dict_file}."
+    cat >> "${dict_file}" <<'EOF'
+
+#__ MAY 2026 -- Dynamic voucher expiration pilot
+ATTRIBUTE Rd-Dynamic-Expiration 84 integer
+EOF
+  fi
+
+  if ! grep -q '^ATTRIBUTE[[:space:]]\+Rd-Expiration-Unix[[:space:]]\+85[[:space:]]\+integer$' "${dict_file}"; then
+    log INFO "Ajout de l'attribut Rd-Expiration-Unix dans ${dict_file}."
+    cat >> "${dict_file}" <<'EOF'
+ATTRIBUTE Rd-Expiration-Unix    85 integer
+EOF
+  fi
+}
+
 update_sql_conf 'server = "[^"]*"' "server = \"${DB_HOST}\""
 if [[ "${DB_PORT}" != "3306" ]]; then
   if grep -q '^\s*#\s*port = 3306' "${SQL_CONF}"; then
@@ -141,6 +165,8 @@ CLIENTS_CONF="/etc/freeradius/3.0/clients.conf"
 if [[ -f "${CLIENTS_CONF}" ]]; then
   perl -0pi -e 's/(client\s+localhost\s*\{[^}]*?require_message_authenticator\s*=\s*)\w+/\1yes/si' "${CLIENTS_CONF}"
 fi
+
+ensure_radiusdesk_dynamic_expiration_attrs
 
 mkdir -p /var/log/freeradius/sqltrace
 chown -R freerad:freerad /var/log/freeradius
