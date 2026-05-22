@@ -31,7 +31,7 @@ use DBI;
 use Data::Dumper;
 use DateTime;
 
-use vars qw(%RAD_REQUEST %RAD_CHECK %RAD_REPLY %RAD_CONFIG $dbh %conf $dbh $stmt_fup_comps $stmt_data_used $conn_valid %comp_limits $default_tz $return $client_type $stmt_fnd_appl $stmt_add_appl $stmt_upd_appl $stmt_bc_start $stmt_nas_type $stmt_del_appl);
+use vars qw(%RAD_REQUEST %RAD_CHECK %RAD_REPLY %RAD_CONFIG $dbh %conf $dbh $stmt_fup_comps $stmt_data_used $conn_valid %comp_limits $default_tz $return $client_type $stmt_fnd_appl $stmt_add_appl $stmt_upd_appl $stmt_bc_start $stmt_nas_type $stmt_del_appl $stmt_user_profile $stmt_fup_group $stmt_fup_group_attrs);
 
 # This is hash wich hold original request from radius
 #my %RAD_REQUEST;
@@ -160,6 +160,25 @@ sub _prepare_statements {
 
     $stmt_nas_type = $dbh->prepare(q{
         SELECT type FROM dynamic_clients WHERE nasidentifier=?
+    });
+
+    $stmt_user_profile = $dbh->prepare(q{
+        SELECT value FROM radcheck
+        WHERE username=? AND attribute='User-Profile'
+        ORDER BY id DESC LIMIT 1
+    });
+
+    $stmt_fup_group = $dbh->prepare(q{
+        SELECT groupname FROM radusergroup
+        WHERE username=? AND groupname LIKE 'FupAdd_%'
+        ORDER BY priority ASC, id ASC
+        LIMIT 1
+    });
+
+    $stmt_fup_group_attrs = $dbh->prepare(q{
+        SELECT attribute, value FROM radgroupcheck
+        WHERE groupname=?
+          AND attribute IN ('Rd-Fup-Profile-Id','Rd-Fup-Bw-Up','Rd-Fup-Bw-Down','Rd-Fup-Comp-Count','Rd-Fup-Burst-Limit','Rd-Fup-Burst-Time','Rd-Fup-Burst-Threshold','Rd-Fup-Ip-Pool','Rd-Fup-Vlan','Rd-Fup-Session-Limit')
     });
 }
 
@@ -299,6 +318,10 @@ sub log_request_attributes {
 }
 
 sub fup {
+    hydrate_fup_config_from_sql();
+    if(!exists($RAD_CONFIG{'Rd-Fup-Profile-Id'}) || !exists($RAD_CONFIG{'Rd-Fup-Bw-Up'}) || !exists($RAD_CONFIG{'Rd-Fup-Bw-Down'})){
+        return RLM_MODULE_NOOP;
+    }
     _ensure_dbh() or return RLM_MODULE_FAIL;
     $stmt_fup_comps->execute($RAD_CONFIG{'Rd-Fup-Profile-Id'});
     my %limits;
@@ -399,6 +422,30 @@ sub fup {
             $stmt_add_appl->finish();
         }          
     }
+}
+
+sub hydrate_fup_config_from_sql {
+    if(exists($RAD_CONFIG{'Rd-Fup-Profile-Id'}) && exists($RAD_CONFIG{'Rd-Fup-Bw-Up'}) && exists($RAD_CONFIG{'Rd-Fup-Bw-Down'})){
+        return;
+    }
+    _ensure_dbh() or return;
+    $stmt_user_profile->execute($RAD_REQUEST{'User-Name'});
+    my $profile_row = $stmt_user_profile->fetchrow_hashref();
+    $stmt_user_profile->finish();
+    return if(!$profile_row || !$profile_row->{'value'});
+
+    _ensure_dbh() or return;
+    $stmt_fup_group->execute($profile_row->{'value'});
+    my $group_row = $stmt_fup_group->fetchrow_hashref();
+    $stmt_fup_group->finish();
+    return if(!$group_row || !$group_row->{'groupname'});
+
+    _ensure_dbh() or return;
+    $stmt_fup_group_attrs->execute($group_row->{'groupname'});
+    while(my $row = $stmt_fup_group_attrs->fetchrow_hashref()){
+        $RAD_CONFIG{$row->{'attribute'}} = $row->{'value'};
+    }
+    $stmt_fup_group_attrs->finish();
 }
 
 sub check_time_of_day {

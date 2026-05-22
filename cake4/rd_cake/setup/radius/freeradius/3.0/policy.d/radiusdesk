@@ -878,11 +878,8 @@ if (&control:Rd-Admin-State) {
 		RADIUSdesk_user_ssid_check
 		
 		#__ FUP Dec 2022 __
-		if(&control:Rd-Fup-Comp-Count){
-		    if(&control:Rd-Fup-Comp-Count >= 0){
-                pl_fup
-            }		
-		}
+		#Always call pl_fup; the module exits fast when user/profile has no FUP context.
+		pl_fup
 		
     }
 }
