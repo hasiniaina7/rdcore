@@ -199,7 +199,7 @@ class AccountingShell extends Shell {
 		                if($q_r){
 		                    $this->out("<comment>Update usage percentage for $username to $perc_used</comment>");
                             $d = [];
-		                    $d['perc_time_used']	= $perc_used;
+		                    $d['perc_time_used']	= max(0, min(100, $perc_used));
 							$d['time_used']		    = $used;
 							$d['time_cap']			= $counters['time']['value'];
 							$this->{'PermanentUsers'}->patchEntity($q_r,$d);
@@ -235,7 +235,7 @@ class AccountingShell extends Shell {
 		                if($q_r){
 		                    $this->out("<comment>Update usage percentage for $username to $perc_used</comment>");
 		                    $d = [];
-		                    $d['perc_data_used']	= $perc_used;
+		                    $d['perc_data_used']	= max(0, min(100, $perc_used));
 							$d['data_used']		    = $used;
 							$d['data_cap']			= $counters['data']['value'];
 							$this->{'PermanentUsers'}->patchEntity($q_r,$d);
@@ -278,7 +278,7 @@ class AccountingShell extends Shell {
                     if($q_r){
                         $this->out("<comment>Update usage percentage for $username to $perc_used</comment>");
                         $d = [];
-                        $d['perc_time_used']= $perc_used;
+                        $d['perc_time_used']= max(0, min(100, $perc_used));
 						$d['time_used']	  = $used;
 						$d['time_cap']	  = $counters['time']['value'];
                         $this->{'Devices'}->patchEntity($q_r,$d);
@@ -294,7 +294,7 @@ class AccountingShell extends Shell {
                     if($q_r){
                         $this->out("<comment>Update usage percentage for $username to $perc_used</comment>");
                         $d = [];
-                        $d['perc_data_used']= $perc_used;
+                        $d['perc_data_used']= max(0, min(100, $perc_used));
 						$d['data_used']	  = $used;
 						$d['data_cap']	  = $counters['data']['value'];
                         $this->{'Devices'}->patchEntity($q_r,$d);

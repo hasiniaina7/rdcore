@@ -463,7 +463,8 @@ class ProfilesController extends AppController
         
         $entity = $this->{$this->main_model}->get($this->reqData['id']);     
         
-        $pc_name    = $this->profCompPrefix.$entity->id;
+        $pc_name     = $this->profCompPrefix.$entity->id;
+        $pc_name_fup = $this->profCompPrefixFup.$entity->id;
         
         if($this->reqData['name'] !== $entity->name){
             
@@ -531,6 +532,12 @@ class ProfilesController extends AppController
             );
             $this->{'Radusergroups'}->save($ne);    
         }
+
+        // Enforce simple vs FUP exclusivity to prevent mixed reply/check attributes.
+        $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name_fup]);
+        $this->{'ProfileComponents'}->deleteAll(['ProfileComponents.name' => $pc_name_fup, 'ProfileComponents.cloud_id' => $this->reqData['cloud_id']]);
+        $this->{'Radgroupchecks'}->deleteAll(['groupname' => $pc_name_fup]);
+        $this->{'Radgroupreplies'}->deleteAll(['groupname' => $pc_name_fup]);
               
         $this->{$this->main_model}->patchEntity($entity, $this->reqData);      
         if ($this->{$this->main_model}->save($entity)) {

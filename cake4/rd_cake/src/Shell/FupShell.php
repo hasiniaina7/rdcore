@@ -219,13 +219,13 @@ class FupShell extends Shell {
 			}		
 		}
     	
-    	if($most_decrease){
+		if($most_decrease){
         	$should_apply = $most_decrease->{'id'};
         	$apply_record = $most_decrease;
 		}else{
 		    if($least_increase){
-		    	$should_apply = $least_decrease->{'id'};
-		    	$apply_record = $least_decrease;    
+		    	$should_apply = $least_increase->{'id'};
+		    	$apply_record = $least_increase;    
 		    }
 		}
 
