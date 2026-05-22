@@ -5,12 +5,18 @@
 
 namespace App\Shell;
 
+use App\Controller\Component\KickerComponent;
+use Cake\Controller\ComponentRegistry;
 use Cake\Console\Shell;
 use Cake\I18n\Time;
 use Cake\Datasource\ConnectionManager;
 use Cake\I18n\FrozenTime;
+use Cake\Log\Log;
+use Cake\ORM\TableRegistry;
 
 class AccountingShell extends Shell {
+    private $root_user_id = 44;
+    private $kicker = null;
 
     public function initialize():void{
         parent::initialize();
@@ -97,15 +103,7 @@ class AccountingShell extends Shell {
                     $time_left_from_expire = $this->Usage->time_left_from_expire($username);
                     if($time_left_from_expire){
                         if($time_left_from_expire == 'expired'){
-                            //Mark time usage as 100% and voucher as expired
-                            $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first(); 
-                            if($q_r){
-                                $d = [];
-                                $d['perc_time_used'] = 100;
-                                $d['status']         = 'expired';
-                                $this->{'Vouchers'}->patchEntity($q_r,$d);
-                                $this->{'Vouchers'}->save($q_r);
-                            }
+                            $this->_expireVoucherAndKickActiveSessions($username, 'accounting-shell-expire-check');
                             $not_expired = false;
                         }else{
                             if($time_left_from_expire < $time_left){
@@ -483,6 +481,66 @@ class AccountingShell extends Shell {
                 "SELECT 1 FROM radcheck WHERE username = '$username' AND attribute = 'Rd-Expiration-Unix'".
             ")"
         );
+    }
+
+    private function _expireVoucherAndKickActiveSessions($username, $source){
+        $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
+        if(!$q_r){
+            Log::warning("[voucher-expire-kick] Voucher not found for $username ($source)");
+            return;
+        }
+
+        if($q_r->status === 'expired'){
+            return;
+        }
+
+        $previous_status = (string)$q_r->status;
+        $d = [];
+        $d['perc_time_used'] = 100;
+        $d['status'] = 'expired';
+        $this->{'Vouchers'}->patchEntity($q_r, $d);
+        if(!$this->{'Vouchers'}->save($q_r)){
+            Log::error("[voucher-expire-kick] Failed to persist expired status for $username ($source)");
+            return;
+        }
+
+        Log::info("[voucher-expire-kick] Status transition $username: $previous_status -> expired ($source)");
+        $this->_kickActiveSessionsByUsername($username, $source);
+    }
+
+    private function _kickActiveSessionsByUsername($username, $source){
+        $Radaccts = TableRegistry::get('Radaccts');
+        $Users = TableRegistry::get('Users');
+
+        $root_user = $Users->find()->where(['Users.id' => $this->root_user_id])->first();
+        if((!$root_user) || (empty($root_user->token))){
+            Log::error("[voucher-expire-kick] Missing root token for kick of $username ($source)");
+            return;
+        }
+
+        $sessions = $Radaccts->find()->where([
+            'Radaccts.username' => $username,
+            'Radaccts.acctstoptime IS NULL'
+        ])->all();
+
+        foreach($sessions as $session){
+            $result = $this->_kicker()->kick($session, $root_user->token);
+            Log::info('[voucher-expire-kick] '.json_encode([
+                'username'  => $username,
+                'source'    => $source,
+                'radacctid' => $session->radacctid ?? null,
+                'nas'       => $session->nasipaddress ?? null,
+                'result'    => $result
+            ]));
+        }
+    }
+
+    private function _kicker(){
+        if($this->kicker === null){
+            $this->kicker = new KickerComponent(new ComponentRegistry());
+            $this->kicker->initialize([]);
+        }
+        return $this->kicker;
     }
 }
 
