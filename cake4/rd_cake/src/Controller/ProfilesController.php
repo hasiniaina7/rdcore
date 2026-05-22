@@ -464,7 +464,6 @@ class ProfilesController extends AppController
         $entity = $this->{$this->main_model}->get($this->reqData['id']);     
         
         $pc_name     = $this->profCompPrefix.$entity->id;
-        $pc_name_fup = $this->profCompPrefixFup.$entity->id;
         
         if($this->reqData['name'] !== $entity->name){
             
@@ -533,12 +532,6 @@ class ProfilesController extends AppController
             $this->{'Radusergroups'}->save($ne);    
         }
 
-        // Enforce simple vs FUP exclusivity to prevent mixed reply/check attributes.
-        $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name_fup]);
-        $this->{'ProfileComponents'}->deleteAll(['ProfileComponents.name' => $pc_name_fup, 'ProfileComponents.cloud_id' => $this->reqData['cloud_id']]);
-        $this->{'Radgroupchecks'}->deleteAll(['groupname' => $pc_name_fup]);
-        $this->{'Radgroupreplies'}->deleteAll(['groupname' => $pc_name_fup]);
-              
         $this->{$this->main_model}->patchEntity($entity, $this->reqData);      
         if ($this->{$this->main_model}->save($entity)) {
             $this->_doRadius($pc_name);     
@@ -781,11 +774,6 @@ class ProfilesController extends AppController
         	$this->{'ProfileComponents'}->save($e_pc);
         }
         
-        $this->{'ProfileComponents'}->deleteAll(['ProfileComponents.name' => $pc_name_simple, 'ProfileComponents.cloud_id' =>$this->reqData['cloud_id']]);
-        $this->{'Radgroupchecks'}->deleteAll(['groupname'  => $pc_name_simple]);
-        $this->{'Radgroupreplies'}->deleteAll(['groupname' => $pc_name_simple]);
-        $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' =>$pc_name_simple]);
-        
 		$this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' =>$pc_name]);		
         $ne = $this->{'Radusergroups'}->newEntity(
             [
@@ -794,11 +782,16 @@ class ProfilesController extends AppController
                 'priority'  => 5
             ]
         );
-        $this->{'Radusergroups'}->save($ne);                		
+        $this->{'Radusergroups'}->save($ne);
 		$entity =  $this->{$this->main_model}->find()->where(['Profiles.id' => $profile_id])->first();
 		$this->{$this->main_model}->patchEntity($entity, $this->reqData); 		
 		if ($this->{$this->main_model}->save($entity)) {
-            $this->_doRadiusFup($pc_name,$profile_id,$fup_comp_count);     
+            $this->_doRadiusFup($pc_name,$profile_id,$fup_comp_count,$pc_name_simple);
+            // FUP is now self-sufficient for monthly counters; remove simple binding to prevent mixed policy.
+            $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name_simple]);
+            $this->{'ProfileComponents'}->deleteAll(['ProfileComponents.name' => $pc_name_simple, 'ProfileComponents.cloud_id' => $this->reqData['cloud_id']]);
+            $this->{'Radgroupchecks'}->deleteAll(['groupname' => $pc_name_simple]);
+            $this->{'Radgroupreplies'}->deleteAll(['groupname' => $pc_name_simple]);
             $this->set(array(
                 'success' => true
             ));
@@ -827,7 +820,7 @@ class ProfilesController extends AppController
         $this->viewBuilder()->setOption('serialize', true);
     }
     
-    private function _doRadiusFup($groupname,$profile_id,$count=0){
+    private function _doRadiusFup($groupname,$profile_id,$count=0,$simpleGroupname=null){
     
     	//Clear any posible left-overs
         $this->{'Radgroupchecks'}->deleteAll(['groupname' => $groupname]);
@@ -892,6 +885,8 @@ class ProfilesController extends AppController
             $e_p_id = $this->{'Radgroupchecks'}->newEntity($d_p_id);
             $this->{'Radgroupchecks'}->save($e_p_id);                                       
         }
+        // Ensure monthly counters/caps exist directly on FUP group so FUP can run without SimpleAdd.
+        $this->_syncMonthlyCountersToFupGroup($groupname,$simpleGroupname,$profile_id);
         
         if(isset($this->reqData['fup_bursting_on'])){ //IF bursting
         
@@ -985,12 +980,86 @@ class ProfilesController extends AppController
         $this->{'Radgroupreplies'}->save($e_ff );       
                     
     }
+
+    private function _syncMonthlyCountersToFupGroup($fupGroupname,$simpleGroupname,$profile_id){
+
+        $copy_attrs = [
+            'Rd-Reset-Type-Data',
+            'Rd-Total-Data',
+            'Rd-Cap-Type-Data',
+            'Rd-Mac-Counter-Data',
+            'Rd-Reset-Interval-Data',
+            'Rd-Reset-Type-Time',
+            'Rd-Total-Time',
+            'Rd-Cap-Type-Time',
+            'Rd-Mac-Counter-Time',
+            'Rd-Reset-Interval-Time'
+        ];
+
+        $simple_map = [];
+        if($simpleGroupname){
+            $q_simple = $this->{'Radgroupchecks'}->find()->where(['groupname' => $simpleGroupname])->all();
+            foreach($q_simple as $row){
+                $simple_map[$row->attribute] = $row->value;
+            }
+        }
+
+        // Fallback when no simple group exists: derive an approximate monthly data counter from FUP stages.
+        if(!array_key_exists('Rd-Reset-Type-Data', $simple_map)){
+            $simple_map['Rd-Reset-Type-Data'] = 'monthly';
+        }
+        if(!array_key_exists('Rd-Cap-Type-Data', $simple_map)){
+            $simple_map['Rd-Cap-Type-Data'] = 'hard';
+        }
+        if(!array_key_exists('Rd-Total-Data', $simple_map)){
+            $max_bytes = 0;
+            $rows = $this->{'ProfileFupComponents'}->find()->where(['profile_id' => $profile_id])->all();
+            foreach($rows as $r){
+                if(is_null($r->data_amount) || is_null($r->data_unit)){
+                    continue;
+                }
+                $bytes = intval($r->data_amount);
+                if($r->data_unit === 'mb'){
+                    $bytes = $bytes * 1024 * 1024;
+                }
+                if($r->data_unit === 'gb'){
+                    $bytes = $bytes * 1024 * 1024 * 1024;
+                }
+                if($bytes > $max_bytes){
+                    $max_bytes = $bytes;
+                }
+            }
+            if($max_bytes > 0){
+                $simple_map['Rd-Total-Data'] = $max_bytes;
+            }
+        }
+
+        foreach($copy_attrs as $attr){
+            if(!array_key_exists($attr,$simple_map)){
+                continue;
+            }
+            $data = [
+                'groupname' => $fupGroupname,
+                'attribute' => $attr,
+                'op'        => ':=',
+                'value'     => $simple_map[$attr],
+                'comment'   => 'FupProfile'
+            ];
+            $entity = $this->{'Radgroupchecks'}->newEntity($data);
+            $this->{'Radgroupchecks'}->save($entity);
+        }
+    }
     
     private function _doRadius($groupname){
     
         //Clear any posible left-overs
         $this->{'Radgroupchecks'}->deleteAll(['groupname' => $groupname]);
         $this->{'Radgroupreplies'}->deleteAll(['groupname' => $groupname]);
+        $fup_groupname = str_replace($this->profCompPrefix, $this->profCompPrefixFup, $groupname);
+        $fup_active = ($this->{'Radgroupchecks'}->find()->where([
+            'groupname'  => $fup_groupname,
+            'attribute'  => 'Rd-Fup-Comp-Count'
+        ])->count() > 0);
       
         if($this->reqData['data_limit_enabled']){
          
@@ -1147,7 +1216,7 @@ class ProfilesController extends AppController
             }  
         }
     
-        if($this->reqData['speed_limit_enabled']){ //IF it is there    
+        if($this->reqData['speed_limit_enabled'] && !$fup_active){ //IF it is there    
             $speed_upload_amount    = $this->reqData['speed_upload_amount'];
             $speed_upload_unit      = $this->reqData['speed_upload_unit'];
             $speed_upload           = $speed_upload_amount * 1024; //Default is kbps
