@@ -22,6 +22,9 @@
 #FUP Run every minute 
 * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake fup >> /dev/null 2>&1
 
+#FUP monthly usage cache reset at 00:01 on day 1
+1 0 1 * * www-data cd /var/www/html/cake4/rd_cake && bin/cake fup_monthly_reset >> /dev/null 2>&1
+
 #Omada quota enforcement (hard cap) every minute for near-real-time disconnect attempts
 * * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake omada:enforce-quota --window 180 --nas-filter TP-Link --retry-max 2 --cooldown 45 >> /dev/null 2>&1
 

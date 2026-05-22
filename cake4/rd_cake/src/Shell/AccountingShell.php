@@ -202,13 +202,13 @@ class AccountingShell extends Shell {
 		                    $d['perc_time_used']	= max(0, min(100, $perc_used));
 							$d['time_used']		    = $used;
 							$d['time_cap']			= $counters['time']['value'];
-							$this->{'PermanentUsers'}->patchEntity($q_r,$d);
+                            $this->{'PermanentUsers'}->patchEntity($q_r,$d);
                             $this->{'PermanentUsers'}->save($q_r);
                             if(
                                 ($counters['time']['cap'] === 'hard') &&
                                 (intval($used) >= intval($counters['time']['value']))
                             ){
-                                $this->_kickActiveSessionsByUsername($username, 'accounting-shell-hard-time-cap');
+                                $this->_suspendAndKickPermanentUser($q_r, $username, 'accounting-shell-hard-time-cap');
                             }
 		                }
 					}else{
@@ -250,7 +250,7 @@ class AccountingShell extends Shell {
                                 ($counters['data']['cap'] === 'hard') &&
                                 (intval($used) >= intval($counters['data']['value']))
                             ){
-                                $this->_kickActiveSessionsByUsername($username, 'accounting-shell-hard-data-cap');
+                                $this->_suspendAndKickPermanentUser($q_r, $username, 'accounting-shell-hard-data-cap');
                             }
 		                }
 					}else{
@@ -531,6 +531,27 @@ class AccountingShell extends Shell {
             $this->kicker->initialize([]);
         }
         return $this->kicker;
+    }
+
+    private function _suspendAndKickPermanentUser($entity, $username, $source){
+        if(!$entity){
+            return;
+        }
+        $changed = false;
+        $d = [];
+        if(($entity->admin_state ?? 'active') !== 'suspended'){
+            $d['admin_state'] = 'suspended';
+            $changed = true;
+        }
+        if(intval($entity->active ?? 1) !== 0){
+            $d['active'] = 0;
+            $changed = true;
+        }
+        if($changed){
+            $this->{'PermanentUsers'}->patchEntity($entity, $d);
+            $this->{'PermanentUsers'}->save($entity);
+        }
+        $this->_kickActiveSessionsByUsername($username, $source);
     }
 }
 

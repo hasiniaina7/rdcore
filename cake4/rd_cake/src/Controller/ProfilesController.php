@@ -792,18 +792,6 @@ class ProfilesController extends AppController
             $this->{'ProfileComponents'}->deleteAll(['ProfileComponents.name' => $pc_name_simple, 'ProfileComponents.cloud_id' => $this->reqData['cloud_id']]);
             $this->{'Radgroupchecks'}->deleteAll(['groupname' => $pc_name_simple]);
             $this->{'Radgroupreplies'}->deleteAll(['groupname' => $pc_name_simple]);
-            // Reset stale usage cache for users bound to this profile after counter-mode changes.
-            $this->{'PermanentUsers'}->updateAll(
-                [
-                    'data_used'      => 0,
-                    'time_used'      => 0,
-                    'perc_data_used' => 0,
-                    'perc_time_used' => 0
-                ],
-                [
-                    'profile_id'     => $profile_id
-                ]
-            );
             $this->set(array(
                 'success' => true
             ));
