@@ -3590,9 +3590,13 @@ DROP TABLE IF EXISTS `new_accountings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `new_accountings` (
-  `mac` varchar(17) NOT NULL,
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY (`mac`)
+  `mac` varchar(17) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_new_accountings_username_mac` (`username`,`mac`),
+  KEY `idx_new_accountings_username` (`username`),
+  KEY `idx_new_accountings_mac` (`mac`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -17,11 +17,12 @@ class VoucherShell extends Shell {
    //It has **Rd-Voucher** attribute it will mark it as depleted if the time is up
    //It has **Expiration** attribute it will mark the voucher as expired if it is passed the expiration date
    
-   public function initialize():void{
+    public function initialize():void{
         parent::initialize();
         $this->loadModel('Vouchers');
+        $this->loadModel('Radchecks');
     }
-    public $tasks   = ['Usage'];
+    public $tasks   = ['Usage','Counters'];
 
     public function main() {
         $qr = $this->{'Vouchers'}->find()
@@ -93,6 +94,40 @@ class VoucherShell extends Shell {
                 }
             }
         }
+
+        // Keep data counters coherent even when AccountingShell queue misses this voucher.
+        $profile = $this->_find_user_profile($name);
+        if($profile){
+            $counters = $this->Counters->return_counter_data($profile,'voucher',$name);
+            if(array_key_exists('data', $counters) && !empty($counters['data']['value'])){
+                $used = $this->Usage->data_usage($counters['data'],$name,'username');
+                if($used !== false){
+                    $perc_used = intval(($used / $counters['data']['value']) * 100);
+                    $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
+                    if($q_r){
+                        $d = [];
+                        $d['status']         = 'used';
+                        $d['perc_data_used'] = $perc_used;
+                        $d['data_used']      = intval($used);
+                        $d['data_cap']       = $counters['data']['value'];
+                        $this->{'Vouchers'}->patchEntity($q_r,$d);
+                        $this->{'Vouchers'}->save($q_r);
+                    }
+                }
+            }
+        }
+    }
+
+    private function _find_user_profile($username){
+        $profile = false;
+        $q_r = $this->Radchecks->find()->where([
+            'Radchecks.username'  => $username,
+            'Radchecks.attribute' => 'User-Profile'
+        ])->first();
+        if($q_r){
+            $profile = $q_r->value;
+        }
+        return $profile;
     }
 }
 

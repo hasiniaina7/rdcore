@@ -81,3 +81,29 @@
 - Validation evidence:
   - Manual kick E2E: status `ack`, endpoint `.../hotspot/authed-records/{id}/disconnect`, HTTP 200, `radacct.acctstoptime` filled in <60s.
   - Quota worker E2E (forced breach + restore): `[QuotaKickAudit]` logged `status=ack` with endpoint/http_code/latency/correlation and stop recorded in 15s.
+
+## 2026-05-22
+
+### Voucher `data_used` stays NULL while traffic exists
+- Symptom: voucher `status=used` and heavy `radacct/user_stats` traffic, but `vouchers.data_used/data_cap/perc_data_used` remains `NULL`.
+- Root cause: `AccountingShell` updates data counters only for usernames present in `new_accountings`; when queue misses entries, voucher data usage never refreshes.
+- Source fix:
+  - `cake4/rd_cake/src/Shell/VoucherShell.php`
+    - add data usage reconciliation for `new/used` vouchers via profile counters (`CountersTask` + `UsageTask`)
+    - persist `status`, `data_used`, `data_cap`, `perc_data_used`
+- Verification query:
+  - `SELECT data_used,data_cap,perc_data_used,status FROM vouchers WHERE name='fancycast';`
+
+### Async accounting queue drops users behind shared MAC
+- Symptom: some active users/vouchers are not refreshed by `AccountingShell` despite recent `radacct` traffic.
+- Root cause:
+  - `new_accountings` used `PRIMARY KEY(mac)` and FreeRADIUS does `INSERT IGNORE`.
+  - when multiple usernames share one `callingstationid`, only one row survives per cron cycle.
+- Source fixes:
+  - `cake4/rd_cake/setup/db/8.111_harden_new_accountings_queue.sql`
+  - `cake4/rd_cake/setup/db/rd.sql`
+  - `cake4/rd_cake/src/Shell/AccountingShell.php`
+  - `cake4/rd_cake/setup/cron/cron4` (syslog signal on failure)
+- Verification query:
+  - `SHOW CREATE TABLE new_accountings;`
+  - `SELECT callingstationid,COUNT(DISTINCT username) FROM radacct ... HAVING COUNT(DISTINCT username)>1;`

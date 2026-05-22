@@ -4,7 +4,7 @@
 * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd mon >> /dev/null 2>&1
 * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd debug_check >> /dev/null 2>&1
 * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd auto_close >> /dev/null 2>&1
-* * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake accounting >> /dev/null 2>&1
+* * * * * www-data cd /var/www/html/cake4/rd_cake && (bin/cake accounting >> /dev/null 2>&1 || /usr/bin/logger -t rdcron-accounting "bin/cake accounting failed")
 */15 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake voucher >> /dev/null 2>&1
 */10 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake update_user_stats >> /dev/null 2>&1
 */10 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake auto_add_devices >> /dev/null 2>&1
@@ -30,4 +30,3 @@
 
 #* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats --server 127.0.0.1 --port 18121 --secret adminsecret --attrs /etc/freeradius/status-all.txt --tag main >> /var/log/freeradius-stats.log 2>&1
 * * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats >> /dev/null 2>&1
-

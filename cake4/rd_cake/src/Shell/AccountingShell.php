@@ -28,7 +28,11 @@ class AccountingShell extends Shell {
     public $tasks = ['Counters','Usage'];
 
     public function main() {
-        $qr = $this->NewAccountings->find()->all();
+        // Process a stable snapshot of queued username/mac pairs.
+        $qr = $this->NewAccountings->find()
+            ->select(['username','mac'])
+            ->distinct(['username','mac'])
+            ->all();
         foreach($qr as $i){
             $this->process_username($i->username,$i->mac);
         }
