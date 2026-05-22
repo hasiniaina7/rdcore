@@ -785,13 +785,25 @@ class ProfilesController extends AppController
         $this->{'Radusergroups'}->save($ne);
 		$entity =  $this->{$this->main_model}->find()->where(['Profiles.id' => $profile_id])->first();
 		$this->{$this->main_model}->patchEntity($entity, $this->reqData); 		
-		if ($this->{$this->main_model}->save($entity)) {
+        if ($this->{$this->main_model}->save($entity)) {
             $this->_doRadiusFup($pc_name,$profile_id,$fup_comp_count,$pc_name_simple);
             // FUP is now self-sufficient for monthly counters; remove simple binding to prevent mixed policy.
             $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name_simple]);
             $this->{'ProfileComponents'}->deleteAll(['ProfileComponents.name' => $pc_name_simple, 'ProfileComponents.cloud_id' => $this->reqData['cloud_id']]);
             $this->{'Radgroupchecks'}->deleteAll(['groupname' => $pc_name_simple]);
             $this->{'Radgroupreplies'}->deleteAll(['groupname' => $pc_name_simple]);
+            // Reset stale usage cache for users bound to this profile after counter-mode changes.
+            $this->{'PermanentUsers'}->updateAll(
+                [
+                    'data_used'      => 0,
+                    'time_used'      => 0,
+                    'perc_data_used' => 0,
+                    'perc_time_used' => 0
+                ],
+                [
+                    'profile_id'     => $profile_id
+                ]
+            );
             $this->set(array(
                 'success' => true
             ));
@@ -883,7 +895,28 @@ class ProfilesController extends AppController
             ];
             
             $e_p_id = $this->{'Radgroupchecks'}->newEntity($d_p_id);
-            $this->{'Radgroupchecks'}->save($e_p_id);                                       
+            $this->{'Radgroupchecks'}->save($e_p_id);
+
+            // Safety fallback: if pl_fup is skipped for any reason, keep users rate-limited.
+            $r_up = [
+                'groupname' => $groupname,
+                'attribute' => 'WISPr-Bandwidth-Max-Up',
+                'op'        => ':=',
+                'value'     => $speed_upload,
+                'comment'   => 'FupProfile'
+            ];
+            $e_r_up = $this->{'Radgroupreplies'}->newEntity($r_up);
+            $this->{'Radgroupreplies'}->save($e_r_up);
+
+            $r_down = [
+                'groupname' => $groupname,
+                'attribute' => 'WISPr-Bandwidth-Max-Down',
+                'op'        => ':=',
+                'value'     => $speed_download,
+                'comment'   => 'FupProfile'
+            ];
+            $e_r_down = $this->{'Radgroupreplies'}->newEntity($r_down);
+            $this->{'Radgroupreplies'}->save($e_r_down);
         }
         // Ensure monthly counters/caps exist directly on FUP group so FUP can run without SimpleAdd.
         $this->_syncMonthlyCountersToFupGroup($groupname,$simpleGroupname,$profile_id);

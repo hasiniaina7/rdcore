@@ -204,6 +204,12 @@ class AccountingShell extends Shell {
 							$d['time_cap']			= $counters['time']['value'];
 							$this->{'PermanentUsers'}->patchEntity($q_r,$d);
                             $this->{'PermanentUsers'}->save($q_r);
+                            if(
+                                ($counters['time']['cap'] === 'hard') &&
+                                (intval($used) >= intval($counters['time']['value']))
+                            ){
+                                $this->_kickActiveSessionsByUsername($username, 'accounting-shell-hard-time-cap');
+                            }
 		                }
 					}else{
 					
@@ -240,6 +246,12 @@ class AccountingShell extends Shell {
 							$d['data_cap']			= $counters['data']['value'];
 							$this->{'PermanentUsers'}->patchEntity($q_r,$d);
                             $this->{'PermanentUsers'}->save($q_r);
+                            if(
+                                ($counters['data']['cap'] === 'hard') &&
+                                (intval($used) >= intval($counters['data']['value']))
+                            ){
+                                $this->_kickActiveSessionsByUsername($username, 'accounting-shell-hard-data-cap');
+                            }
 		                }
 					}else{
 					
