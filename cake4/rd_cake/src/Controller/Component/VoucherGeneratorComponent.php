@@ -29,108 +29,50 @@ class VoucherGeneratorComponent extends Component {
 	);
 
 	private $adjectives		= array(
-		'large',	'small',	'long',		'short',	'thick',	'narrow',	'deep',
-		'flat',		'whole',	'low',		'high',		'near',		'far',		'moving',
-		'speed',	'fast',		'quick',	'slow',		'early',	'late',		'sky',
-		'bright',	'dark',		'cloudy',	'heat',		'warm',		'cool',		'cold',
-		'wind',		'windy',	'noisy',	'loud',		'quiet',	'water',	'fire',
-		'earth',	'dry',		'wet',		'clear',	'thing',	'hard',		'soft',
-		'heavy',	'light',	'strong',	'weak',		'clean',	'tidy',		'clean',
-		'dirty',	'empty',	'full',		'close',	'living',	'thirsty',	'hungry',
-		'fresh',	'dead',		'healthy',	'taste',	'sweet',	'sour',		'bitter',
-		'salty',	'value',	'good',		'bad',		'great',	'important','useful',
-		'price',	'expensive','cheap',	'free',		'power',	'difficult','strong',
-		'weak',		'able',		'rich',		'brave',	'fine',		'sad',		'proud',
-		'happy',	'liked',	'clever',	'famous',	'exciting',	'funny',	'team',
-		'kind',		'polite',	'fair',		'share',	'work',		'busy',		'lucky',
-		'well',		'safe',		'careful',	'back',		'bad',		'baggy',	'bare',
-		'barren',	'basic',	'beloved',	'calm',		'candid',	'capital',	'careful',
-		'careless',	'caring',	'charming',	'damaged',	'damp',		'dangerous','dapper',
-		'daring',	'dark',		'darling',	'dazzling',	'dead',		'deadly',	'dear',
-		'dearest',	'eager',	'early',	'earnest',	'easy',		'fabulous',	'faint',
-		'fair',		'fake',		'famous',	'fancy',	'fantastic','far',		'general',
-		'generous',	'gentle',	'giant',	'giddy',	'gigantic',	'hairy',	'half',
-		'handy',	'happy',	'hard',		'icky',		'icy',		'ideal',	'idiotic',
-		'idle',		'idolized',	'ignorant',	'ill',		'illegal',	'jaded',	'jagged',
-		'keen',		'lame',		'lanky',	'large',	'last',		'lavish',	'lawful',
-		'mad',		'majestic',	'major',	'mammoth',	'married',	'marvelous','naive',
-		'narrow',	'nasty',	'natural',	'naughty',	'obedient',	'obese',	'oblong',
-		'obvious',	'oily',		'pale',		'paltry',	'parched',	'partial',	'past',
-		'pastel',	'peaceful',	'peppery',	'perfect',	'perfumed',	'quaint',	'radiant',
-		'ragged',	'rapid',	'rare',		'rash',		'raw',		'recent',	'reckless',
-		'sad',		'safe',		'salty',	'same',		'sandy',	'sane',		'scaly',
-		'scared',	'scary',	'scented',	'scholarly','scientific','scornful','scratchy',
-		'scrawny',	'second',	'secret',	'selfish',	'tall',		'tame',		'tan',
-		'tart',		'tasty',	'taut',		'tedious',	'teeming',	'ultimate',	'vain',
-		'valid',	'warm',		'warped',	'wary',		'watchful',	'wavy',		'yawning',
-		'yearly',	'zany',		'false',	'active',	'actual',	'adept',	'afraid',
-		'aged',		'best',		'better',	'bewitched','big',		'bitter',	'black',
-		'cheap',	'cheerful',	'cheery',	'chief',	'chilly',	'chubby',	'circular',
-		'classic',	'clean',	'clear',	'clearcut',	'clever',	'close',	'closed',
-		'decent',	'decimal',	'deep',		'delayed',	'delicious','elaborate','elastic',
-		'elated',	'electric',	'elegant',	'fast',		'fatal',	'fatherly',	'favorable',
-		'favorite',	'fearful',	'fearless',	'feisty',	'feline',	'few',		'fickle',
-		'gifted',	'giving',	'glamorous','glaring',	'glass',	'gleeful',	'harmless',
-		'harmonious','harsh',	'hasty',	'hateful',	'haunting',	'jealous',	'key',
-		'kind',		'lazy',		'leading',	'leafy',	'lean',		'left',		'legal',
-		'light',	'massive',	'mature',	'meager',	'mealy',	'mean',		'measly',
-		'meaty',	'medical',	'mediocre',	'nautical',	'near',		'neat',		'needy',
-		'odd',		'oddball',	'offbeat',	'offensive','official',	'old',		'perky',
-		'pesky',	'petty',	'phony',	'physical',	'piercing',	'pink',		'pitiful',
-		'plain',	'ready',	'real',		'red',		'reflecting','regal',	'regular',
-		'separate',	'serene',	'serious',	'serpentine','several',	'severe',	'shabby',
-		'shadowy',	'shady',	'shallow',	'shameful',	'shameless','sharp',	'shimmering',
-		'shiny',	'shocked',	'shocking',	'shoddy',	'short',	'shortterm','showy',
-		'shrill',	'shy',		'sick',		'silent',	'silky',	'tempting',	'tender',
-		'tense',	'tepid',	'terrific',	'testy',	'thankful',	'that',		'these',
-		'uneven',	'unfit',	'unfolded',	'uniform',	'vast',		'velvety',	'weak',
-		'wealthy',	'weary',	'webbed',	'weekly',	'weepy',	'weighty',	'weird',
-		'welcome',	'yellow',	'zealous'
+		'actif', 'agile', 'alerte', 'ancien', 'ardent', 'assure', 'attentif', 'audacieux',
+		'beau', 'bizarre', 'bon', 'brave', 'calme', 'capable', 'certain', 'chaleureux',
+		'clair', 'classe', 'compact', 'constant', 'correct', 'courant', 'court', 'cretin',
+		'curieux', 'decent', 'difficile', 'discret', 'doux', 'droit', 'dur', 'efficace',
+		'elegant', 'enorme', 'entier', 'epais', 'equitable', 'exact', 'fameux', 'fidele',
+		'fiable', 'fin', 'fort', 'fragile', 'franc', 'frais', 'froid', 'futile',
+		'gai', 'general', 'gentil', 'grand', 'grave', 'gris', 'habile', 'heureux',
+		'honnorable', 'humble', 'ideal', 'immense', 'important', 'innocent', 'intense', 'juste',
+		'lent', 'libre', 'limite', 'long', 'loyal', 'lucide', 'lourd', 'malin',
+		'majeur', 'meilleur', 'mince', 'mobile', 'modeste', 'neuf', 'noble', 'normal',
+		'obscur', 'paisible', 'patient', 'petit', 'poli', 'precieux', 'pressant', 'primaire',
+		'prive', 'proche', 'propre', 'prudent', 'pur', 'rapide', 'rare', 'reel',
+		'riche', 'rigide', 'rond', 'rouge', 'rude', 'sage', 'sain', 'sale',
+		'sec', 'serieux', 'simple', 'sincere', 'solide', 'sombre', 'souple', 'stable',
+		'strict', 'superbe', 'sur', 'tendre', 'tenu', 'terne', 'timide', 'tranquille',
+		'utile', 'valide', 'vif', 'vrai'
 	);
 
 	private $nouns		= array(
-		'crime',	'mitten',	'lace',		'ghost',	'grain',	'aftermath','tramp',
-		'badge',	'snow',		'way',		'yam',		'page',		'rabbit',	'building',
-		'brake',	'view',		'reason',	'agreement','cakes',	'dress',	'actor',
-		'playground','van',		'pet',		'expansion','slip',		'sun',		'river',
-		'pleasure',	'knife',	'quill',	'quiet',	'debt',		'hope',		'nerve',
-		'hose',		'dinner',	'mountain',	'chance',	'fuel',		'plot',		'memory',
-		'cart',		'bulb',		'produce',	'wheel',	'soap',		'addition',	'train',
-		'place',	'cook',		'work',		'giraffe',	'trousers',	'doctor',	'meat',
-		'clam',		'visitor',	'profit',	'bite',		'rain',		'fact',		'wine',
-		'sky',		'reward',	'size',		'toothbrush','butter',	'statement','ray',
-		'experience','zinc',	'side',		'stage',	'error',	'guide',	'writing',
-		'quartz',	'stranger',	'pin',		'need',		'payment',	'roll',		'circle',
-		'flavor',	'machine',	'fear',		'sticks',	'belief',	'fireman',	'tent',
-		'trouble',	'trains',	'juice',	'legs',		'songs',	'form',		'laugh',
-		'sponge',	'feeling',	'back',		'scarf',	'car',		'question',	'furniture',
-		'arithmetic','lunchroom','temper',	'sail',		'needle',	'waves',	'airport',
-		'salt',		'loaf',		'rule',		'meal',		'tub',		'apparel',	'range',
-		'quiver',	'scale',	'basket',	'respect',	'chickens',	'unit',		'dad',
-		'team',		'order',	'steel',	'birthday',	'horse',	'sleep',	'dinosaurs',
-		'ticket',	'plastic',	'kick',		'hour',		'powder',	'fold',		'ocean',
-		'tail',		'cherry',	'fall',		'reaction',	'bushes',	'dolls',	'education',
-		'line',		'sneeze',	'jelly',	'alarm',	'pancake',	'jellyfish','join',
-		'wire',		'jeans',	'number',	'income',	'drink',	'earth',	'hair',
-		'bells',	'scissors',	'wind',		'end',		'box',		'instrument','crayon',
-		'class',	'trick',	'point',	'boundary',	'potato',	'club',		'pizzas',
-		'punishment','curtain',	'war',		'cabbage',	'morning',	'chicken',	'shelf',
-		'smash',	'growth',	'crow',		'purpose',	'price',	'sort',		'geese',
-		'aunt',		'cast',		'skate',	'kitty',	'letters',	'flowers',	'noise',
-		'boy',		'push',		'yard',		'connection','shop',	'brother',	'industry',
-		'eyes',		'girl',		'flock',	'turn',		'vein',		'flight',	'cap',
-		'thrill',	'roof',		'meeting',	'throat',	'bikes',	'stove',	'houses',
-		'flesh',	'carpenter','self',		'pies',		'transport','shape',	'notebook',
-		'creator',	'sink',		'truck',	'quilt',	'marble',	'bike',		'berry',
-		'branch',	'part',		'middle',	'throne',	'cream',	'straw',	'rat',
-		'spiders',	'sleet',	'balance',	'toy',		'grape',	'play',		'water',
-		'bell',		'birth',	'vegetable','pollution','wall',		'tree',		'trade',
-		'blood',	'wash',		'humor',	'pear',		'hot',		'show',		'cup',
-		'beds',		'day',		'rose',		'foot',		'table',	'doll',		'wave',
-		'change',	'bath',		'kiss',		'rings',	'sense',	'snail',	'talk',	
-		'note',		'route',	'sisters',	'knee',		'celery',	'sign',		'fish',
-		'finger',	'toe',		'sofa',		'store',	'clover',	'spade',	'texture',
-		'month',	'grade',	'pigs'
+		'arbre', 'atelier', 'avion', 'bagage', 'balcon', 'bateau', 'bijou', 'brique',
+		'brume', 'bureau', 'cabane', 'cable', 'cadeau', 'cadran', 'canal', 'carte',
+		'casque', 'chaine', 'chaise', 'champ', 'chant', 'chariot', 'chemin', 'chene',
+		'chien', 'chiffre', 'chute', 'ciel', 'circuit', 'citron', 'clavier', 'cle',
+		'coffre', 'colline', 'combat', 'comete', 'compte', 'corde', 'courant', 'cours',
+		'crayon', 'cristal', 'croute', 'danse', 'decor', 'defi', 'depart', 'desert',
+		'design', 'destin', 'dossier', 'dragon', 'eclair', 'ecole', 'ecran', 'effort',
+		'elan', 'espace', 'espoir', 'etoile', 'etude', 'eventail', 'faisceau', 'famille',
+		'farine', 'fichier', 'filtre', 'flambeau', 'fleur', 'forage', 'forfait', 'foret',
+		'format', 'foudre', 'fraise', 'fromage', 'fusion', 'garage', 'geste', 'glace',
+		'gouffre', 'grain', 'groupe', 'guide', 'guitare', 'havre', 'hiver', 'horizon',
+		'image', 'impact', 'indice', 'jardin', 'jeton', 'journal', 'jungle', 'lampe',
+		'legende', 'levier', 'liaison', 'lierre', 'ligne', 'livre', 'lueur', 'machine',
+		'maison', 'marche', 'marin', 'masque', 'matin', 'memoire', 'mer', 'message',
+		'metier', 'miroir', 'modele', 'module', 'montagne', 'mur', 'musique', 'navire',
+		'neige', 'niche', 'niveau', 'nuage', 'objet', 'ocean', 'orage', 'outil',
+		'panier', 'papier', 'parcours', 'parfum', 'passage', 'patin', 'paysage', 'peinture',
+		'pendule', 'phare', 'pierre', 'piste', 'plaine', 'plume', 'poche', 'pont',
+		'portail', 'poudre', 'prairie', 'projet', 'quartz', 'question', 'racine', 'rayon',
+		'regard', 'relais', 'repere', 'reseau', 'ressort', 'retour', 'riviere', 'route',
+		'sable', 'saison', 'salon', 'saveur', 'schema', 'secret', 'signal', 'silence',
+		'socle', 'soleil', 'somme', 'source', 'sphere', 'spirale', 'station', 'style',
+		'surface', 'table', 'talent', 'tempo', 'terrain', 'tissage', 'trace', 'trafic',
+		'trait', 'transport', 'tresor', 'tribune', 'unite', 'usage', 'vallee', 'valeur',
+		'vapeur', 'vecteur', 'verger', 'village', 'vision', 'vitesse', 'voyage'
 	);
 
     public $voucherNames	= array(); //We first have an empty list which we'll populate and add to each time we generate a voucher
@@ -209,7 +151,7 @@ class VoucherGeneratorComponent extends Component {
 			$w2			= rand(0,$pool_count);
 			$v_value 	= $this->wordPool[$w1].$d1.$this->wordPool[$w2].$d2;
 			//Test if not already taken
-			if(!in_array("v_value", $this->voucherNames)){
+			if(!in_array($v_value, $this->voucherNames)){
 				$duplicate_flag = false; //Break the loop - we ar unique;
 				array_push($this->voucherNames, $v_value);
 			}
@@ -229,7 +171,7 @@ class VoucherGeneratorComponent extends Component {
 			$v_value 	    = $this->adjectives[$a].$this->nouns[$n];
 			//Test if not already taken
 			if(
-				(!in_array("v_value", $this->voucherNames))&&
+				(!in_array($v_value, $this->voucherNames))&&
 				(strlen($v_value)<=16) //Coova does not like passwords longer than 16 Characters
 			){
 				$duplicate_flag = false; //Break the loop - we ar unique;
@@ -243,7 +185,7 @@ class VoucherGeneratorComponent extends Component {
 		$duplicate_flag = true;
 		while($duplicate_flag){		
 			$v_value = rand ( 1000,999999);
-			if(!in_array("v_value", $this->voucherNames)){
+			if(!in_array($v_value, $this->voucherNames)){
 				$duplicate_flag = false; //Break the loop - we ar unique;
 				array_push($this->voucherNames, $v_value);
 			}

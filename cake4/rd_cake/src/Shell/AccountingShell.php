@@ -186,8 +186,16 @@ class AccountingShell extends Shell {
                     $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
                     if($q_r){
                         $d = [];
-                        $d['perc_data_used'] = $perc_data_used;
-                        $d['status']         = 'used';
+                        $d['perc_data_used'] = max(0, min(100, $perc_data_used));
+                        if($q_r->status !== 'expired'){
+                            $d['status'] = 'used';
+                            if(
+                                ($counters['data']['cap'] === 'hard') &&
+                                (intval($counters['data']['usage']) >= intval($counters['data']['value']))
+                            ){
+                                $d['status'] = 'depleted';
+                            }
+                        }
 		                $d['data_used']	= intval($counters['data']['usage']);
 		                $d['data_cap']	= $counters['data']['value'];
                         $this->{'Vouchers'}->patchEntity($q_r,$d);

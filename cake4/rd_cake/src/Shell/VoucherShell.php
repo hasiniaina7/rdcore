@@ -95,24 +95,59 @@ class VoucherShell extends Shell {
             }
         }
 
-        // Keep data counters coherent even when AccountingShell queue misses this voucher.
+        // Keep counter-based usage coherent even when AccountingShell queue misses this voucher.
         $profile = $this->_find_user_profile($name);
         if($profile){
             $counters = $this->Counters->return_counter_data($profile,'voucher',$name);
+            $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
+            if(!$q_r){
+                return;
+            }
+
+            if(array_key_exists('time', $counters) && !empty($counters['time']['value'])){
+                $used = $this->Usage->time_usage($counters['time'],$name,'username');
+                if($used !== false){
+                    $perc_used = intval(($used / $counters['time']['value']) * 100);
+                    $d = [];
+                    $d['time_used']      = intval($used);
+                    $d['time_cap']       = $counters['time']['value'];
+                    $d['perc_time_used'] = max(0, min(100, $perc_used));
+
+                    if($q_r->status !== 'expired'){
+                        $d['status'] = 'used';
+                        if(
+                            ($counters['time']['cap'] === 'hard') &&
+                            (intval($used) >= intval($counters['time']['value']))
+                        ){
+                            $d['status'] = 'depleted';
+                        }
+                    }
+                    $this->{'Vouchers'}->patchEntity($q_r,$d);
+                    $this->{'Vouchers'}->save($q_r);
+                    $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
+                }
+            }
+
             if(array_key_exists('data', $counters) && !empty($counters['data']['value'])){
                 $used = $this->Usage->data_usage($counters['data'],$name,'username');
                 if($used !== false){
                     $perc_used = intval(($used / $counters['data']['value']) * 100);
-                    $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
-                    if($q_r){
-                        $d = [];
-                        $d['status']         = 'used';
-                        $d['perc_data_used'] = $perc_used;
-                        $d['data_used']      = intval($used);
-                        $d['data_cap']       = $counters['data']['value'];
-                        $this->{'Vouchers'}->patchEntity($q_r,$d);
-                        $this->{'Vouchers'}->save($q_r);
+                    $d = [];
+                    $d['perc_data_used'] = max(0, min(100, $perc_used));
+                    $d['data_used']      = intval($used);
+                    $d['data_cap']       = $counters['data']['value'];
+
+                    if($q_r->status !== 'expired'){
+                        $d['status'] = 'used';
+                        if(
+                            ($counters['data']['cap'] === 'hard') &&
+                            (intval($used) >= intval($counters['data']['value']))
+                        ){
+                            $d['status'] = 'depleted';
+                        }
                     }
+                    $this->{'Vouchers'}->patchEntity($q_r,$d);
+                    $this->{'Vouchers'}->save($q_r);
                 }
             }
         }

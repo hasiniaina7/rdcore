@@ -107,3 +107,11 @@
 - Verification query:
   - `SHOW CREATE TABLE new_accountings;`
   - `SELECT callingstationid,COUNT(DISTINCT username) FROM radacct ... HAVING COUNT(DISTINCT username)>1;`
+
+### Voucher terminal status on hard quota exhaustion
+- Symptom: vouchers with `data_used >= data_cap` remained `status=used` (even `perc_data_used>=100`).
+- Root cause: voucher update paths set `status=used` during data refresh without terminal guard.
+- Source fixes:
+  - `cake4/rd_cake/src/Shell/AccountingShell.php`
+  - `cake4/rd_cake/src/Shell/VoucherShell.php`
+  - behavior: when counter cap type is `hard`, reaching/exceeding `time_cap` or `data_cap` marks voucher `depleted` (unless already `expired`).
