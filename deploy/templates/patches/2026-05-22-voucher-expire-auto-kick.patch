@@ -1,5 +1,5 @@
 diff --git a/cake4/rd_cake/src/Shell/AccountingShell.php b/cake4/rd_cake/src/Shell/AccountingShell.php
-index 769c4201..fbc03f14 100644
+index 769c4201..727d493f 100644
 --- a/cake4/rd_cake/src/Shell/AccountingShell.php
 +++ b/cake4/rd_cake/src/Shell/AccountingShell.php
 @@ -5,12 +5,18 @@
@@ -38,7 +38,7 @@ index 769c4201..fbc03f14 100644
                              $not_expired = false;
                          }else{
                              if($time_left_from_expire < $time_left){
-@@ -484,6 +482,66 @@ class AccountingShell extends Shell {
+@@ -484,6 +482,68 @@ class AccountingShell extends Shell {
              ")"
          );
      }
@@ -51,6 +51,8 @@ index 769c4201..fbc03f14 100644
 +        }
 +
 +        if($q_r->status === 'expired'){
++            Log::info("[voucher-expire-kick] Status already expired for $username; retrying active-session kick ($source)");
++            $this->_kickActiveSessionsByUsername($username, $source.'-retry');
 +            return;
 +        }
 +
@@ -106,7 +108,7 @@ index 769c4201..fbc03f14 100644
  
  ?>
 diff --git a/cake4/rd_cake/src/Shell/VoucherShell.php b/cake4/rd_cake/src/Shell/VoucherShell.php
-index c3dc8dcd..0769fbd9 100644
+index c3dc8dcd..a24b7f0a 100644
 --- a/cake4/rd_cake/src/Shell/VoucherShell.php
 +++ b/cake4/rd_cake/src/Shell/VoucherShell.php
 @@ -5,12 +5,18 @@
@@ -145,7 +147,7 @@ index c3dc8dcd..0769fbd9 100644
              }
          }
  
-@@ -225,6 +223,66 @@ class VoucherShell extends Shell {
+@@ -225,6 +223,68 @@ class VoucherShell extends Shell {
              ")"
          );
      }
@@ -158,6 +160,8 @@ index c3dc8dcd..0769fbd9 100644
 +        }
 +
 +        if($q_r->status === 'expired'){
++            Log::info("[voucher-expire-kick] Status already expired for $username; retrying active-session kick ($source)");
++            $this->_kickActiveSessionsByUsername($username, $source.'-retry');
 +            return;
 +        }
 +
