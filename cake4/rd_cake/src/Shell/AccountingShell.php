@@ -491,6 +491,8 @@ class AccountingShell extends Shell {
         }
 
         if($q_r->status === 'expired'){
+            Log::info("[voucher-expire-kick] Status already expired for $username; retrying active-session kick ($source)");
+            $this->_kickActiveSessionsByUsername($username, $source.'-retry');
             return;
         }
 
