@@ -115,3 +115,16 @@
   - `cake4/rd_cake/src/Shell/AccountingShell.php`
   - `cake4/rd_cake/src/Shell/VoucherShell.php`
   - behavior: when counter cap type is `hard`, reaching/exceeding `time_cap` or `data_cap` marks voucher `depleted` (unless already `expired`).
+
+## 2026-05-22 - Voucher pilot dynamic expiration caused Access-Reject
+- Symptom: vouchers on pilot profiles `001*..004*` intermittently returned `Access-Reject` with only `Message-Authenticator` in reply, while non-pilot profiles continued to auth.
+- Root cause: new custom attributes used by pilot (`Rd-Dynamic-Expiration`, `Rd-Expiration-Unix`) were written into `radgroupcheck/radcheck` but not declared in FreeRADIUS dictionary overrides, so SQL check items became unsafe for policy evaluation.
+- Files:
+  - `cake4/rd_cake/setup/radius/freeradius/3.0/dictionary_overrides/dictionary.radiusdesk`
+- Fix:
+  - added dictionary declarations:
+    - `ATTRIBUTE Rd-Dynamic-Expiration 84 integer`
+    - `ATTRIBUTE Rd-Expiration-Unix 85 integer`
+  - validated config (`freeradius -CX`) and restarted FreeRADIUS.
+- Verification query:
+  - `SELECT id,username,reply,nasname,authdate FROM radpostauth WHERE username IN ('waterreason','dyntest001--00001','dyntest002--00001','dyntest003--00001','dyntest004--00001') ORDER BY id DESC;`
