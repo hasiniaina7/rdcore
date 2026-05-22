@@ -149,5 +149,9 @@ ATTRIBUTE RADIUSdesk-Virtual-Server    82 string
 
 ATTRIBUTE Rd-Admin-State 83 string
 
+#__ MAY 2026 -- Dynamic voucher expiration pilot
+ATTRIBUTE Rd-Dynamic-Expiration 84 integer
+ATTRIBUTE Rd-Expiration-Unix    85 integer
+
 
 END-VENDOR   RADIUSdesk
