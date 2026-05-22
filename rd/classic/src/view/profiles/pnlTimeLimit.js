@@ -40,6 +40,13 @@ Ext.define('Rd.view.profiles.pnlTimeLimit', {
                         minValue    : 1,
                         maxValue    : 120
 			        },
+                    {
+                        xtype       : 'checkbox',
+                        itemId      : 'chkDynamicExpiration',
+                        boxLabel    : 'Enable Dynamic Expiration (Voucher pilot)',
+                        name        : 'dynamic_expiration_enabled',
+                        margin      : '0 0 0 15'
+                    },
 			        {
                         xtype       : 'radiogroup',
                         fieldLabel  : 'Reset',

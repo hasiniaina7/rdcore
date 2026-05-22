@@ -351,6 +351,7 @@ class ProfilesController extends AppController
             'session_limit_enabled',
             'adv_data_limit_enabled',
             'adv_time_limit_enabled',
+            'dynamic_expiration_enabled',
         ];
         
         foreach($t_f_settings as $i){
@@ -438,7 +439,8 @@ class ProfilesController extends AppController
             'data_limit_enabled',
             'session_limit_enabled',
             'adv_data_limit_enabled',
-            'adv_time_limit_enabled'        
+            'adv_time_limit_enabled',
+            'dynamic_expiration_enabled'
         ];
         
         foreach($t_f_settings as $i){
@@ -1099,6 +1101,18 @@ class ProfilesController extends AppController
                 ];
                 $e_time_amount = $this->{'Radgroupchecks'}->newEntity($t_amount);
                 $this->{'Radgroupchecks'}->save($e_time_amount);
+
+                if($this->reqData['dynamic_expiration_enabled']){
+                    $t_dynamic_exp = [
+                        'groupname' => $groupname,
+                        'attribute' => 'Rd-Dynamic-Expiration',
+                        'op'        => ':=',
+                        'value'     => '1',
+                        'comment'   => 'SimpleProfile'
+                    ];
+                    $e_time_dynamic_exp = $this->{'Radgroupchecks'}->newEntity($t_dynamic_exp);
+                    $this->{'Radgroupchecks'}->save($e_time_dynamic_exp);
+                }
             }
             
             
@@ -1407,6 +1421,7 @@ class ProfilesController extends AppController
             'session_limit_enabled' => false,
             'adv_data_limit_enabled'=> false,
             'adv_time_limit_enabled'=> false,
+            'dynamic_expiration_enabled' => false,
             'logintime_1_span'      => 'disabled',
             'logintime_2_span'      => 'disabled',
             'logintime_3_span'      => 'disabled',
@@ -1496,6 +1511,10 @@ class ProfilesController extends AppController
                     $data['time_amount'] = $t/60;
                     $data['time_unit'] = 'min';
                 }
+            }
+
+            if($e->attribute == 'Rd-Dynamic-Expiration'){
+                $data['dynamic_expiration_enabled'] = ($e->value == '1');
             }
             
             if($e->attribute == 'Login-Time'){

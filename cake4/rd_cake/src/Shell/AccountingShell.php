@@ -50,6 +50,7 @@ class AccountingShell extends Shell {
         //____ Vouchers _____
         if($type == 'voucher'){
             $this->out("<info>$username is a Voucher</info>");
+            $this->_arm_dynamic_expiration_for_voucher($username);
             //Find the profile
             $profile = $this->_find_user_profile($username);
             if($profile){
@@ -424,6 +425,64 @@ class AccountingShell extends Shell {
             $retval = $q_r->value;
         }
         return $retval;
+    }
+
+    private function _arm_dynamic_expiration_for_voucher($username){
+        $user_type = $this->Radchecks->find()->where([
+            'Radchecks.username'  => $username,
+            'Radchecks.attribute' => 'Rd-User-Type'
+        ])->first();
+        if((!$user_type) || ($user_type->value !== 'voucher')){
+            return;
+        }
+
+        $profile = $this->_find_user_profile($username);
+        if(!$profile){
+            return;
+        }
+
+        $dynamic_enabled = false;
+        $q_groups = $this->Radusergroups->find()->where(['Radusergroups.username' => $profile])->all();
+        foreach($q_groups as $group){
+            $q_dyn = $this->Radgroupchecks->find()->where([
+                'Radgroupchecks.groupname'  => $group->groupname,
+                'Radgroupchecks.attribute'  => 'Rd-Dynamic-Expiration',
+                'Radgroupchecks.value'      => '1'
+            ])->first();
+            if($q_dyn){
+                $dynamic_enabled = true;
+                break;
+            }
+        }
+        if(!$dynamic_enabled){
+            return;
+        }
+
+        $counters = $this->Counters->return_counter_data($profile,'voucher',$username);
+        if((!array_key_exists('time', $counters)) || empty($counters['time']['value'])){
+            return;
+        }
+        $total_time = intval($counters['time']['value']);
+        if($total_time <= 0){
+            return;
+        }
+
+        $conn = ConnectionManager::get('default');
+        $stmt = $conn->execute("SELECT UNIX_TIMESTAMP(MIN(created)) AS first_login_ts FROM user_stats WHERE username = '$username'");
+        $row = $stmt->fetch('assoc');
+        if((!$row) || (!$row['first_login_ts'])){
+            return;
+        }
+        $first_login_ts = intval($row['first_login_ts']);
+        $exp_unix       = $first_login_ts + $total_time;
+
+        $conn->execute(
+            "INSERT INTO radcheck (username, attribute, op, value) ".
+            "SELECT '$username', 'Rd-Expiration-Unix', ':=', '$exp_unix' FROM DUAL ".
+            "WHERE NOT EXISTS (".
+                "SELECT 1 FROM radcheck WHERE username = '$username' AND attribute = 'Rd-Expiration-Unix'".
+            ")"
+        );
     }
 }
 

@@ -235,7 +235,20 @@ class UsageTask extends Shell {
 
     public function time_left_from_expire($username){
         $time_left =false;
-        //See if there is an expiry date check attribute for this voucher
+        // Prefer precise Unix-second expiry when present.
+        $q_r = $this->{'Radchecks'}->find()->where(['Radchecks.username' => $username,'Radchecks.attribute' => 'Rd-Expiration-Unix'])->first();
+        if($q_r){
+            $exp_in_unix = intval($q_r->value);
+            if($exp_in_unix > 0){
+                $time_left   = $exp_in_unix - time();
+                if($time_left <= 0){
+                    $time_left = 'expired';
+                }
+                return $time_left;
+            }
+        }
+
+        // Legacy fallback: "Expiration" text format.
         $q_r = $this->{'Radchecks'}->find()->where(['Radchecks.username' => $username,'Radchecks.attribute' => 'Expiration'])->first();
         if($q_r){
             $exp            = $q_r->value;
