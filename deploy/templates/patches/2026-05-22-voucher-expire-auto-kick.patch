@@ -1,5 +1,5 @@
 diff --git a/cake4/rd_cake/src/Shell/AccountingShell.php b/cake4/rd_cake/src/Shell/AccountingShell.php
-index 769c4201..727d493f 100644
+index 769c4201..31dcba9e 100644
 --- a/cake4/rd_cake/src/Shell/AccountingShell.php
 +++ b/cake4/rd_cake/src/Shell/AccountingShell.php
 @@ -5,12 +5,18 @@
@@ -21,7 +21,28 @@ index 769c4201..727d493f 100644
  
      public function initialize():void{
          parent::initialize();
-@@ -97,15 +103,7 @@ class AccountingShell extends Shell {
+@@ -71,19 +77,7 @@ class AccountingShell extends Shell {
+ 
+                     if($time_left_from_login){
+                         if($time_left_from_login == 'depleted'){
+-                            //Mark time usage as 100% and voucher as depleted
+-                            $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();   
+-                            if($q_r){
+-                                $d = [];
+-                                $d['perc_time_used'] = 100;
+-                                $d['status']         = 'depleted';
+-								if($time_avail){
+-									$d['time_cap']       = $time_avail;
+-									$d['time_used']      = $time_avail; //Make them equal
+-								}
+-								$this->{'Vouchers'}->patchEntity($q_r,$d);
+-                                $this->{'Vouchers'}->save($q_r);
+-                            }
++                            $this->_setTerminalStatusAndKickActiveSessions($username, 'depleted', 'accounting-shell-deplete-check');
+                             $not_depleted = false;
+ 
+                         }else{
+@@ -97,15 +91,7 @@ class AccountingShell extends Shell {
                      $time_left_from_expire = $this->Usage->time_left_from_expire($username);
                      if($time_left_from_expire){
                          if($time_left_from_expire == 'expired'){
@@ -34,24 +55,45 @@ index 769c4201..727d493f 100644
 -                                $this->{'Vouchers'}->patchEntity($q_r,$d);
 -                                $this->{'Vouchers'}->save($q_r);
 -                            }
-+                            $this->_expireVoucherAndKickActiveSessions($username, 'accounting-shell-expire-check');
++                            $this->_setTerminalStatusAndKickActiveSessions($username, 'expired', 'accounting-shell-expire-check');
                              $not_expired = false;
                          }else{
                              if($time_left_from_expire < $time_left){
-@@ -484,6 +482,68 @@ class AccountingShell extends Shell {
+@@ -147,19 +133,7 @@ class AccountingShell extends Shell {
+                     //print_r($perc_used_from_login);
+                     if($perc_used_from_login !== false){
+                         if($perc_used_from_login == 'depleted'){
+-                            //Mark time usage as 100% and voucher as depleted
+-                            $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
+-                            if($q_r){
+-                                $d = [];
+-                                $d['perc_time_used'] = 100;
+-                                $d['status']         = 'depleted';
+-								if($time_avail){
+-									$d['time_cap']       = $time_avail;
+-									$d['time_used']      = $time_avail; //Make them equal
+-								}
+-                                $this->{'Vouchers'}->patchEntity($q_r,$d);
+-                                $this->{'Vouchers'}->save($q_r);
+-                            }
++                            $this->_setTerminalStatusAndKickActiveSessions($username, 'depleted', 'accounting-shell-deplete-perc-check');
+ 
+                         }else{
+                             $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
+@@ -484,6 +458,68 @@ class AccountingShell extends Shell {
              ")"
          );
      }
 +
-+    private function _expireVoucherAndKickActiveSessions($username, $source){
++    private function _setTerminalStatusAndKickActiveSessions($username, $status, $source){
 +        $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
 +        if(!$q_r){
-+            Log::warning("[voucher-expire-kick] Voucher not found for $username ($source)");
++            Log::warning("[voucher-terminal-kick] Voucher not found for $username ($source)");
 +            return;
 +        }
 +
-+        if($q_r->status === 'expired'){
-+            Log::info("[voucher-expire-kick] Status already expired for $username; retrying active-session kick ($source)");
++        if($q_r->status === $status){
++            Log::info("[voucher-terminal-kick] Status already $status for $username; retrying active-session kick ($source)");
 +            $this->_kickActiveSessionsByUsername($username, $source.'-retry');
 +            return;
 +        }
@@ -59,14 +101,14 @@ index 769c4201..727d493f 100644
 +        $previous_status = (string)$q_r->status;
 +        $d = [];
 +        $d['perc_time_used'] = 100;
-+        $d['status'] = 'expired';
++        $d['status'] = $status;
 +        $this->{'Vouchers'}->patchEntity($q_r, $d);
 +        if(!$this->{'Vouchers'}->save($q_r)){
-+            Log::error("[voucher-expire-kick] Failed to persist expired status for $username ($source)");
++            Log::error("[voucher-terminal-kick] Failed to persist $status status for $username ($source)");
 +            return;
 +        }
 +
-+        Log::info("[voucher-expire-kick] Status transition $username: $previous_status -> expired ($source)");
++        Log::info("[voucher-terminal-kick] Status transition $username: $previous_status -> $status ($source)");
 +        $this->_kickActiveSessionsByUsername($username, $source);
 +    }
 +
@@ -76,7 +118,7 @@ index 769c4201..727d493f 100644
 +
 +        $root_user = $Users->find()->where(['Users.id' => $this->root_user_id])->first();
 +        if((!$root_user) || (empty($root_user->token))){
-+            Log::error("[voucher-expire-kick] Missing root token for kick of $username ($source)");
++            Log::error("[voucher-terminal-kick] Missing root token for kick of $username ($source)");
 +            return;
 +        }
 +
@@ -87,7 +129,7 @@ index 769c4201..727d493f 100644
 +
 +        foreach($sessions as $session){
 +            $result = $this->_kicker()->kick($session, $root_user->token);
-+            Log::info('[voucher-expire-kick] '.json_encode([
++            Log::info('[voucher-terminal-kick] '.json_encode([
 +                'username'  => $username,
 +                'source'    => $source,
 +                'radacctid' => $session->radacctid ?? null,
@@ -108,7 +150,7 @@ index 769c4201..727d493f 100644
  
  ?>
 diff --git a/cake4/rd_cake/src/Shell/VoucherShell.php b/cake4/rd_cake/src/Shell/VoucherShell.php
-index c3dc8dcd..a24b7f0a 100644
+index c3dc8dcd..c4823b29 100644
 --- a/cake4/rd_cake/src/Shell/VoucherShell.php
 +++ b/cake4/rd_cake/src/Shell/VoucherShell.php
 @@ -5,12 +5,18 @@
@@ -130,7 +172,28 @@ index c3dc8dcd..a24b7f0a 100644
  
      //This shell runs at longer intervals (15 min) to check for two things.
      //It checks all the new and used vouchers and then see if:
-@@ -86,15 +92,7 @@ class VoucherShell extends Shell {
+@@ -48,19 +54,7 @@ class VoucherShell extends Shell {
+ 
+ 		if($time_left_from_login){
+             if($time_left_from_login == 'depleted'){
+-                //Mark time usage as 100% and voucher as depleted
+-                $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $name])->first();
+-                if($q_r){
+-                    $d = [];
+-                    $d['perc_time_used'] = 100;
+-                    $d['status']         = 'depleted';
+-					if($time_avail){
+-						$d['time_cap']       = $time_avail;
+-						$d['time_used']      = $time_avail; //Make them equal
+-					}
+-                    $this->{'Vouchers'}->patchEntity($q_r,$d);
+-                    $this->{'Vouchers'}->save($q_r);
+-                }
++                $this->_setTerminalStatusAndKickActiveSessions($name, 'depleted', 'voucher-shell-deplete-check');
+             }else{
+ 				if($time_avail){
+ 					$time_used 	= $time_avail - $time_left_from_login;
+@@ -86,15 +80,7 @@ class VoucherShell extends Shell {
           $time_left_from_expire = $this->Usage->time_left_from_expire($name);
          if($time_left_from_expire){
              if($time_left_from_expire == 'expired'){
@@ -143,24 +206,24 @@ index c3dc8dcd..a24b7f0a 100644
 -                    $this->{'Vouchers'}->patchEntity($q_r,$d);
 -                    $this->{'Vouchers'}->save($q_r);
 -                }
-+                $this->_expireVoucherAndKickActiveSessions($name, 'voucher-shell-expire-check');
++                $this->_setTerminalStatusAndKickActiveSessions($name, 'expired', 'voucher-shell-expire-check');
              }
          }
  
-@@ -225,6 +223,68 @@ class VoucherShell extends Shell {
+@@ -225,6 +211,68 @@ class VoucherShell extends Shell {
              ")"
          );
      }
 +
-+    private function _expireVoucherAndKickActiveSessions($username, $source){
++    private function _setTerminalStatusAndKickActiveSessions($username, $status, $source){
 +        $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
 +        if(!$q_r){
-+            Log::warning("[voucher-expire-kick] Voucher not found for $username ($source)");
++            Log::warning("[voucher-terminal-kick] Voucher not found for $username ($source)");
 +            return;
 +        }
 +
-+        if($q_r->status === 'expired'){
-+            Log::info("[voucher-expire-kick] Status already expired for $username; retrying active-session kick ($source)");
++        if($q_r->status === $status){
++            Log::info("[voucher-terminal-kick] Status already $status for $username; retrying active-session kick ($source)");
 +            $this->_kickActiveSessionsByUsername($username, $source.'-retry');
 +            return;
 +        }
@@ -168,14 +231,14 @@ index c3dc8dcd..a24b7f0a 100644
 +        $previous_status = (string)$q_r->status;
 +        $d = [];
 +        $d['perc_time_used'] = 100;
-+        $d['status'] = 'expired';
++        $d['status'] = $status;
 +        $this->{'Vouchers'}->patchEntity($q_r, $d);
 +        if(!$this->{'Vouchers'}->save($q_r)){
-+            Log::error("[voucher-expire-kick] Failed to persist expired status for $username ($source)");
++            Log::error("[voucher-terminal-kick] Failed to persist $status status for $username ($source)");
 +            return;
 +        }
 +
-+        Log::info("[voucher-expire-kick] Status transition $username: $previous_status -> expired ($source)");
++        Log::info("[voucher-terminal-kick] Status transition $username: $previous_status -> $status ($source)");
 +        $this->_kickActiveSessionsByUsername($username, $source);
 +    }
 +
@@ -185,7 +248,7 @@ index c3dc8dcd..a24b7f0a 100644
 +
 +        $root_user = $Users->find()->where(['Users.id' => $this->root_user_id])->first();
 +        if((!$root_user) || (empty($root_user->token))){
-+            Log::error("[voucher-expire-kick] Missing root token for kick of $username ($source)");
++            Log::error("[voucher-terminal-kick] Missing root token for kick of $username ($source)");
 +            return;
 +        }
 +
@@ -196,7 +259,7 @@ index c3dc8dcd..a24b7f0a 100644
 +
 +        foreach($sessions as $session){
 +            $result = $this->_kicker()->kick($session, $root_user->token);
-+            Log::info('[voucher-expire-kick] '.json_encode([
++            Log::info('[voucher-terminal-kick] '.json_encode([
 +                'username'  => $username,
 +                'source'    => $source,
 +                'radacctid' => $session->radacctid ?? null,
