@@ -392,6 +392,18 @@ class FreeRadiusBehavior extends Behavior {
             }else{
                 $entity->time_valid = '';
             }
+
+            // Safety net for operators: when a profile is clearly "1 day fixed validity",
+            // auto-apply Rd-Voucher if no explicit activate-on-login duration was provided.
+            if(
+                $entity->isNew() &&
+                (($entity->time_valid === '') || ($entity->time_valid === null))
+            ){
+                $auto_time_valid = $this->_autoTimeValidFromProfile($entity);
+                if($auto_time_valid !== null){
+                    $entity->time_valid = $auto_time_valid;
+                }
+            }
 		    //Auto-populate the time_cap field with the value for time_valid
 		    if($entity->time_valid !== ''){
 			    $expire		= $entity->time_valid;
@@ -400,6 +412,56 @@ class FreeRadiusBehavior extends Behavior {
 			    $entity->time_cap = $time_avail;
 		    }
         }
+    }
+
+    private function _autoTimeValidFromProfile($entity){
+        $profile_name = null;
+        if(isset($entity->profile) && ($entity->profile !== '')){
+            $profile_name = $entity->profile;
+        }
+
+        if(($profile_name === null) && isset($entity->profile_id) && $entity->profile_id){
+            $Profiles = TableRegistry::get('Profiles');
+            $q_profile = $Profiles->find()->where(['Profiles.id' => $entity->profile_id])->first();
+            if($q_profile){
+                $profile_name = $q_profile->name;
+            }
+        }
+
+        if($profile_name === null){
+            return null;
+        }
+
+        $Radusergroups = TableRegistry::get('Radusergroups');
+        $Radgroupchecks = TableRegistry::get('Radgroupchecks');
+        $q_groups = $Radusergroups->find()
+            ->where(['Radusergroups.username' => $profile_name])
+            ->order(['Radusergroups.priority ASC'])
+            ->all();
+
+        $counters = [];
+        foreach($q_groups as $g){
+            $q_checks = $Radgroupchecks->find()
+                ->where(['Radgroupchecks.groupname' => $g->groupname])
+                ->all();
+            foreach($q_checks as $chk){
+                $counters[$chk->attribute] = $chk->value;
+            }
+        }
+
+        $reset_time = $counters['Rd-Reset-Type-Time'] ?? null;
+        $total_time = intval($counters['Rd-Total-Time'] ?? 0);
+        $cap_time   = $counters['Rd-Cap-Type-Time'] ?? null;
+
+        if(
+            ($reset_time === 'never') &&
+            ($cap_time === 'hard') &&
+            ($total_time === 86400)
+        ){
+            return '1-00-00-00';
+        }
+
+        return null;
     }
 
     private function _deleteUsernameEntriesFromTables($username){
