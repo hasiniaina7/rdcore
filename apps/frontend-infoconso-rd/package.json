@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "deploy": "MODE=local bash ../../../installation-script/deploy/scripts/deploy_infoconso.sh",
+    "deploy:remote": "MODE=remote bash ../../../installation-script/deploy/scripts/deploy_infoconso.sh"
   },
   "dependencies": {
     "@types/react-i18next": "^7.8.3",
