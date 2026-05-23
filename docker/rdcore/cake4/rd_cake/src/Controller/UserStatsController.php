@@ -4,6 +4,7 @@ namespace App\Controller;
 use Cake\I18n\FrozenTime;
 use Cake\Core\Configure;
 use Cake\Core\Configure\Engine\PhpConfig;
+use Cake\Datasource\ConnectionManager;
 
 
 class UserStatsController extends AppController {
@@ -11,6 +12,8 @@ class UserStatsController extends AppController {
     public $base            = "Access Providers/Controllers/UserStats/";
     protected $main_model   = 'UserStats';
     protected $time_zone    = 'UTC'; //Default for timezone
+    protected $time_zone_value = '+00:00';
+    protected $time_zone_source = 'name';
 
     protected  $fields = [
                         'data_in' => 'sum(UserStats.acctinputoctets)',
@@ -103,17 +106,8 @@ class UserStatsController extends AppController {
             $query          = $this->{$this->main_model}->find();
             $slot_start     = $slot_start->addHour(1); 
                       
-            $time_start = $query->func()->CONVERT_TZ([
-                "'$slot_start_txt'"     => 'literal',
-                "'$this->time_zone'"    => 'literal',
-                "'+00:00'"              => 'literal',
-            ]);
-            
-            $time_end = $query->func()->CONVERT_TZ([
-                "'$slot_end_txt'"       => 'literal',
-                "'$this->time_zone'"    => 'literal',
-                "'+00:00'"              => 'literal',
-            ]);
+            $time_start = $this->_buildUtcBoundaryExpr($query,$slot_start_txt);
+            $time_end   = $this->_buildUtcBoundaryExpr($query,$slot_end_txt);
                       
             array_push($where, ["timestamp >=" => $time_start]);
             array_push($where, ["timestamp <=" => $time_end]);
@@ -124,10 +118,10 @@ class UserStatsController extends AppController {
                 ->first();
 
             if($q_r){
-                $d_in           = $q_r->data_in;
+                $d_in           = $this->_numOrZero($q_r->data_in);
                 $total_in       = $total_in + $d_in;
 
-                $d_out          = $q_r->data_out;
+                $d_out          = $this->_numOrZero($q_r->data_out);
                 $total_out      = $total_out + $d_out;
                 
                 $total_in_out   = $total_in_out + ($d_in + $d_out);
@@ -159,17 +153,8 @@ class UserStatsController extends AppController {
             $slot_end_txt       = $slot_start->addDay(1)->subSecond(1)->i18nFormat('yyyy-MM-dd HH:mm:ss'); //Our interval is one day
               
             $query = $this->{$this->main_model}->find();
-            $time_start = $query->func()->CONVERT_TZ([
-                "'$slot_start_txt'"     => 'literal',
-                "'$this->time_zone'"    => 'literal',
-                "'+00:00'"              => 'literal',
-            ]);
-            
-            $time_end = $query->func()->CONVERT_TZ([
-                "'$slot_end_txt'"       => 'literal',
-                "'$this->time_zone'"    => 'literal',
-                "'+00:00'"              => 'literal',
-            ]);
+            $time_start = $this->_buildUtcBoundaryExpr($query,$slot_start_txt);
+            $time_end   = $this->_buildUtcBoundaryExpr($query,$slot_end_txt);
             
             $where  = $base_search;   
             array_push($where, ["timestamp >=" => $time_start]);
@@ -181,10 +166,10 @@ class UserStatsController extends AppController {
                 ->first();
 
             if($q_r){
-                $d_in           = $q_r->data_in;
+                $d_in           = $this->_numOrZero($q_r->data_in);
                 $total_in       = $total_in + $d_in;
 
-                $d_out          = $q_r->data_out;
+                $d_out          = $this->_numOrZero($q_r->data_out);
                 $total_out      = $total_out + $d_out;
                 $total_in_out   = $total_in_out + ($d_in + $d_out);
                 array_push($items, ['id' => $count, 'time_unit' => $slot_start_h_m, 'data_in' => $d_in, 'data_out' => $d_out]);
@@ -225,26 +210,17 @@ class UserStatsController extends AppController {
             $slot_end_txt       = $slot_start->addDay(1)->subSecond(1)->i18nFormat('yyyy-MM-dd HH:mm:ss'); //Our interval is one day
             
             $query = $this->{$this->main_model}->find();
-            $time_start = $query->func()->CONVERT_TZ([
-                "'$slot_start_txt'"     => 'literal',
-                "'$this->time_zone'"    => 'literal',
-                "'+00:00'"              => 'literal',
-            ]);
-            
-            $time_end = $query->func()->CONVERT_TZ([
-                "'$slot_end_txt'"       => 'literal',
-                "'$this->time_zone'"    => 'literal',
-                "'+00:00'"              => 'literal',
-            ]);
+            $time_start = $this->_buildUtcBoundaryExpr($query,$slot_start_txt);
+            $time_end   = $this->_buildUtcBoundaryExpr($query,$slot_end_txt);
                        
             array_push($where, ["timestamp >=" => $time_start]);
             array_push($where, ["timestamp <=" => $time_end]);
                 
             $q_r = $this->{$this->main_model}->find()->select($this->fields)->where($where)->first();
             if($q_r){   
-                $d_in           = $q_r->data_in;
+                $d_in           = $this->_numOrZero($q_r->data_in);
                 $total_in       = $total_in + $d_in;
-                $d_out          = $q_r->data_out;
+                $d_out          = $this->_numOrZero($q_r->data_out);
                 $total_out      = $total_out + $d_out;
                 $total_in_out   = $total_in_out + ($d_in + $d_out);
                 array_push($items, ['id' => $id_counter, 'time_unit' => $slot_start_h_m, 'data_in' => $d_in, 'data_out' => $d_out]);
@@ -370,6 +346,10 @@ class UserStatsController extends AppController {
             $ent_tz = $this->{'Timezones'}->find()->where(['Timezones.id' => $tz_id])->first();
             if($ent_tz){
                 $this->time_zone = $ent_tz->name;
+                if((property_exists($ent_tz,'value')) && ($ent_tz->value !== '')){
+                    $this->time_zone_value = $ent_tz->value;
+                }
+                $this->_resolveTimezoneSource();
                 return; //No need to go further
             }      
         }
@@ -389,11 +369,49 @@ class UserStatsController extends AppController {
                         $ent_tz = $this->{'Timezones'}->find()->where(['Timezones.id' => $tz_id])->first();
                         if($ent_tz){
                             $this->time_zone = $ent_tz->name;
+                            if((property_exists($ent_tz,'value')) && ($ent_tz->value !== '')){
+                                $this->time_zone_value = $ent_tz->value;
+                            }
                         }
                     }
                 } 
             }
         }
+        $this->_resolveTimezoneSource();
+    }
+
+    private function _buildUtcBoundaryExpr($query,$localDateTime){
+        $fromTz = $this->time_zone;
+        if($this->time_zone_source === 'value'){
+            $fromTz = $this->time_zone_value;
+        }
+        return $query->func()->CONVERT_TZ([
+            "'$localDateTime'" => 'literal',
+            "'$fromTz'"         => 'literal',
+            "'+00:00'"          => 'literal',
+        ]);
+    }
+
+    private function _resolveTimezoneSource(){
+        $this->time_zone_source = 'name';
+        $conn   = ConnectionManager::get('default');
+        $stmt   = $conn->execute(
+            "SELECT CONVERT_TZ(:dt,:tz,'+00:00') AS conv",
+            ['dt' => '2000-01-01 00:00:00', 'tz' => $this->time_zone]
+        );
+        $row = $stmt->fetch('assoc');
+        if(($row === false) || ($row['conv'] === null)){
+            if(($this->time_zone_value !== null) && ($this->time_zone_value !== '')){
+                $this->time_zone_source = 'value';
+            }
+        }
+    }
+
+    private function _numOrZero($value){
+        if($value === null){
+            return 0;
+        }
+        return (float)$value;
     }
 
 }
