@@ -552,18 +552,18 @@ RADIUSdesk_data_counter {
             #Get the total usage of the user
             if(&control:Rd-Tmp-Avail-Data){ #This indicates it it a device!
                 update control {
-                    Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM user_stats WHERE callingstationid='%{request:User-Name}'}"
+                    Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM radacct_history WHERE callingstationid='%{request:User-Name}'}"
                 }
             }
             else{
                 if((&control:Rd-Mac-Counter-Data)&&(&request:Calling-Station-Id)){
                     update control {
-                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM user_stats WHERE username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'}"
+                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM radacct_history WHERE username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'}"
                     }
                 }
                 else{
                     update control {
-                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM user_stats WHERE username='%{request:User-Name}'}"
+                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM radacct_history WHERE username='%{request:User-Name}'}"
                     }
                 }
             }
@@ -606,18 +606,18 @@ RADIUSdesk_time_counter {
             #Get the total usage of the user
             if(&control:Rd-Tmp-Avail-Time){ #This indicates it it a device!
                 update control {
-                    Rd-Used-Time := "{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid='%{request:User-Name}'}"
+                    Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(acctsessiontime),0) FROM radacct_history WHERE callingstationid='%{request:User-Name}'}"
                 }
             }
             else{
                if((&control:Rd-Mac-Counter-Time)&&(&request:Calling-Station-Id)){
                     update control {
-                        Rd-Used-Time := "{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'}"
+                        Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(acctsessiontime),0) FROM radacct_history WHERE username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'}"
                     }
                 }
                 else{
                     update control {
-                        Rd-Used-Time := "{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username='%{request:User-Name}'}"
+                        Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(acctsessiontime),0) FROM radacct_history WHERE username='%{request:User-Name}'}"
                     }
                 }
             }
