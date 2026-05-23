@@ -24,6 +24,12 @@ class ProfilesController extends AppController
     protected $profCompPrefixFup = 'FupAdd_';
     protected $reqData		= [];
 
+    private function _isFupActiveForProfile($profileId){
+        return ($this->{'ProfileFupComponents'}->find()->where([
+            'profile_id' => $profileId
+        ])->count() > 0);
+    }
+
     public function initialize():void{
         parent::initialize();
 
@@ -465,10 +471,7 @@ class ProfilesController extends AppController
         
         $pc_name     = $this->profCompPrefix.$entity->id;
         $pc_name_fup = $this->profCompPrefixFup.$entity->id;
-        $fup_active  = ($this->{'Radgroupchecks'}->find()->where([
-            'groupname' => $pc_name_fup,
-            'attribute' => 'Rd-Fup-Comp-Count'
-        ])->count() > 0);
+        $fup_active  = $this->_isFupActiveForProfile($entity->id);
         
         if($this->reqData['name'] !== $entity->name){
             
@@ -1103,10 +1106,8 @@ class ProfilesController extends AppController
         $this->{'Radgroupchecks'}->deleteAll(['groupname' => $groupname]);
         $this->{'Radgroupreplies'}->deleteAll(['groupname' => $groupname]);
         $fup_groupname = str_replace($this->profCompPrefix, $this->profCompPrefixFup, $groupname);
-        $fup_active = ($this->{'Radgroupchecks'}->find()->where([
-            'groupname'  => $fup_groupname,
-            'attribute'  => 'Rd-Fup-Comp-Count'
-        ])->count() > 0);
+        $profile_id = intval(str_replace($this->profCompPrefix, '', $groupname));
+        $fup_active = $this->_isFupActiveForProfile($profile_id);
       
         if($this->reqData['data_limit_enabled']){
          
