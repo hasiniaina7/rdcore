@@ -29,6 +29,7 @@ class VoucherShell extends Shell {
         $this->loadModel('Radchecks');
         $this->loadModel('Radusergroups');
         $this->loadModel('Radgroupchecks');
+        $this->loadModel('Realms');
     }
     public $tasks   = ['Usage','Counters'];
 
@@ -44,6 +45,7 @@ class VoucherShell extends Shell {
     private function process_voucher($name){
 
         $this->out("<info>Voucher => $name</info>");
+        $this->_ensureVoucherRegistered($name);
         $this->_arm_dynamic_expiration_for_voucher($name);
 
         //Test for depleted
@@ -272,6 +274,63 @@ class VoucherShell extends Shell {
             $this->kicker->initialize([]);
         }
         return $this->kicker;
+    }
+
+    private function _ensureVoucherRegistered($username){
+        $existing = $this->Radchecks->find()->where([
+            'Radchecks.username' => $username
+        ])->count();
+        if($existing > 0){
+            return;
+        }
+
+        $voucher = $this->Vouchers->find()->where(['Vouchers.name' => $username])->first();
+        if(!$voucher){
+            return;
+        }
+
+        $realmName = (string)$voucher->realm;
+        if(!empty($voucher->realm_id)){
+            $realm = $this->Realms->find()->where(['Realms.id' => $voucher->realm_id])->first();
+            if($realm && !empty($realm->name)){
+                $realmName = (string)$realm->name;
+            }
+        }
+
+        $checks = [
+            ['attribute' => 'User-Profile', 'value' => (string)$voucher->profile],
+            ['attribute' => 'Rd-Realm', 'value' => $realmName],
+            ['attribute' => 'Cleartext-Password', 'value' => (string)$voucher->password],
+            ['attribute' => 'Rd-User-Type', 'value' => 'voucher']
+        ];
+
+        if(!empty($voucher->expire)){
+            $expireTs = strtotime((string)$voucher->expire);
+            if($expireTs){
+                $checks[] = ['attribute' => 'Expiration', 'value' => date('j M Y', $expireTs)];
+            }
+        }
+
+        if(!empty($voucher->time_valid)){
+            $checks[] = ['attribute' => 'Rd-Voucher', 'value' => (string)$voucher->time_valid];
+        }
+
+        foreach($checks as $item){
+            $entity = $this->Radchecks->newEntity([
+                'username'  => $username,
+                'attribute' => $item['attribute'],
+                'op'        => ':=',
+                'value'     => $item['value']
+            ]);
+            $this->Radchecks->save($entity);
+        }
+
+        if($voucher->realm !== $realmName){
+            $voucher->realm = $realmName;
+            $this->Vouchers->save($voucher);
+        }
+
+        Log::warning("[voucher-auto-register] Rebuilt missing radcheck rows for voucher {$username}");
     }
 }
 
