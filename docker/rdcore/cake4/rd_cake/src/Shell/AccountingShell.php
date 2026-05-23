@@ -205,8 +205,8 @@ class AccountingShell extends Shell {
 					//We will only update the usage if it is NOT Rd-Mac-Counter-Time in the counter (mac_counter)
 					if(!$counters['time']['mac_counter']){
                     
-		                $used       = $this->Usage->time_usage($counters['time'],$username,'username');
-		                $perc_used  = intval(($used / $counters['time']['value'])* 100);                  
+		                $used           = $this->Usage->time_usage_monthly($username,'username');
+		                $perc_used      = ($counters['time']['value'] > 0) ? intval(($used / $counters['time']['value'])* 100) : 0;
 		                $q_r        = $this->{'PermanentUsers'}->find()->where(['PermanentUsers.username' => $username])->first();
 		                if($q_r){
 		                    $this->out("<comment>Update usage percentage for $username to $perc_used</comment>");
@@ -241,8 +241,8 @@ class AccountingShell extends Shell {
 					//We will only update the usage if it is NOT Rd-Mac-Counter-Data in the counter (mac_counter)
 					if(!$counters['data']['mac_counter']){
 
-		                $used       = $this->Usage->data_usage($counters['data'],$username,'username');
-		                $perc_used  = intval(($used / $counters['data']['value'])* 100);                   
+		                $used           = $this->Usage->data_usage_monthly($username,'username');
+		                $perc_used      = ($counters['data']['value'] > 0) ? intval(($used / $counters['data']['value'])* 100) : 0;
 		                $q_r        = $this->{'PermanentUsers'}->find()->where(['PermanentUsers.username' => $username])->first();
 		                if($q_r){
 		                    $this->out("<comment>Update usage percentage for $username to $perc_used</comment>");

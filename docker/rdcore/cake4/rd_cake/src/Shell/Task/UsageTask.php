@@ -102,7 +102,7 @@ class UsageTask extends Shell {
         }
     }
 
-	public function data_usage_for_mac($counter_data,$username,$mac){
+    public function data_usage_for_mac($counter_data,$username,$mac){
         //print_r($counter_data);
         
         $conn = ConnectionManager::get('default');
@@ -130,6 +130,28 @@ class UsageTask extends Shell {
         }else{
             return false;
         }
+    }
+
+    public function time_usage_monthly($username, $field = 'username'){
+        $conn = ConnectionManager::get('default');
+        $start_time = mktime(0, 0, 0, date('m'), 1, date('Y'));
+        $query_string = "SELECT IFNULL(SUM(GREATEST(UNIX_TIMESTAMP(timestamp) - GREATEST(UNIX_TIMESTAMP(created), $start_time), 0)), 0) AS used ".
+                        "FROM user_stats ".
+                        "WHERE $field='$username' AND UNIX_TIMESTAMP(timestamp) > '$start_time'";
+        $stmt = $conn->execute($query_string);
+        $row = $stmt->fetch('assoc');
+        return $row['used'];
+    }
+
+    public function data_usage_monthly($username, $field = 'username'){
+        $conn = ConnectionManager::get('default');
+        $start_time = mktime(0, 0, 0, date('m'), 1, date('Y'));
+        $query_string = "SELECT IFNULL(SUM(acctinputoctets) + SUM(acctoutputoctets), 0) AS used ".
+                        "FROM user_stats ".
+                        "WHERE $field='$username' AND created > FROM_UNIXTIME($start_time)";
+        $stmt = $conn->execute($query_string);
+        $row = $stmt->fetch('assoc');
+        return $row['used'];
     }
 
     private function _find_start_time($counter_data){
