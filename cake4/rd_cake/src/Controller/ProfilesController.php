@@ -464,18 +464,38 @@ class ProfilesController extends AppController
         $entity = $this->{$this->main_model}->get($this->reqData['id']);     
         
         $pc_name     = $this->profCompPrefix.$entity->id;
+        $pc_name_fup = $this->profCompPrefixFup.$entity->id;
+        $fup_active  = ($this->{'Radgroupchecks'}->find()->where([
+            'groupname' => $pc_name_fup,
+            'attribute' => 'Rd-Fup-Comp-Count'
+        ])->count() > 0);
         
         if($this->reqData['name'] !== $entity->name){
             
-            $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' =>$pc_name]);
-            $ne = $this->{'Radusergroups'}->newEntity(
-                [
-                    'username'  => $this->reqData['name'],
-                    'groupname' => $pc_name,
-                    'priority'  => 5
-                ]
-            );
-            $this->{'Radusergroups'}->save($ne);
+            $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name]);
+            if(!$fup_active){
+                $ne = $this->{'Radusergroups'}->newEntity(
+                    [
+                        'username'  => $this->reqData['name'],
+                        'groupname' => $pc_name,
+                        'priority'  => 5
+                    ]
+                );
+                $this->{'Radusergroups'}->save($ne);
+            }
+
+            // Keep FUP profile binding aligned when profile name changes.
+            $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name_fup]);
+            if($fup_active){
+                $ne_fup = $this->{'Radusergroups'}->newEntity(
+                    [
+                        'username'  => $this->reqData['name'],
+                        'groupname' => $pc_name_fup,
+                        'priority'  => 5
+                    ]
+                );
+                $this->{'Radusergroups'}->save($ne_fup);
+            }
             
             //== HEADS UP ==
             //==UPDATE ALL THE Permanet users
@@ -521,7 +541,7 @@ class ProfilesController extends AppController
         
         //Small fix (wizard had this bit missing)
         $count_ug = $this->{'Radusergroups'}->find()->where(['Radusergroups.groupname' =>$pc_name])->count();
-        if($count_ug == 0){
+        if(($count_ug == 0) && (!$fup_active)){
             $ne = $this->{'Radusergroups'}->newEntity(
                 [
                     'username'  => $this->reqData['name'],
@@ -534,7 +554,13 @@ class ProfilesController extends AppController
 
         $this->{$this->main_model}->patchEntity($entity, $this->reqData);      
         if ($this->{$this->main_model}->save($entity)) {
-            $this->_doRadius($pc_name);     
+            $this->_doRadius($pc_name);
+            if($fup_active){
+                // Option 2 enforcement: FUP is the single source of quota policy.
+                // We still parse simple payload, then sync monthly counters into FUP and detach SimpleAdd binding.
+                $this->_syncMonthlyCountersToFupGroup($pc_name_fup,$pc_name,$entity->id);
+                $this->{'Radusergroups'}->deleteAll(['Radusergroups.groupname' => $pc_name]);
+            }
             $this->set(array(
                 'success' => true
             ));
