@@ -547,30 +547,8 @@ RADIUSdesk_nas_data_counter {
 RADIUSdesk_data_counter {
 
     if((&control:Rd-Total-Data)&&(&control:Rd-Reset-Type-Data)&&(&control:Rd-Cap-Type-Data == 'hard')){
-        pl_reset_time_for_data
-        if(updated){ # Reset Time was updated,
-            # we can now use it in a query
-            if(&control:Rd-Tmp-Avail-Data){ #This indicates it it a device!
-                update control {
-                    Rd-Used-Data := "{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND UNIX_TIMESTAMP(timestamp) >= %{control:Rd-Start-Time}}"
-                }
-            }
-            else{ 
-                #Here we need to see if the counter is to be applied on the device level and there is a device present in the request
-                if((&control:Rd-Mac-Counter-Data)&&(&request:Calling-Station-Id)){
-                    update control {
-                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
-                    }
-                }
-                else{
-                    update control {
-                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
-                    }
-                }
-            }
-        }
-        else{
-            #Asumes reset type = never
+        # Avoid reset-time helpers for "never"; always use total historical usage.
+        if(&control:Rd-Reset-Type-Data == 'never'){
             #Get the total usage of the user
             if(&control:Rd-Tmp-Avail-Data){ #This indicates it it a device!
                 update control {
@@ -589,6 +567,29 @@ RADIUSdesk_data_counter {
                     }
                 }
             }
+        } else {
+            pl_reset_time_for_data
+            if(updated){ # Reset Time was updated,
+                # we can now use it in a query
+                if(&control:Rd-Tmp-Avail-Data){ #This indicates it it a device!
+                    update control {
+                        Rd-Used-Data := "{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND UNIX_TIMESTAMP(timestamp) >= %{control:Rd-Start-Time}}"
+                    }
+                }
+                else{ 
+                    #Here we need to see if the counter is to be applied on the device level and there is a device present in the request
+                    if((&control:Rd-Mac-Counter-Data)&&(&request:Calling-Station-Id)){
+                        update control {
+                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
+                        }
+                    }
+                    else{
+                        update control {
+                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
+                        }
+                    }
+                }
+            }
         }
 
         #Now we know how much they are allowed to use and the usage.
@@ -600,30 +601,8 @@ RADIUSdesk_data_counter {
 RADIUSdesk_time_counter {
 
     if((&control:Rd-Total-Time)&&(&control:Rd-Reset-Type-Time)&&(&control:Rd-Cap-Type-Time == 'hard')){
-        pl_reset_time_for_time
-        if(updated){ # Reset Time was updated,
-            # we can now use it in a query
-            if(&control:Rd-Tmp-Avail-Time){ #This indicates it it a device!
-                update control {
-					Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
-                }
-            }
-            else{
-                #Here we need to see if the counter is to be applied on the device level and there is a device present in the request
-                if((&control:Rd-Mac-Counter-Time)&&(&request:Calling-Station-Id)){
-                    update control {
-                        Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
-                    }
-                }
-                else{
-                    update control {
-                        Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
-                    }
-                }
-            }
-        }
-        else{
-            #Asumes reset type = never
+        # Avoid reset-time helpers for "never"; always use total historical usage.
+        if(&control:Rd-Reset-Type-Time == 'never'){
             #Get the total usage of the user
             if(&control:Rd-Tmp-Avail-Time){ #This indicates it it a device!
                 update control {
@@ -639,6 +618,29 @@ RADIUSdesk_time_counter {
                 else{
                     update control {
                         Rd-Used-Time := "{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username='%{request:User-Name}'}"
+                    }
+                }
+            }
+        } else {
+            pl_reset_time_for_time
+            if(updated){ # Reset Time was updated,
+                # we can now use it in a query
+                if(&control:Rd-Tmp-Avail-Time){ #This indicates it it a device!
+                    update control {
+						Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
+                    }
+                }
+                else{
+                    #Here we need to see if the counter is to be applied on the device level and there is a device present in the request
+                    if((&control:Rd-Mac-Counter-Time)&&(&request:Calling-Station-Id)){
+                        update control {
+                            Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
+                        }
+                    }
+                    else{
+                        update control {
+                            Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
+                        }
                     }
                 }
             }
