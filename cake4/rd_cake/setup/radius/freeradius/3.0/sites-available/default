@@ -290,7 +290,12 @@ authorize {
 	#
 	#  See policy.d/filter for the definition of the filter_username policy.
 	#
-	filter_username
+    #filter_username
+
+    update control{
+        RADIUSdesk-Virtual-Server := "default"
+    }	
+    RADIUSdesk
 
 	#
 	#  Some broken equipment sends passwords with embedded zeros.
@@ -439,7 +444,7 @@ authorize {
 	#  is meant to mirror the "users" file.
 	#
 	#  See "Authorization Queries" in mods-available/sql
-	-sql
+#	-sql
 
 	#
 	#  If you are using /etc/smbpasswd, and are also doing
@@ -469,7 +474,7 @@ authorize {
 
 	#
 	expiration
-	logintime
+	#logintime
 
 	#
 	#  If no other module has claimed responsibility for
@@ -671,6 +676,13 @@ preacct {
 	#
 	#  Read the 'acct_users' file
 	files
+	
+	update control{
+        RADIUSdesk-Virtual-Server := "default"
+    }
+    
+	RADIUSdesk
+	
 }
 
 #
@@ -685,13 +697,13 @@ accounting {
 	#  Create a 'detail'ed log of the packets.
 	#  Note that accounting requests which are proxied
 	#  are also logged in the detail file.
-	detail
+#	detail
 #	daily
 
 	#  Update the wtmp file
 	#
 	#  If you don't use "radlast", you can delete this line.
-	unix
+#	unix
 
 	#
 	#  For Simultaneous-Use tracking.
@@ -712,7 +724,9 @@ accounting {
 	#  Log traffic to an SQL database.
 	#
 	#  See "Accounting queries" in mods-available/sql
-	-sql
+#	-sql
+
+    RADIUSdesk
 
 	#
 	#  If you receive stop packets with zero session length,
@@ -732,7 +746,7 @@ accounting {
 #	pgsql-voip
 
 	# For Exec-Program and Exec-Program-Wait
-	exec
+#	exec
 
 	#  Filter attributes from the accounting response.
 	attr_filter.accounting_response
@@ -754,7 +768,7 @@ session {
 
 	#
 	#  See "Simultaneous Use Checking Queries" in mods-available/sql
-#	sql
+	sql
 }
 
 
@@ -868,7 +882,7 @@ post-auth {
 	#  After authenticating the user, do another SQL query.
 	#
 	#  See "Authentication Logging Queries" in mods-available/sql
-	-sql
+#	-sql
 
 	#
 	#  Un-comment the following if you want to modify the user's object
@@ -961,6 +975,8 @@ post-auth {
 
 	#  Remove reply message if the response contains an EAP-Message
 	remove_reply_message_if_eap
+	
+	RADIUSdesk
 
 	#
 	#  Access-Reject packets are sent through the REJECT sub-section of the
@@ -973,7 +989,7 @@ post-auth {
 	#
 	Post-Auth-Type REJECT {
 		# log failed authentications in SQL, too.
-		-sql
+#		-sql
 		attr_filter.access_reject
 
 		# Insert EAP-Failure message if the request was
@@ -983,6 +999,17 @@ post-auth {
 
 		#  Remove reply message if the response contains an EAP-Message
 		remove_reply_message_if_eap
+		
+		#CoovaChilli does not like the Reply-Message := "\r\nYou are already logged in - access denied\r\n\n" so we detect it and rewrite it
+		if(reply:Reply-Message =~ /You are already logged in/i){
+			update reply {
+				Reply-Message := "Simultaneous connections limited to %{control:Simultaneous-Use}"
+			}
+		}	
+
+        #RADIUSdesk -> For rejects:
+        RADIUSdesk_last_reject		
+		
 	}
 
 	#
@@ -1072,6 +1099,9 @@ post-auth {
 			&EAP-Key-Name := &reply:EAP-Session-Id
 		}
 	}
+	
+	
+	
 }
 
 #
