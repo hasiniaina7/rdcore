@@ -88,6 +88,36 @@ table_exists() {
   [[ "${count}" -gt 0 ]]
 }
 
+ensure_mysql_timezone_support() {
+  log INFO "Vérification du support MySQL CONVERT_TZ avec les timezones configurées."
+  local tz_name=""
+  tz_name="$(mysql_exec "${DB_NAME}" "SELECT name FROM timezones WHERE name IS NOT NULL AND name <> '' ORDER BY id ASC LIMIT 1;" 2>/dev/null || true)"
+
+  if [[ -z "${tz_name}" ]]; then
+    log WARN "Aucune timezone nommée trouvée dans timezones; vérification CONVERT_TZ ignorée."
+    return 0
+  fi
+
+  local converted=""
+  converted="$(mysql_exec "" "SELECT CONVERT_TZ('2000-01-01 00:00:00','${tz_name}','+00:00');" 2>/dev/null || true)"
+  if [[ -z "${converted}" || "${converted}" == "NULL" ]]; then
+    log WARN "CONVERT_TZ('${tz_name}') retourne NULL. Tentative de chargement des tables timezone MySQL."
+    if command -v mysql_tzinfo_to_sql >/dev/null 2>&1; then
+      mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql "${MYSQL_ARGS[@]}" mysql || log WARN "Import des timezones MySQL échoué."
+      converted="$(mysql_exec "" "SELECT CONVERT_TZ('2000-01-01 00:00:00','${tz_name}','+00:00');" 2>/dev/null || true)"
+      if [[ -z "${converted}" || "${converted}" == "NULL" ]]; then
+        log WARN "CONVERT_TZ('${tz_name}') reste NULL après import timezone MySQL."
+      else
+        log INFO "CONVERT_TZ opérationnel après import timezone MySQL."
+      fi
+    else
+      log WARN "mysql_tzinfo_to_sql introuvable; import timezone MySQL impossible."
+    fi
+  else
+    log INFO "Support CONVERT_TZ déjà opérationnel avec timezone '${tz_name}'."
+  fi
+}
+
 ensure_rd_database_schema() {
   log INFO "Vérification du schéma SQL (${DB_NAME})"
   if ! mysql_exec "" "SELECT 1;" >/dev/null 2>&1; then
@@ -289,6 +319,7 @@ chown -R www-data:www-data /var/www/rdcore
 chown -R www-data:www-data /var/www/html
 
 ensure_rd_database_schema
+ensure_mysql_timezone_support
 
 if [[ -x "${BASE_DIR}/scripts/cleanup_stale_radacct.sh" ]]; then
   log INFO "Nettoyage automatique des sessions radacct orphelines."
