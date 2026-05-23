@@ -276,7 +276,19 @@ class UserStatsController extends AppController {
                         $username = $q_r->username;
                     }                    
                 }
-                array_push($base_search, ['UserStats.username' => $username]);
+                // Some deployments store accounting usernames with a realm suffix
+                // (e.g. "user@realm") while UI rows show only "user".
+                // Match both to avoid empty graphs with non-zero usage percentages.
+                if((is_string($username)) && (strpos($username, '@') === false)){
+                    array_push($base_search, [
+                        'OR' => [
+                            ['UserStats.username' => $username],
+                            ['UserStats.username LIKE' => $username.'@%']
+                        ]
+                    ]);
+                }else{
+                    array_push($base_search, ['UserStats.username' => $username]);
+                }
                 
             }
             //Devices
