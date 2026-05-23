@@ -103,11 +103,9 @@ class UserStatsController extends AppController {
             $slot_start_txt = $slot_start->i18nFormat('yyyy-MM-dd HH:mm:ss');
             $slot_end_txt   = $slot_start->addHour(1)->subSecond(1)->i18nFormat('yyyy-MM-dd HH:mm:ss');
             $where          = $base_search;            
-            $query          = $this->{$this->main_model}->find();
             $slot_start     = $slot_start->addHour(1); 
-                      
-            $time_start = $this->_buildUtcBoundaryExpr($query,$slot_start_txt);
-            $time_end   = $this->_buildUtcBoundaryExpr($query,$slot_end_txt);
+            $time_start = $this->_toUtcBoundary($slot_start_txt);
+            $time_end   = $this->_toUtcBoundary($slot_end_txt);
                       
             array_push($where, ["timestamp >=" => $time_start]);
             array_push($where, ["timestamp <=" => $time_end]);
@@ -152,9 +150,8 @@ class UserStatsController extends AppController {
             $slot_start_txt     = $slot_start->i18nFormat('yyyy-MM-dd HH:mm:ss');
             $slot_end_txt       = $slot_start->addDay(1)->subSecond(1)->i18nFormat('yyyy-MM-dd HH:mm:ss'); //Our interval is one day
               
-            $query = $this->{$this->main_model}->find();
-            $time_start = $this->_buildUtcBoundaryExpr($query,$slot_start_txt);
-            $time_end   = $this->_buildUtcBoundaryExpr($query,$slot_end_txt);
+            $time_start = $this->_toUtcBoundary($slot_start_txt);
+            $time_end   = $this->_toUtcBoundary($slot_end_txt);
             
             $where  = $base_search;   
             array_push($where, ["timestamp >=" => $time_start]);
@@ -209,9 +206,8 @@ class UserStatsController extends AppController {
             $slot_start_txt     = $slot_start->i18nFormat('yyyy-MM-dd HH:mm:ss');
             $slot_end_txt       = $slot_start->addDay(1)->subSecond(1)->i18nFormat('yyyy-MM-dd HH:mm:ss'); //Our interval is one day
             
-            $query = $this->{$this->main_model}->find();
-            $time_start = $this->_buildUtcBoundaryExpr($query,$slot_start_txt);
-            $time_end   = $this->_buildUtcBoundaryExpr($query,$slot_end_txt);
+            $time_start = $this->_toUtcBoundary($slot_start_txt);
+            $time_end   = $this->_toUtcBoundary($slot_end_txt);
                        
             array_push($where, ["timestamp >=" => $time_start]);
             array_push($where, ["timestamp <=" => $time_end]);
@@ -379,18 +375,6 @@ class UserStatsController extends AppController {
         $this->_resolveTimezoneSource();
     }
 
-    private function _buildUtcBoundaryExpr($query,$localDateTime){
-        $fromTz = $this->time_zone;
-        if($this->time_zone_source === 'value'){
-            $fromTz = $this->time_zone_value;
-        }
-        return $query->func()->CONVERT_TZ([
-            "'$localDateTime'" => 'literal',
-            "'$fromTz'"         => 'literal',
-            "'+00:00'"          => 'literal',
-        ]);
-    }
-
     private function _resolveTimezoneSource(){
         $this->time_zone_source = 'name';
         $conn   = ConnectionManager::get('default');
@@ -429,6 +413,21 @@ class UserStatsController extends AppController {
         }catch(\Exception $e){
             return null;
         }
+    }
+
+    private function _toUtcBoundary($localDateTime){
+        $tzRef = $this->time_zone;
+        if($this->time_zone_source === 'value'){
+            $tzRef = $this->time_zone_value;
+        }
+        try{
+            $dt = new \DateTime($localDateTime,new \DateTimeZone($tzRef));
+        }catch(\Exception $e){
+            // Last safe fallback keeps behavior deterministic without hardcoded local TZ.
+            $dt = new \DateTime($localDateTime,new \DateTimeZone('UTC'));
+        }
+        $dt->setTimezone(new \DateTimeZone('UTC'));
+        return $dt->format('Y-m-d H:i:s');
     }
 
     private function _numOrZero($value){
