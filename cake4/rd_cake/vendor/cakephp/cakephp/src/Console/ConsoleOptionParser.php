@@ -684,10 +684,10 @@ class ConsoleOptionParser
     public function parse(array $argv, ?ConsoleIo $io = null): array
     {
         $command = isset($argv[0]) ? Inflector::underscore($argv[0]) : null;
-        if (isset($this->_subcommands[$command])) {
+        if ($command !== null && isset($this->_subcommands[$command])) {
             array_shift($argv);
         }
-        if (isset($this->_subcommands[$command]) && $this->_subcommands[$command]->parser()) {
+        if ($command !== null && isset($this->_subcommands[$command]) && $this->_subcommands[$command]->parser()) {
             /** @psalm-suppress PossiblyNullReference */
             return $this->_subcommands[$command]->parser()->parse($argv, $io);
         }

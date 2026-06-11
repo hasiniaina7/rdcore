@@ -140,16 +140,16 @@ class Mysql extends Driver
 
         $config['flags'] += [
             PDO::ATTR_PERSISTENT => $config['persistent'],
-            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+            $this->mysqlAttribute('ATTR_USE_BUFFERED_QUERY') => true,
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         ];
 
         if (!empty($config['ssl_key']) && !empty($config['ssl_cert'])) {
-            $config['flags'][PDO::MYSQL_ATTR_SSL_KEY] = $config['ssl_key'];
-            $config['flags'][PDO::MYSQL_ATTR_SSL_CERT] = $config['ssl_cert'];
+            $config['flags'][$this->mysqlAttribute('ATTR_SSL_KEY')] = $config['ssl_key'];
+            $config['flags'][$this->mysqlAttribute('ATTR_SSL_CERT')] = $config['ssl_cert'];
         }
         if (!empty($config['ssl_ca'])) {
-            $config['flags'][PDO::MYSQL_ATTR_SSL_CA] = $config['ssl_ca'];
+            $config['flags'][$this->mysqlAttribute('ATTR_SSL_CA')] = $config['ssl_ca'];
         }
 
         if (empty($config['unix_socket'])) {
@@ -341,5 +341,15 @@ class Mysql extends Driver
         deprecationWarning('Feature support checks are now implemented by `supports()` with FEATURE_* constants.');
 
         return $this->supports(static::FEATURE_WINDOW);
+    }
+
+    private function mysqlAttribute(string $name): int
+    {
+        $pdoMysqlConstant = 'Pdo\Mysql::' . $name;
+        if (defined($pdoMysqlConstant)) {
+            return constant($pdoMysqlConstant);
+        }
+
+        return constant('PDO::MYSQL_' . $name);
     }
 }

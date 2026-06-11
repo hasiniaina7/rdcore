@@ -335,12 +335,14 @@ class VouchersController extends AppController{
                 }        
             }
 
-            // Backfill percentages for legacy rows where caps/usages exist but percentages stayed null.
-            if (($row['perc_time_used'] === null) && !empty($row['time_cap']) && ($row['time_used'] !== null)) {
-                $row['perc_time_used'] = max(0, min(100, intval(($row['time_used'] / $row['time_cap']) * 100)));
+            // Derive voucher percentages from raw counters so over-quota usage remains visible.
+            if (!empty($row['time_cap']) && ($row['time_used'] !== null)) {
+                $time_pct = ($row['time_used'] / $row['time_cap']) * 100;
+                $row['perc_time_used'] = max(0, ($row['time_used'] > $row['time_cap']) ? intval(ceil($time_pct)) : intval($time_pct));
             }
-            if (($row['perc_data_used'] === null) && !empty($row['data_cap']) && ($row['data_used'] !== null)) {
-                $row['perc_data_used'] = max(0, min(100, intval(($row['data_used'] / $row['data_cap']) * 100)));
+            if (!empty($row['data_cap']) && ($row['data_used'] !== null)) {
+                $data_pct = ($row['data_used'] / $row['data_cap']) * 100;
+                $row['perc_data_used'] = max(0, ($row['data_used'] > $row['data_cap']) ? intval(ceil($data_pct)) : intval($data_pct));
             }
             if (
                 ($row['status'] === 'new') &&

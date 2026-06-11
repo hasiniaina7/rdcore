@@ -157,11 +157,16 @@ class AccountingShell extends Shell {
                     $counters['data']['usage'] = $this->Usage->data_usage($counters['data'],$username,'username');
                     //$counters['data']['usage'] =$this->Usage->find_no_reset_data_usage($username); 
                     //--People are actually issuing vouchers which resets monthly-- 
-                    $perc_data_used = intval(($counters['data']['usage'] / $counters['data']['value'])* 100);
+                    $data_pct = ($counters['data']['usage'] / $counters['data']['value']) * 100;
+                    $perc_data_used = intval($data_pct);
+                    if(intval($counters['data']['usage']) > intval($counters['data']['value'])){
+                        $perc_data_used = intval(ceil($data_pct));
+                    }
                     $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
                     if($q_r){
                         $d = [];
-                        $d['perc_data_used'] = max(0, min(100, $perc_data_used));
+                        $d['perc_data_used'] = max(0, $perc_data_used);
+                        $kick_active_sessions = false;
                         if($q_r->status !== 'expired'){
                             $d['status'] = 'used';
                             if(
@@ -169,12 +174,16 @@ class AccountingShell extends Shell {
                                 (intval($counters['data']['usage']) >= intval($counters['data']['value']))
                             ){
                                 $d['status'] = 'depleted';
+                                $kick_active_sessions = true;
                             }
                         }
 		                $d['data_used']	= intval($counters['data']['usage']);
 		                $d['data_cap']	= $counters['data']['value'];
                         $this->{'Vouchers'}->patchEntity($q_r,$d);
                         $this->{'Vouchers'}->save($q_r);
+                        if($kick_active_sessions || ($q_r->status === 'depleted')){
+                            $this->_kickActiveSessionsByUsername($username, 'accounting-shell-hard-data-cap');
+                        }
                     }
                 }
             }

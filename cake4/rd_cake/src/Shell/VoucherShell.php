@@ -35,7 +35,7 @@ class VoucherShell extends Shell {
 
     public function main() {
         $qr = $this->{'Vouchers'}->find()
-            ->where(['OR'=> [['Vouchers.status' => 'new'],['Vouchers.status' => 'used']]])
+            ->where(['Vouchers.status IN' => ['new', 'used', 'depleted', 'expired']])
             ->all();
         foreach($qr as $i){
             $this->process_voucher($i->name);
@@ -122,11 +122,16 @@ class VoucherShell extends Shell {
             if(array_key_exists('data', $counters) && !empty($counters['data']['value'])){
                 $used = $this->Usage->data_usage($counters['data'],$name,'username');
                 if($used !== false){
-                    $perc_used = intval(($used / $counters['data']['value']) * 100);
+                    $data_pct = ($used / $counters['data']['value']) * 100;
+                    $perc_used = intval($data_pct);
+                    if(intval($used) > intval($counters['data']['value'])){
+                        $perc_used = intval(ceil($data_pct));
+                    }
                     $d = [];
-                    $d['perc_data_used'] = max(0, min(100, $perc_used));
+                    $d['perc_data_used'] = max(0, $perc_used);
                     $d['data_used']      = intval($used);
                     $d['data_cap']       = $counters['data']['value'];
+                    $kick_active_sessions = false;
 
                     if($q_r->status !== 'expired'){
                         $d['status'] = 'used';
@@ -135,10 +140,14 @@ class VoucherShell extends Shell {
                             (intval($used) >= intval($counters['data']['value']))
                         ){
                             $d['status'] = 'depleted';
+                            $kick_active_sessions = true;
                         }
                     }
                     $this->{'Vouchers'}->patchEntity($q_r,$d);
                     $this->{'Vouchers'}->save($q_r);
+                    if($kick_active_sessions || ($q_r->status === 'depleted')){
+                        $this->_kickActiveSessionsByUsername($name, 'voucher-shell-hard-data-cap');
+                    }
                 }
             }
         }

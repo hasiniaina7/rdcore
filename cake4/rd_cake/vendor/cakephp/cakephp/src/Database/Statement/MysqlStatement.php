@@ -35,12 +35,22 @@ class MysqlStatement extends PDOStatement
         $connection = $this->_driver->getConnection();
 
         try {
-            $connection->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $this->_bufferResults);
+            $connection->setAttribute($this->bufferedQueryAttribute(), $this->_bufferResults);
             $result = $this->_statement->execute($params);
         } finally {
-            $connection->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+            $connection->setAttribute($this->bufferedQueryAttribute(), true);
         }
 
         return $result;
+    }
+
+    private function bufferedQueryAttribute(): int
+    {
+        $pdoMysqlConstant = 'Pdo\Mysql::ATTR_USE_BUFFERED_QUERY';
+        if (defined($pdoMysqlConstant)) {
+            return constant($pdoMysqlConstant);
+        }
+
+        return constant('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY');
     }
 }

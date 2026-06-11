@@ -138,8 +138,16 @@ class EnforceOmadaQuotaCommand extends Command
         $radchecks = TableRegistry::getTableLocator()->get('Radchecks');
 
         $counterInfo = [];
+        $profileName = $username;
+        $profile = $radchecks->find()
+            ->where(['Radchecks.username' => $username, 'Radchecks.attribute' => 'User-Profile'])
+            ->first();
+        if ($profile && (string)$profile->value !== '') {
+            $profileName = (string)$profile->value;
+        }
+
         $groups = $radusergroups->find()
-            ->where(['Radusergroups.username' => $username])
+            ->where(['Radusergroups.username' => $profileName])
             ->order(['Radusergroups.priority ASC'])
             ->all();
 

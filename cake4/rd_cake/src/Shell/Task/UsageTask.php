@@ -91,7 +91,6 @@ class UsageTask extends Shell {
         }
 
         if($query_string){
-            print_r($query_string);
             $conn = ConnectionManager::get('default');
             $stmt = $conn->execute($query_string);
             $row = $stmt->fetch('assoc');
@@ -121,7 +120,6 @@ class UsageTask extends Shell {
         }
 
         if($query_string){
-            print_r($query_string);
             $conn = ConnectionManager::get('default');
             $stmt = $conn->execute($query_string);
             $row = $stmt->fetch('assoc');
