@@ -16,7 +16,7 @@ run_remote() {
   fi
 }
 
-run_remote "git fetch '$GIT_REMOTE' '$GIT_REF' && git checkout '$GIT_REF' && git pull '$GIT_REMOTE' '$GIT_REF' && npm install --workspaces --omit=dev && npm --workspace apps/backend-portal-api-rd-omada run build"
+run_remote "git fetch '$GIT_REMOTE' '$GIT_REF' && git checkout '$GIT_REF' && git pull '$GIT_REMOTE' '$GIT_REF' && npm install --workspaces && npm --workspace apps/backend-portal-api-rd-omada run build"
 
 if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
   if [[ -n "$TARGET_HOST" ]]; then
