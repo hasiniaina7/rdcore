@@ -1,4 +1,4 @@
-import { LRUCache } from 'lru-cache';
+import LRUCache from 'lru-cache';
 import { fetchDynamicDetails } from './radiusdeskIntegration';
 import { DynamicDetailResponse } from '../types';
 import config from '../config';

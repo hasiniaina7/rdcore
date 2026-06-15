@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { LRUCache } from 'lru-cache';
+import LRUCache from 'lru-cache';
 import createError from 'http-errors';
 import config from '../config';
 import type { AdminAuthMode, AdminSession } from '../types';

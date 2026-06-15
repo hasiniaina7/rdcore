@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { LRUCache } from 'lru-cache';
+import LRUCache from 'lru-cache';
 import config from '../config';
 
 export type UsageSessionPayload = {
