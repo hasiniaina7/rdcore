@@ -272,11 +272,14 @@ const verifyRadiusdeskCredentials = async (username, password) => {
     // 1) PermanentUsers: comparer le mot de passe côté RadiusDesk
     try {
         const permanentResponse = await (0, radiusdeskIntegration_1.findPermanentUser)(normalizedUsername);
-        const permanentRecord = extractFirstRecord(permanentResponse);
+        //Patch pour contourner collision de nom d'utilisateur
+        const permanentItems = permanentResponse?.items;
+        const permanentRecord = Array.isArray(permanentItems)
+            ? permanentItems.find((item) => typeof item?.username === 'string' &&
+                item.username.trim() === normalizedUsername)
+            : undefined;
         if (permanentRecord) {
-            const recordUsername = typeof permanentRecord.username === 'string'
-                ? permanentRecord.username.trim()
-                : undefined;
+            const recordUsername = permanentRecord.username?.trim();
             if (recordUsername && recordUsername === normalizedUsername) {
                 const userId = permanentRecord.id;
                 if (userId != null) {
@@ -289,6 +292,7 @@ const verifyRadiusdeskCredentials = async (username, password) => {
                     }
                 }
             }
+            //Patch pour contourner collision de nom d'utilisateur
         }
     }
     catch {

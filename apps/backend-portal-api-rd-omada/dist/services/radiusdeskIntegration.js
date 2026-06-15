@@ -136,7 +136,7 @@ async function findPermanentUser(username) {
             },
         ]);
         const { data } = await radiusClient.get('/permanent-users/index.json', {
-            params: withDefaults({ limit: 1, page: 1, start: 0, filter }),
+            params: withDefaults({ limit: 20, page: 1, start: 0, filter }),
         });
         return data;
     }, 'permanent-users');
