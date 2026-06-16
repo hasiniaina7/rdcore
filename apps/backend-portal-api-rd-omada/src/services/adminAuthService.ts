@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import { LRUCache as _LRUCache } from 'lru-cache';
-const LRUCache = require('lru-cache') as typeof _LRUCache;
+import { LRUCache } from 'lru-cache';
 import createError from 'http-errors';
 import config from '../config';
 import type { AdminAuthMode, AdminSession } from '../types';

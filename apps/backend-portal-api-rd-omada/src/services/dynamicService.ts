@@ -1,5 +1,4 @@
-import { LRUCache as _LRUCache } from 'lru-cache';
-const LRUCache = require('lru-cache') as typeof _LRUCache;
+import { LRUCache } from 'lru-cache';
 import { fetchDynamicDetails } from './radiusdeskIntegration';
 import { DynamicDetailResponse } from '../types';
 import config from '../config';
