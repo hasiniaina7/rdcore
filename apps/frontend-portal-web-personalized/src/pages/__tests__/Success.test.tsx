@@ -13,6 +13,18 @@ vi.mock('recharts', async () => {
   };
 });
 
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    Link: ({ children, ...props }: { children: ReactNode }) => (
+      <a {...props}>
+        {children}
+      </a>
+    ),
+  };
+});
+
 vi.mock('../../hooks/useOmadaParams', () => ({
   __esModule: true,
   default: () => ({}),
@@ -74,6 +86,7 @@ describe('Success page', () => {
     mockedUseUsageData.mockReturnValue({
       usage: {
         username: 'demo',
+        accountType: 'voucher',
         dataUsed: 2048,
         dataCap: 4096,
         timeUsed: 600,
@@ -135,8 +148,50 @@ describe('Success page', () => {
     render(<Success />);
 
     expect(screen.getByText('success.sessionsTitle')).toBeInTheDocument();
-    expect(screen.getByText('success.routerStatsSubtitle')).toBeInTheDocument();
-    expect(screen.getAllByText('AP-1').length).toBeGreaterThan(0);
+    expect(screen.getByText('success.sessionsCaption')).toBeInTheDocument();
     expect(screen.getByText('success.lastUpdated')).toBeInTheDocument();
+  });
+
+  it('uses the monthly total for permanent accounts', () => {
+    mockedUseAuth.mockReturnValue({
+      session: {
+        token: 'abc',
+        profile: { username: 'demo', mac: 'AA:BB', accountType: 'permanent' },
+      },
+      login: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockedUseUsageData.mockReturnValue({
+      usage: {
+        username: 'demo',
+        accountType: 'permanent',
+        dataUsed: 2048,
+        dataCap: 4096,
+        timeUsed: 600,
+        timeCap: 3600,
+        depleted: false,
+        sessions: [],
+      },
+      summary: {
+        username: 'demo',
+        historyLimit: 50,
+        macs: [],
+        periods: [
+          { period: 'daily', totalBytes: 1024, totalTimeSeconds: 120, sessionCount: 1 },
+          { period: 'weekly', totalBytes: 2048, totalTimeSeconds: 240, sessionCount: 2 },
+          { period: 'monthly', totalBytes: 8192, totalTimeSeconds: 900, sessionCount: 6 },
+        ],
+      },
+      activeSessions: null,
+      inactiveSessions: null,
+      errors: [],
+      isLoading: false,
+      lastUpdated: Date.now(),
+      refresh: vi.fn(),
+    });
+
+    render(<Success />);
+
+    expect(screen.getAllByRole('progressbar')[0]).toHaveAttribute('aria-valuenow', '100');
   });
 });

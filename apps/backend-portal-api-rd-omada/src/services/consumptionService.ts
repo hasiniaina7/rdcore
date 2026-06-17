@@ -86,6 +86,11 @@ const extractFirstRecord = (payload: RadiusdeskCollection | undefined): Record<s
   return payload.items[0];
 };
 
+const getMonthlyUsageBytes = (insights: Awaited<ReturnType<typeof fetchUsageByUsername>> | null | undefined) => {
+  const monthly = insights?.periods.find((period) => period.period === 'monthly');
+  return monthly?.totalBytes ?? undefined;
+};
+
 const humanizeBytes = (value: number | null | undefined): HumanizedValue => {
   if (value == null || !Number.isFinite(value)) {
     return { raw: value ?? null, formatted: null, unit: null };
@@ -438,7 +443,9 @@ export async function getConsumptionOverview(payload: { username: string; passwo
     (inactiveSessions?.sessions?.reduce((acc: number, s: any) => acc + (toNumber(s?.acctsessiontime) ?? 0), 0) ?? 0);
 
   const dataCapBytes = usage.dataCap ?? null;
-  const dataUsedBytes = usage.dataUsed ?? 0;
+  const monthlyUsageBytes = getMonthlyUsageBytes(insights);
+  const dataUsedBytes =
+    account.accountType === 'permanent' ? monthlyUsageBytes ?? usage.dataUsed ?? 0 : usage.dataUsed ?? 0;
   const dataRemainingBytes = dataCapBytes != null ? Math.max(0, dataCapBytes - dataUsedBytes) : null;
   let timeCapSeconds = usage.timeCap ?? account.timeCapSeconds ?? null;
   let timeUsedSeconds = usage.timeUsed ?? account.timeUsedSeconds ?? null;

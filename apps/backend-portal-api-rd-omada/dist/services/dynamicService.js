@@ -5,11 +5,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDynamicDetail = getDynamicDetail;
 exports.resetDynamicDetailCache = resetDynamicDetailCache;
-const LRUCache = require('lru-cache');
+const lru_cache_1 = require("lru-cache");
 const radiusdeskIntegration_1 = require("./radiusdeskIntegration");
 const config_1 = __importDefault(require("../config"));
 const metrics_1 = require("../utils/metrics");
-const cache = new LRUCache({
+const cache = new lru_cache_1.LRUCache({
     ttl: 15 * 1000,
     allowStale: false,
     max: 100,

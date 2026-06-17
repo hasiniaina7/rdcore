@@ -4,6 +4,7 @@ import { setApiAuthToken } from '../../api/client';
 type AuthProfile = {
   username: string;
   mac?: string;
+  accountType?: 'permanent' | 'voucher' | 'unknown';
 };
 
 export type UsageSession = {

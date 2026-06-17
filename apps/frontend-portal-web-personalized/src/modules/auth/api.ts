@@ -11,6 +11,7 @@ export type LoginResult = {
   profile: {
     username: string;
     mac?: string;
+    accountType?: 'permanent' | 'voucher' | 'unknown';
   };
 };
 

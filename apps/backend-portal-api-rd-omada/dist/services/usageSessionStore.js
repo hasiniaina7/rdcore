@@ -7,10 +7,10 @@ exports.createUsageSession = createUsageSession;
 exports.getUsageSession = getUsageSession;
 exports.deleteUsageSession = deleteUsageSession;
 const crypto_1 = require("crypto");
-const LRUCache = require('lru-cache');
+const lru_cache_1 = require("lru-cache");
 const config_1 = __importDefault(require("../config"));
 const ttlMs = config_1.default.USAGE_SESSION_TTL_MINUTES * 60 * 1000;
-const sessionStore = new LRUCache({
+const sessionStore = new lru_cache_1.LRUCache({
     max: config_1.default.USAGE_SESSION_CACHE_SIZE,
     ttl: ttlMs,
     updateAgeOnGet: true,

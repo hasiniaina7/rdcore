@@ -52,6 +52,7 @@ describe('fetchUsage', () => {
     });
 
     const result = await fetchUsage('user', 'secret', undefined, 5, true);
+    expect(result.accountType).toBe('permanent');
     expect(result.mac).toBeUndefined();
     expect(result.dataUsed).toBe(123);
     expect(result.dataCap).toBe(456);

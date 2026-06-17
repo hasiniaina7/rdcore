@@ -19,7 +19,7 @@ const mockedLoginUsageUser = loginService_1.loginUsageUser;
         mockedLoginUsageUser.mockResolvedValue({
             token: 'session-token',
             expiresAt: 123,
-            profile: { username: 'bob', mac: '00:11:22' },
+            profile: { username: 'bob', mac: '00:11:22', accountType: 'permanent' },
         });
         const res = await (0, supertest_1.default)(app_1.default).post('/api/login').send({ username: 'bob', password: 'secret' });
         (0, vitest_1.expect)(res.status).toBe(200);
@@ -28,7 +28,7 @@ const mockedLoginUsageUser = loginService_1.loginUsageUser;
             data: {
                 token: 'session-token',
                 expiresAt: 123,
-                profile: { username: 'bob', mac: '00:11:22' },
+                profile: { username: 'bob', mac: '00:11:22', accountType: 'permanent' },
             },
         });
         (0, vitest_1.expect)(mockedLoginUsageUser).toHaveBeenCalledWith({ username: 'bob', password: 'secret' });

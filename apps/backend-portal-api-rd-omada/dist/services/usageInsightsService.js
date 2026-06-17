@@ -13,7 +13,6 @@ const PERIODS = [
     { period: 'hourly', windowMs: HOUR_MS },
     { period: 'daily', windowMs: DAY_MS },
     { period: 'weekly', windowMs: 7 * DAY_MS },
-    { period: 'monthly', windowMs: 30 * DAY_MS },
 ];
 const DEFAULT_WINDOWS = {
     hour: 24 * HOUR_MS,
@@ -71,6 +70,12 @@ const alignToUnitStart = (value, granularity) => {
     return date.getTime();
 };
 const alignToUnitEnd = (value, granularity, bucketSize) => alignToUnitStart(value, granularity) + bucketSize - 1;
+const startOfMonth = (timestamp) => {
+    const date = new Date(timestamp);
+    date.setDate(1);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+};
 const normalizeRange = (options) => {
     const granularity = options?.granularity ?? 'day';
     const bucketSize = granularity === 'hour' ? HOUR_MS : DAY_MS;
@@ -150,13 +155,22 @@ const createTimeseriesBuilder = (options) => {
     };
 };
 const computePeriodSummaries = (items, now) => {
-    const periodStates = PERIODS.map((period) => ({
-        period: period.period,
-        since: now - period.windowMs,
-        totalBytes: 0,
-        totalTimeSeconds: 0,
-        sessionCount: 0,
-    }));
+    const periodStates = [
+        ...PERIODS.map((period) => ({
+            period: period.period,
+            since: now - period.windowMs,
+            totalBytes: 0,
+            totalTimeSeconds: 0,
+            sessionCount: 0,
+        })),
+        {
+            period: 'monthly',
+            since: startOfMonth(now),
+            totalBytes: 0,
+            totalTimeSeconds: 0,
+            sessionCount: 0,
+        },
+    ];
     for (const entry of items) {
         const start = parseDate(entry.acctstarttime ?? entry.start_time);
         if (!start) {
@@ -186,14 +200,38 @@ const normalizeOptions = (input) => {
     return input ?? {};
 };
 const extractSessions = (payload) => Array.isArray(payload) ? payload : [];
+const mergeSessionItems = (responses) => {
+    const seen = new Set();
+    const merged = [];
+    for (const response of responses) {
+        for (const item of extractSessions(response?.items)) {
+            const keyParts = [
+                String(item.radacctid ?? ''),
+                String(item.acctsessionid ?? ''),
+                String(item.username ?? ''),
+                String(item.acctstarttime ?? item.start_time ?? ''),
+            ];
+            const key = keyParts.join('|');
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            merged.push(item);
+        }
+    }
+    return merged;
+};
 async function fetchUsageByUsername(username, optionsInput) {
     if (!username?.trim()) {
         throw (0, http_errors_1.default)(400, 'username is required');
     }
     const options = normalizeOptions(optionsInput);
     const normalizedLimit = clampHistoryLimit(options.historyLimit);
-    const sessionsResponse = await (0, radiusdeskIntegration_1.getSessions)(username.trim(), normalizedLimit, { onlyConnected: false });
-    const items = extractSessions(sessionsResponse?.items);
+    const [inactiveResponse, activeResponse] = await Promise.all([
+        (0, radiusdeskIntegration_1.getSessions)(username.trim(), normalizedLimit, { onlyConnected: false }),
+        (0, radiusdeskIntegration_1.getSessions)(username.trim(), normalizedLimit, { onlyConnected: true }),
+    ]);
+    const items = mergeSessionItems([inactiveResponse, activeResponse]);
     const macs = new Set();
     const now = options.endDate?.getTime() ?? Date.now();
     const periods = computePeriodSummaries(items, now);
@@ -227,8 +265,11 @@ async function fetchUsageTimeseries(username, options) {
         throw (0, http_errors_1.default)(400, 'username is required');
     }
     const normalizedLimit = clampHistoryLimit(options?.historyLimit);
-    const sessionsResponse = await (0, radiusdeskIntegration_1.getSessions)(username.trim(), normalizedLimit, { onlyConnected: false });
-    const items = extractSessions(sessionsResponse?.items);
+    const [inactiveResponse, activeResponse] = await Promise.all([
+        (0, radiusdeskIntegration_1.getSessions)(username.trim(), normalizedLimit, { onlyConnected: false }),
+        (0, radiusdeskIntegration_1.getSessions)(username.trim(), normalizedLimit, { onlyConnected: true }),
+    ]);
+    const items = mergeSessionItems([inactiveResponse, activeResponse]);
     const builder = createTimeseriesBuilder(options);
     for (const entry of items) {
         if (!entry || typeof entry !== 'object') {

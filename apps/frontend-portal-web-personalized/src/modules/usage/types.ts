@@ -9,6 +9,7 @@ export interface UsageSessionsOptions {
 
 export interface UsageStats {
   username: string;
+  accountType: 'permanent' | 'voucher' | 'unknown';
   mac?: string;
   dataUsed?: number;
   dataCap?: number | null;

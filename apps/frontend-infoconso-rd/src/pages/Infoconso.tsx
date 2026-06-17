@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import "../styles/infoconso.css";
 import { login, fetchConsumption } from "../modules/usage/api/consumption.api";
 import { LoginType, ConsumptionData, LoginPayload } from "../modules/usage/types";
-import { formatBytes } from "../modules/usage/utils";
 import { LoginSwitcher } from "../modules/usage/components/LoginSwitcher";
 import { VoucherLoginForm } from "../modules/usage/components/VoucherLoginForm";
 import { UserLoginForm } from "../modules/usage/components/UserLoginForm";
@@ -18,6 +17,15 @@ function HeaderBadge({ label }: { label: string }) {
 }
 
 const iconStroke = "#2563eb";
+
+function toCapValue(raw: number): { raw: number; formatted: string; unit: "GB" } {
+  const gbValue = raw / (1024 ** 3);
+  return {
+    raw,
+    formatted: gbValue.toFixed(1),
+    unit: "GB",
+  };
+}
 
 const IconData = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconStroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -174,11 +182,29 @@ export default function InfoconsoPage() {
   };
 
   const summary = consumption?.summary;
+  const monthlyPeriod = consumption?.insights.periods.find((period) => period.period === "monthly");
+  const isPermanentAccount = summary?.accountType === "permanent" || summary?.accountType === "user";
+  const displaySummary = useMemo(() => {
+    if (!summary || !isPermanentAccount || monthlyPeriod == null) {
+      return summary;
+    }
 
-  const totalBytes = useMemo(() => {
-    if (!consumption) return 0;
-    return consumption.insights.periods.reduce((sum, p) => sum + (p.totalBytes || 0), 0);
-  }, [consumption]);
+    const monthlyUsed = monthlyPeriod.totalBytes;
+    const dataUsed = toCapValue(monthlyUsed);
+    const dataRemaining = summary.dataCap.raw != null ? toCapValue(Math.max(0, summary.dataCap.raw - monthlyUsed)) : summary.dataRemaining;
+    const percDataUsed = summary.dataCap.raw ? Math.min(100, Math.round((monthlyUsed / summary.dataCap.raw) * 100)) : summary.percDataUsed;
+
+    return {
+      ...summary,
+      dataUsed,
+      dataRemaining,
+      percDataUsed,
+    };
+  }, [isPermanentAccount, monthlyPeriod, summary]);
+  const activeSummary = displaySummary ?? summary;
+  const displaySummaryData = activeSummary!;
+
+  const totalBytes = displaySummaryData?.dataUsed.raw ?? 0;
 
   return (
     <div className="infoconso-page">
@@ -217,7 +243,7 @@ export default function InfoconsoPage() {
                   onCodeChange={setVoucherCode}
                   onSubmit={handleLogin}
                   loading={loading}
-                  error={undefined}
+                  error={error ?? undefined}
                 />
               ) : (
                 <UserLoginForm
@@ -227,7 +253,7 @@ export default function InfoconsoPage() {
                   onPasswordChange={setPassword}
                   onSubmit={handleLogin}
                   loading={loading}
-                  error={undefined}
+                  error={error ?? undefined}
                 />
               )}
             </div>
@@ -262,7 +288,7 @@ export default function InfoconsoPage() {
                     <HeaderBadge label={`Type: ${summary.accountType}`} />
                     {summary.profile && <HeaderBadge label={`Profil: ${summary.profile}`} />}
                     {summary.status && <HeaderBadge label={`Statut: ${summary.status}`} />}
-                    <HeaderBadge label={`Volume: ${formatBytes(totalBytes)}`} />
+                    <HeaderBadge label={`Volume: ${displaySummaryData.dataUsed.formatted} ${displaySummaryData.dataUsed.unit}`} />
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -288,10 +314,10 @@ export default function InfoconsoPage() {
               )}
               <QuotaCard
                 title="Quota Data"
-                cap={summary.dataCap}
-                used={summary.dataUsed}
-                remaining={summary.dataRemaining}
-                percent={summary.percDataUsed}
+                cap={displaySummaryData.dataCap}
+                used={displaySummaryData.dataUsed}
+                remaining={displaySummaryData.dataRemaining}
+                percent={displaySummaryData.percDataUsed}
                 icon={<IconData />}
               />
               <QuotaCard

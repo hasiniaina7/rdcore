@@ -11,11 +11,12 @@ import {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-const PERIODS: Array<{ period: UsagePeriodKey; windowMs: number }> = [
+type RollingPeriodKey = Exclude<UsagePeriodKey, 'monthly'>;
+
+const PERIODS: Array<{ period: RollingPeriodKey; windowMs: number }> = [
   { period: 'hourly', windowMs: HOUR_MS },
   { period: 'daily', windowMs: DAY_MS },
   { period: 'weekly', windowMs: 7 * DAY_MS },
-  { period: 'monthly', windowMs: 30 * DAY_MS },
 ];
 
 const DEFAULT_WINDOWS: Record<UsageTimeseriesGranularity, number> = {
@@ -101,6 +102,13 @@ const alignToUnitEnd = (
   bucketSize: number
 ) => alignToUnitStart(value, granularity) + bucketSize - 1;
 
+const startOfMonth = (timestamp: number) => {
+  const date = new Date(timestamp);
+  date.setDate(1);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+};
+
 const normalizeRange = (options?: UsageSummaryOptions): NormalizedRange => {
   const granularity = options?.granularity ?? 'day';
   const bucketSize = granularity === 'hour' ? HOUR_MS : DAY_MS;
@@ -185,13 +193,28 @@ const createTimeseriesBuilder = (options?: UsageSummaryOptions) => {
 };
 
 const computePeriodSummaries = (items: Record<string, unknown>[], now: number) => {
-  const periodStates = PERIODS.map((period) => ({
-    period: period.period,
-    since: now - period.windowMs,
-    totalBytes: 0,
-    totalTimeSeconds: 0,
-    sessionCount: 0,
-  }));
+  const periodStates: Array<{
+    period: UsagePeriodKey;
+    since: number;
+    totalBytes: number;
+    totalTimeSeconds: number;
+    sessionCount: number;
+  }> = [
+    ...PERIODS.map((period) => ({
+      period: period.period,
+      since: now - period.windowMs,
+      totalBytes: 0,
+      totalTimeSeconds: 0,
+      sessionCount: 0,
+    })),
+    {
+      period: 'monthly',
+      since: startOfMonth(now),
+      totalBytes: 0,
+      totalTimeSeconds: 0,
+      sessionCount: 0,
+    },
+  ];
 
   for (const entry of items) {
     const start = parseDate(entry.acctstarttime ?? entry.start_time);
@@ -228,6 +251,30 @@ const normalizeOptions = (input?: number | UsageSummaryOptions): UsageSummaryOpt
 const extractSessions = (payload: unknown): Record<string, unknown>[] =>
   Array.isArray(payload) ? (payload as Record<string, unknown>[]) : [];
 
+const mergeSessionItems = (responses: Array<{ items?: Record<string, unknown>[] } | undefined>) => {
+  const seen = new Set<string>();
+  const merged: Record<string, unknown>[] = [];
+
+  for (const response of responses) {
+    for (const item of extractSessions(response?.items)) {
+      const keyParts = [
+        String(item.radacctid ?? ''),
+        String(item.acctsessionid ?? ''),
+        String(item.username ?? ''),
+        String(item.acctstarttime ?? item.start_time ?? ''),
+      ];
+      const key = keyParts.join('|');
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+
+  return merged;
+};
+
 export async function fetchUsageByUsername(
   username: string,
   optionsInput?: number | UsageSummaryOptions
@@ -237,8 +284,11 @@ export async function fetchUsageByUsername(
   }
   const options = normalizeOptions(optionsInput);
   const normalizedLimit = clampHistoryLimit(options.historyLimit);
-  const sessionsResponse = await getSessions(username.trim(), normalizedLimit, { onlyConnected: false });
-  const items = extractSessions(sessionsResponse?.items);
+  const [inactiveResponse, activeResponse] = await Promise.all([
+    getSessions(username.trim(), normalizedLimit, { onlyConnected: false }),
+    getSessions(username.trim(), normalizedLimit, { onlyConnected: true }),
+  ]);
+  const items = mergeSessionItems([inactiveResponse, activeResponse]);
   const macs = new Set<string>();
   const now = options.endDate?.getTime() ?? Date.now();
   const periods = computePeriodSummaries(items, now);
@@ -278,8 +328,11 @@ export async function fetchUsageTimeseries(
     throw createError(400, 'username is required');
   }
   const normalizedLimit = clampHistoryLimit(options?.historyLimit);
-  const sessionsResponse = await getSessions(username.trim(), normalizedLimit, { onlyConnected: false });
-  const items = extractSessions(sessionsResponse?.items);
+  const [inactiveResponse, activeResponse] = await Promise.all([
+    getSessions(username.trim(), normalizedLimit, { onlyConnected: false }),
+    getSessions(username.trim(), normalizedLimit, { onlyConnected: true }),
+  ]);
+  const items = mergeSessionItems([inactiveResponse, activeResponse]);
   const builder = createTimeseriesBuilder(options);
 
   for (const entry of items) {

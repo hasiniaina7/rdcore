@@ -44,6 +44,7 @@ const mockedFindVoucher = vitest_1.vi.mocked(radiusdeskIntegration_1.findVoucher
             items: [{ data_used: 123, data_cap: 456, time_cap: 3600 }],
         });
         const result = await (0, usageService_1.fetchUsage)('user', 'secret', undefined, 5, true);
+        (0, vitest_1.expect)(result.accountType).toBe('permanent');
         (0, vitest_1.expect)(result.mac).toBeUndefined();
         (0, vitest_1.expect)(result.dataUsed).toBe(123);
         (0, vitest_1.expect)(result.dataCap).toBe(456);

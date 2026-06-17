@@ -17,6 +17,7 @@ async function loginUsageUser(payload) {
         profile: {
             username: usage.username,
             mac: usage.mac ?? normalizedMac,
+            accountType: usage.accountType,
         },
     };
 }

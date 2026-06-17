@@ -71,6 +71,10 @@ const extractFirstRecord = (payload) => {
     }
     return payload.items[0];
 };
+const getMonthlyUsageBytes = (insights) => {
+    const monthly = insights?.periods.find((period) => period.period === 'monthly');
+    return monthly?.totalBytes ?? undefined;
+};
 const humanizeBytes = (value) => {
     if (value == null || !Number.isFinite(value)) {
         return { raw: value ?? null, formatted: null, unit: null };
@@ -356,7 +360,8 @@ async function getConsumptionOverview(payload) {
     const totalSessionSeconds = (activeSessions?.sessions?.reduce((acc, s) => acc + (toNumber(s?.acctsessiontime) ?? 0), 0) ?? 0) +
         (inactiveSessions?.sessions?.reduce((acc, s) => acc + (toNumber(s?.acctsessiontime) ?? 0), 0) ?? 0);
     const dataCapBytes = usage.dataCap ?? null;
-    const dataUsedBytes = usage.dataUsed ?? 0;
+    const monthlyUsageBytes = getMonthlyUsageBytes(insights);
+    const dataUsedBytes = account.accountType === 'permanent' ? monthlyUsageBytes ?? usage.dataUsed ?? 0 : usage.dataUsed ?? 0;
     const dataRemainingBytes = dataCapBytes != null ? Math.max(0, dataCapBytes - dataUsedBytes) : null;
     let timeCapSeconds = usage.timeCap ?? account.timeCapSeconds ?? null;
     let timeUsedSeconds = usage.timeUsed ?? account.timeUsedSeconds ?? null;

@@ -19,7 +19,7 @@ describe('POST /api/login', () => {
     mockedLoginUsageUser.mockResolvedValue({
       token: 'session-token',
       expiresAt: 123,
-      profile: { username: 'bob', mac: '00:11:22' },
+      profile: { username: 'bob', mac: '00:11:22', accountType: 'permanent' },
     });
 
     const res = await request(app).post('/api/login').send({ username: 'bob', password: 'secret' });
@@ -30,7 +30,7 @@ describe('POST /api/login', () => {
       data: {
         token: 'session-token',
         expiresAt: 123,
-        profile: { username: 'bob', mac: '00:11:22' },
+        profile: { username: 'bob', mac: '00:11:22', accountType: 'permanent' },
       },
     });
     expect(mockedLoginUsageUser).toHaveBeenCalledWith({ username: 'bob', password: 'secret' });

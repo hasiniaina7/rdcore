@@ -39,18 +39,22 @@ export default function Success() {
 
   const activeMac = macOverride ?? session?.profile?.mac ?? undefined;
 
-  const { usage, activeSessions, inactiveSessions, errors, isLoading, lastUpdated, refresh } = useUsageData({
+  const { usage, summary, activeSessions, inactiveSessions, errors, isLoading, lastUpdated, refresh } = useUsageData({
     enabled: Boolean(session),
     mac: activeMac,
   });
 
   const sessions = useMemo(() => combineSessions(activeSessions?.sessions, inactiveSessions?.sessions), [activeSessions, inactiveSessions]);
   const aggregates = useMemo(() => computeAggregatesFromSessions(sessions), [sessions]);
+  const summaryMonthlyBytes = summary?.periods.find((period) => period.period === 'monthly')?.totalBytes;
+  const isPermanentAccount =
+    usage?.accountType === 'permanent' || session?.profile?.accountType === 'permanent';
+  const displayedDataUsed = isPermanentAccount && summaryMonthlyBytes != null ? summaryMonthlyBytes : usage?.dataUsed;
 
   const onlineCount = activeSessions?.sessions.length ?? 0;
   const inactiveCount = inactiveSessions?.sessions.length ?? 0;
   const isOnline = onlineCount > 0;
-  const dataProgress = calculateProgress(usage?.dataUsed, usage?.dataCap);
+  const dataProgress = calculateProgress(displayedDataUsed, usage?.dataCap);
   const effectiveTimeUsed = usage?.timeUsed ?? aggregates?.monthTime ?? 0;
   const effectiveTimeCap = usage?.timeCap ?? null;
   const derivedRemaining =
@@ -156,7 +160,7 @@ export default function Success() {
               <h2 className="cp-title">{t('success.quotaSubtitle')}</h2>
             </div>
           </div>
-          <p>{t('success.dataUsed', { used: bytesToHuman(usage?.dataUsed), cap: bytesToHuman(usage?.dataCap ?? undefined) })}</p>
+          <p>{t('success.dataUsed', { used: bytesToHuman(displayedDataUsed), cap: bytesToHuman(usage?.dataCap ?? undefined) })}</p>
           <div className="cp-progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={dataProgress ?? 0} role="progressbar">
             <div className="cp-progress__bar" style={{ width: `${dataProgress ?? 0}%` }} />
           </div>

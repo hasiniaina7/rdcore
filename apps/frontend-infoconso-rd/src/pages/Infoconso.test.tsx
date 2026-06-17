@@ -1,12 +1,38 @@
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import InfoconsoPage from "./Infoconso";
-import { consumptionMockData } from "../modules/usage/mock/consumption.mock";
 
 vi.mock("../modules/usage/api/consumption.api", () => {
-  return {
-    login: vi.fn(async ({ type, code, username, password }) => {
+  return (async () => {
+    const { consumptionMockData } = await import("../modules/usage/mock/consumption.mock");
+    const permanentData = {
+      ...consumptionMockData.data,
+      summary: {
+        ...consumptionMockData.data.summary,
+        accountType: "permanent",
+        dataCap: { raw: 858993459200, formatted: "800.0", unit: "GB" },
+        dataUsed: { raw: 123, formatted: "0.0", unit: "GB" },
+        dataRemaining: { raw: 858993459077, formatted: "799.9", unit: "GB" },
+        percDataUsed: 0,
+      },
+      insights: {
+        ...consumptionMockData.data.insights,
+        periods: [
+          { period: "hourly", totalBytes: 0, totalTimeSeconds: 0, sessionCount: 0 },
+          { period: "daily", totalBytes: 0, totalTimeSeconds: 0, sessionCount: 0 },
+          { period: "weekly", totalBytes: 0, totalTimeSeconds: 0, sessionCount: 0 },
+          {
+            period: "monthly",
+            totalBytes: 452689552998,
+            totalTimeSeconds: 128783,
+            sessionCount: 9,
+          },
+        ],
+      },
+    };
+    return {
+      login: vi.fn(async ({ type, code, username, password }) => {
       if (type === "voucher") {
         if (!code) throw new Error("Veuillez saisir un code.");
         return consumptionMockData.data;
@@ -15,12 +41,22 @@ vi.mock("../modules/usage/api/consumption.api", () => {
         if (username === "baduser") {
           throw new Error("Nom d'utilisateur ou mot de passe incorrect.");
         }
+        if (username === "tsou") {
+          return permanentData;
+        }
         return consumptionMockData.data;
       }
       return consumptionMockData.data;
     }),
-    fetchConsumption: vi.fn(async () => consumptionMockData.data),
-  };
+      fetchConsumption: vi.fn(async () => consumptionMockData.data),
+    };
+  })();
+});
+
+beforeEach(() => {
+  cleanup();
+  localStorage.clear();
+  sessionStorage.clear();
 });
 
 describe("InfoconsoPage login flows", () => {
@@ -41,6 +77,7 @@ describe("InfoconsoPage login flows", () => {
     render(<InfoconsoPage />);
 
     fireEvent.click(screen.getAllByRole("button", { name: /Utilisateur/i })[0]);
+    await screen.findByLabelText(/Nom d'utilisateur/i);
 
     fireEvent.click(screen.getByRole("button", { name: /Se connecter/i }));
 
@@ -60,7 +97,7 @@ describe("InfoconsoPage login flows", () => {
     fireEvent.click(screen.getByRole("button", { name: /Se connecter/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Nom d'utilisateur ou mot de passe incorrect\./i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Nom d'utilisateur ou mot de passe incorrect\./i).length).toBeGreaterThan(0);
     });
   });
 
@@ -69,7 +106,7 @@ describe("InfoconsoPage login flows", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: /Utilisateur/i })[0]);
 
-    fireEvent.change(await screen.findByLabelText(/Nom d'utilisateur/i), { target: { value: "hasina" } });
+    fireEvent.change(await screen.findByLabelText(/Nom d'utilisateur/i), { target: { value: "tsou" } });
     fireEvent.change(screen.getByLabelText(/Mot de passe/i), { target: { value: "hasina123" } });
 
     fireEvent.click(screen.getByRole("button", { name: /Se connecter/i }));
@@ -77,5 +114,8 @@ describe("InfoconsoPage login flows", () => {
     await waitFor(() => {
       expect(screen.getByText(/Sessions actives/i)).toBeInTheDocument();
     });
+
+    expect(screen.getAllByText(/421\.6 GB/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("progressbar")[0]).toHaveAttribute("aria-valuenow", "53");
   });
 });

@@ -8,7 +8,10 @@ type RadiusdeskCollection = {
   items?: Array<Record<string, unknown>>;
 };
 
+type AccountType = 'permanent' | 'voucher' | 'unknown';
+
 type QuotaMetadata = {
+  accountType: AccountType;
   expiresAt?: string;
   timeCapSeconds?: number | null;
   timeUsedSeconds?: number;
@@ -85,6 +88,7 @@ const buildUsageFromQuota = (
   const timeRemainingSeconds = computeRemainingSeconds(quota.timeCapSeconds, quota.timeUsedSeconds, quota.expiresAt);
   return {
     username,
+    accountType: quota.accountType,
     mac,
     dataUsed: quota.dataUsedBytes ?? undefined,
     dataCap: quota.dataCapBytes ?? null,
@@ -100,7 +104,7 @@ const buildUsageFromQuota = (
 async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMetadata> {
   const normalized = username?.trim();
   if (!normalized) {
-    return {};
+    return { accountType: 'unknown' };
   }
   try {
     const response = await findPermanentUser(normalized);
@@ -112,6 +116,7 @@ async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMe
       const dataUsedBytes = toNumber(record.data_used ?? record.dataUsed);
       const dataCapBytes = toNumber(record.data_cap ?? record.dataCap) ?? null;
       return {
+        accountType: 'permanent',
         expiresAt,
         timeCapSeconds: timeCapSeconds ?? null,
         timeUsedSeconds: timeUsedSeconds ?? undefined,
@@ -132,6 +137,7 @@ async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMe
       const dataUsedBytes = toNumber(record.data_used ?? record.dataUsed);
       const dataCapBytes = toNumber(record.data_cap ?? record.dataCap) ?? null;
       return {
+        accountType: 'voucher',
         expiresAt,
         timeCapSeconds: timeCapSeconds ?? null,
         timeUsedSeconds: timeUsedSeconds ?? undefined,
@@ -142,7 +148,7 @@ async function fetchQuotaMetadata(username: string | undefined): Promise<QuotaMe
   } catch {
     // Ignore voucher lookup failures.
   }
-  return {};
+  return { accountType: 'unknown' };
 }
 
 export async function fetchUsage(
@@ -176,6 +182,7 @@ export async function fetchUsage(
     const dataCapBytes = quota.dataCapBytes ?? usage?.data?.data_cap ?? null;
     return {
       username: normalizedUsername,
+      accountType: quota.accountType,
       mac: normalizedMac,
       dataUsed: dataUsedBytes,
       dataCap: dataCapBytes,
@@ -208,6 +215,7 @@ export async function fetchUsage(
         const dataCapBytes = quota.dataCapBytes ?? usage?.data?.data_cap ?? null;
         return {
           username: normalizedUsername,
+          accountType: quota.accountType,
           dataUsed: dataUsedBytes,
           dataCap: dataCapBytes,
           timeUsed: timeUsedSeconds,
@@ -242,6 +250,7 @@ export async function fetchUsage(
 
   return {
     username: normalizedUsername,
+    accountType: quota.accountType,
     mac: derivedMac,
     dataUsed: dataUsedBytes,
     dataCap: dataCapBytes,

@@ -21,6 +21,7 @@ export async function loginUsageUser(payload: LoginPayload) {
     profile: {
       username: usage.username,
       mac: usage.mac ?? normalizedMac,
+      accountType: usage.accountType,
     },
   };
 }
