@@ -9,10 +9,10 @@ export default function App() {
   return (
     <BrowserRouter basename={basename}>
       <Routes>
-        <Route path="/infoconso" element={<InfoconsoPage />} />
-        <Route path="/support" element={<Support />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="*" element={<Navigate to="/infoconso" replace />} />
+        <Route path="/" element={<InfoconsoPage />} />
+        <Route path="support" element={<Support />} />
+        <Route path="terms" element={<Terms />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
