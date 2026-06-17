@@ -5,18 +5,21 @@ set -euo pipefail
 #   MODE=local ./scripts/deploy_infoconso.sh
 #   MODE=remote REMOTE_HOST=ubuntu@host ./scripts/deploy_infoconso.sh
 #
-# Local mode builds from the checked-out source and syncs dist/ into TARGET_DIR.
-# Remote mode builds locally and rsyncs dist/ to REMOTE_HOST:REMOTE_TARGET.
-# In both cases the web root is updated through a staging directory and an
-# atomic directory swap to avoid disrupting in-flight requests.
+# Local mode builds from the checked-out source and syncs dist/ into the local
+# portal public directory. Remote mode builds locally and rsyncs dist/ to the
+# live portal public directory on the EC2 host. In both cases the portal-frontend
+# PM2 process is reloaded after the assets are in place.
 
 FRONT_DIR="${FRONT_DIR:-/home/mastershark-linux/dev/radiusdesk/captive-portail/apps/frontend-infoconso-rd}"
-TARGET_DIR="${TARGET_DIR:-/var/www/infoconso}"
-NGINX_SERVICE="${NGINX_SERVICE:-nginx}"
-MODE="${MODE:-local}"
+MODE="${MODE:-remote}"
 REMOTE_HOST="${REMOTE_HOST:-ubuntu@ec2-13-247-123-11.af-south-1.compute.amazonaws.com}"
-REMOTE_TARGET="${REMOTE_TARGET:-$TARGET_DIR}"
+REMOTE_PROJECT_DIR="${REMOTE_PROJECT_DIR:-/home/ubuntu/captive-portail}"
+REMOTE_PUBLIC_DIR="${REMOTE_PUBLIC_DIR:-$REMOTE_PROJECT_DIR/public}"
+PM2_APP="${PM2_APP:-portal-frontend}"
+PM2_ECOSYSTEM="${PM2_ECOSYSTEM:-deployments/pm2/ecosystem.config.js}"
 RSYNC_RSH="${RSYNC_RSH:-ssh -i /home/mastershark-linux/ssh/key-not-for-faneva.pem}"
+LOCAL_PROJECT_DIR="${LOCAL_PROJECT_DIR:-$REMOTE_PROJECT_DIR}"
+LOCAL_PUBLIC_DIR="${LOCAL_PUBLIC_DIR:-$LOCAL_PROJECT_DIR/public}"
 
 if [[ ! -d "$FRONT_DIR" ]]; then
   echo "ERROR: FRONT_DIR does not exist: $FRONT_DIR" >&2
@@ -38,28 +41,21 @@ fi
 
 echo "==> Syncing dist/ via rsync (${MODE})"
 if [[ "$MODE" == "remote" ]]; then
+  ssh -i /home/mastershark-linux/ssh/key-not-for-faneva.pem -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+    "$REMOTE_HOST" "mkdir -p '$REMOTE_PUBLIC_DIR'"
   rsync -az --delete -e "$RSYNC_RSH" \
-    "${FRONT_DIR}/dist/" "${REMOTE_HOST}:${REMOTE_TARGET}/"
+    "${FRONT_DIR}/dist/" "${REMOTE_HOST}:${REMOTE_PUBLIC_DIR}/"
+  ssh -i /home/mastershark-linux/ssh/key-not-for-faneva.pem -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+    "$REMOTE_HOST" "cd '$REMOTE_PROJECT_DIR' && pm2 startOrReload '$PM2_ECOSYSTEM' --only '$PM2_APP'"
 else
-  LIVE_DIR="$TARGET_DIR"
-  STAGING_DIR="${TARGET_DIR}.staging.$$"
-  PREV_DIR="${TARGET_DIR}.prev.$$"
-
-  sudo mkdir -p "$STAGING_DIR"
-  sudo rsync -a --delete "${FRONT_DIR}/dist/" "$STAGING_DIR/"
-  sudo chown -R www-data:www-data "$STAGING_DIR"
-  sudo find "$STAGING_DIR" -type d -exec chmod 755 {} +
-
-  if [[ -d "$LIVE_DIR" ]]; then
-    sudo mv "$LIVE_DIR" "$PREV_DIR"
-  fi
-  sudo mv "$STAGING_DIR" "$LIVE_DIR"
-  if [[ -d "$PREV_DIR" ]]; then
-    sudo rm -rf "$PREV_DIR"
+  mkdir -p "$LOCAL_PUBLIC_DIR"
+  rsync -a --delete "${FRONT_DIR}/dist/" "$LOCAL_PUBLIC_DIR/"
+  if [[ -d "$LOCAL_PROJECT_DIR" ]]; then
+    (
+      cd "$LOCAL_PROJECT_DIR"
+      pm2 startOrReload "$PM2_ECOSYSTEM" --only "$PM2_APP"
+    )
   fi
 fi
 
-echo "==> Reloading ${NGINX_SERVICE}"
-sudo systemctl reload "$NGINX_SERVICE"
-
-echo "Deployment complete. Visit https://hotspot.techzone.lat/infoconso/"
+echo "Deployment complete. Visit https://techzone.lat/infoconso/"
