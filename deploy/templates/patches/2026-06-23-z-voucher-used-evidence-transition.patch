@@ -1,0 +1,17 @@
+diff --git a/cake4/rd_cake/src/Shell/VoucherShell.php b/cake4/rd_cake/src/Shell/VoucherShell.php
+--- a/cake4/rd_cake/src/Shell/VoucherShell.php
++++ b/cake4/rd_cake/src/Shell/VoucherShell.php
+@@ -39,7 +39,12 @@ class VoucherShell extends Shell {
+             ->where(['Vouchers.status IN' => ['new', 'used', 'depleted', 'expired']])
+             ->all();
+         foreach($qr as $i){
+-            $this->process_voucher($i->name, isset($positive_evidence[$i->name]));
++            $has_positive_evidence = isset($positive_evidence[$i->name]);
++            if(($i->status === 'new') && $has_positive_evidence){
++                $this->{'Vouchers'}->patchEntity($i, ['status' => 'used']);
++                $this->{'Vouchers'}->save($i);
++            }
++            $this->process_voucher($i->name, $has_positive_evidence);
+         }
+     }
+ 

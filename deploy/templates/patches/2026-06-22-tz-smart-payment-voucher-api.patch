@@ -1,0 +1,118 @@
+diff --git a/cake4/rd_cake/src/Controller/VouchersController.php b/cake4/rd_cake/src/Controller/VouchersController.php
+index 345ed80..e09ffb1 100644
+--- a/cake4/rd_cake/src/Controller/VouchersController.php
++++ b/cake4/rd_cake/src/Controller/VouchersController.php
+@@ -402,1 +402,112 @@ class VouchersController extends AppController{
++    public function paymentAdd(){
++
++        $user = $this->_ap_right_check();
++        if(!$user){
++            return;
++        }
++
++        $req_d      = $this->request->getData();
++        $order_id   = trim((string)($req_d['order_id'] ?? ''));
++        $cloud_id   = (int)($req_d['cloud_id'] ?? 0);
++
++        if(
++            ($order_id === '') ||
++            (strlen($order_id) > 96) ||
++            (!preg_match('/^pay_[a-f0-9]{32}$/', $order_id)) ||
++            ($cloud_id <= 0)
++        ){
++            $this->JsonErrors->errorMessage('invalid TECHZONE payment voucher payload');
++            return;
++        }
++
++        $realm_entity = $this->Realms->entityBasedOnPost($req_d);
++        if(!$realm_entity){
++            $this->JsonErrors->errorMessage('realm or realm_id not found in DB or not supplied');
++            return;
++        }
++
++        $profile_entity = $this->Profiles->entityBasedOnPost($req_d);
++        if(!$profile_entity){
++            $this->JsonErrors->errorMessage('profile or profile_id not found in DB or not supplied');
++            return;
++        }
++
++        $existing = $this->Vouchers->find()->where([
++            'Vouchers.extra_name'  => 'tz_smart_order_id',
++            'Vouchers.extra_value' => $order_id
++        ])->first();
++        if($existing){
++            if(
++                ((int)$existing->cloud_id !== $cloud_id) ||
++                ((int)$existing->realm_id !== (int)$realm_entity->id) ||
++                ((int)$existing->profile_id !== (int)$profile_entity->id)
++            ){
++                $this->JsonErrors->errorMessage('existing voucher does not match requested scope');
++                return;
++            }
++            $this->set([
++                'success'  => true,
++                'replayed' => true,
++                'data'     => [
++                    'id'         => $existing->id,
++                    'name'       => $existing->name,
++                    'password'   => $existing->password,
++                    'cloud_id'   => $existing->cloud_id,
++                    'realm'      => $existing->realm,
++                    'realm_id'   => $existing->realm_id,
++                    'profile'    => $existing->profile,
++                    'profile_id' => $existing->profile_id,
++                    'status'     => $existing->status
++                ]
++            ]);
++            $this->viewBuilder()->setOption('serialize', true);
++            return;
++        }
++
++        $req_d['cloud_id']   = $cloud_id;
++        $req_d['realm']      = $realm_entity->name;
++        $req_d['realm_id']   = $realm_entity->id;
++        $req_d['profile']    = $profile_entity->name;
++        $req_d['profile_id'] = $profile_entity->id;
++        $req_d['batch']      = 'TZ SMART Payments';
++        $req_d['status']     = 'new';
++        $req_d['extra_name'] = 'tz_smart_order_id';
++        $req_d['extra_value']= $order_id;
++
++        $saved = null;
++        for($attempt = 0; $attempt < 20; $attempt++){
++            $voucher_code      = $this->VoucherGenerator->generateVoucher();
++            $req_d['name']     = $voucher_code;
++            $req_d['password'] = $voucher_code;
++            $entity = $this->Vouchers->newEntity($req_d);
++            if($this->Vouchers->save($entity)){
++                $saved = $entity;
++                break;
++            }
++        }
++
++        if(!$saved){
++            $this->JsonErrors->errorMessage('Could not create TECHZONE payment voucher');
++            return;
++        }
++
++        $this->Radaccts->deleteAll(['Radaccts.username' => $saved->name]);
++
++        $this->set([
++            'success'  => true,
++            'replayed' => false,
++            'data'     => [
++                'id'         => $saved->id,
++                'name'       => $saved->name,
++                'password'   => $saved->password,
++                'cloud_id'   => $saved->cloud_id,
++                'realm'      => $saved->realm,
++                'realm_id'   => $saved->realm_id,
++                'profile'    => $saved->profile,
++                'profile_id' => $saved->profile_id,
++                'status'     => $saved->status
++            ]
++        ]);
++        $this->viewBuilder()->setOption('serialize', true);
++    }
++
+     public function add(){

@@ -1,0 +1,91 @@
+diff --git a/cake4/rd_cake/src/Shell/VoucherShell.php b/cake4/rd_cake/src/Shell/VoucherShell.php
+index 0552180d..b7d74570 100644
+--- a/cake4/rd_cake/src/Shell/VoucherShell.php
++++ b/cake4/rd_cake/src/Shell/VoucherShell.php
+@@ -34,15 +34,16 @@ class VoucherShell extends Shell {
+     public $tasks   = ['Usage','Counters'];
+ 
+     public function main() {
++        $positive_evidence = $this->_loadPositiveEvidenceForNewVouchers();
+         $qr = $this->{'Vouchers'}->find()
+             ->where(['Vouchers.status IN' => ['new', 'used', 'depleted', 'expired']])
+             ->all();
+         foreach($qr as $i){
+-            $this->process_voucher($i->name);
++            $this->process_voucher($i->name, isset($positive_evidence[$i->name]));
+         }
+     }
+ 
+-    private function process_voucher($name){
++    private function process_voucher($name, $has_positive_evidence = false){
+ 
+         $this->out("<info>Voucher => $name</info>");
+         $this->_ensureVoucherRegistered($name);
+@@ -70,7 +71,9 @@ class VoucherShell extends Shell {
+ 						$d['time_cap']       = $time_avail;
+ 						$d['time_used']      = $time_used;
+ 						$d['perc_time_used'] = $perc_time_used;
+-						$d['status']         = 'used';
++						if($this->_canMarkVoucherUsed($q_r->status, $has_positive_evidence, $time_used)){
++							$d['status'] = 'used';
++						}
+ 				        $this->{'Vouchers'}->patchEntity($q_r,$d);
+                         $this->{'Vouchers'}->save($q_r);
+ 				    }
+@@ -104,7 +107,7 @@ class VoucherShell extends Shell {
+                     $d['time_cap']       = $counters['time']['value'];
+                     $d['perc_time_used'] = max(0, min(100, $perc_used));
+ 
+-                    if($q_r->status !== 'expired'){
++                    if($this->_canMarkVoucherUsed($q_r->status, $has_positive_evidence, $used)){
+                         $d['status'] = 'used';
+                         if(
+                             ($counters['time']['cap'] === 'hard') &&
+@@ -133,7 +136,7 @@ class VoucherShell extends Shell {
+                     $d['data_cap']       = $counters['data']['value'];
+                     $kick_active_sessions = false;
+ 
+-                    if($q_r->status !== 'expired'){
++                    if($this->_canMarkVoucherUsed($q_r->status, $has_positive_evidence, $used)){
+                         $d['status'] = 'used';
+                         if(
+                             ($counters['data']['cap'] === 'hard') &&
+@@ -153,6 +156,38 @@ class VoucherShell extends Shell {
+         }
+     }
+ 
++    private function _loadPositiveEvidenceForNewVouchers(){
++        $conn = ConnectionManager::get('default');
++        $stmt = $conn->execute(
++            "SELECT DISTINCT v.name ".
++            "FROM vouchers v ".
++            "WHERE v.status = 'new' ".
++            "AND (".
++                "v.last_accept_time IS NOT NULL ".
++                "OR EXISTS (SELECT 1 FROM radpostauth p WHERE p.username = v.name AND p.reply = 'Access-Accept') ".
++                "OR EXISTS (SELECT 1 FROM radacct r WHERE r.username = v.name) ".
++                "OR EXISTS (SELECT 1 FROM radacct_history h WHERE h.username = v.name) ".
++                "OR EXISTS (SELECT 1 FROM user_stats u WHERE u.username = v.name)".
++            ")"
++        );
++
++        $positive_evidence = [];
++        while($row = $stmt->fetch('assoc')){
++            $positive_evidence[$row['name']] = true;
++        }
++        return $positive_evidence;
++    }
++
++    protected function _canMarkVoucherUsed($current_status, $has_positive_evidence, $usage){
++        if(in_array($current_status, ['depleted', 'expired'], true)){
++            return false;
++        }
++        if($current_status !== 'new'){
++            return true;
++        }
++        return $has_positive_evidence || (intval($usage) > 0);
++    }
++
+     private function _find_user_profile($username){
+         $profile = false;
+         $q_r = $this->Radchecks->find()->where([
