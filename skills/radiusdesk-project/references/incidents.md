@@ -1,5 +1,17 @@
 # Incidents & Fix Notes
 
+## 2026-06-29
+
+### Voucher data quota `never` ignores active usage
+- Symptom: vouchers on `Rd-Reset-Type-Data := never` could authenticate even when UI/current usage from `user_stats` exceeded the hard data cap.
+- Root cause: `RADIUSdesk_data_counter` used `radacct_history` for `never`, which misses active sessions until stop accounting archives them.
+- Source fix:
+  - `installation-script/deploy/scripts/50_freeradius.sh`
+  - phase 50 now patches `/etc/freeradius/3.0/policy.d/radiusdesk` after archive extraction so vouchers use `user_stats`, while non-vouchers keep the existing `radacct_history` queries.
+- Verification query:
+  - compare voucher cap with `SELECT SUM(acctinputoctets + acctoutputoctets) FROM user_stats WHERE username='<voucher>';`
+  - confirm `radtest <voucher> <password> 127.0.0.1 0 testing123` rejects when usage exceeds the hard cap.
+
 ## 2026-05-21
 
 ### Users cards mismatch (`online` vs `activity sessions`)
