@@ -119,6 +119,159 @@ EOF
   fi
 }
 
+localize_radiusdesk_reply_messages() {
+  local radius_policy="/etc/freeradius/3.0/policy.d/radiusdesk"
+  local perl_dir="/etc/freeradius/3.0/mods-config/perl"
+
+  if [[ ! -f "${radius_policy}" ]]; then
+    log WARN "Policy RadiusDesk introuvable (${radius_policy}), localisation Reply-Message ignoree."
+    return
+  fi
+
+  log INFO "Localisation en francais des Reply-Message RadiusDesk."
+
+  perl -0pi -e '
+    s/Reply-Message := "NAS-Identifier %\{request:NAS-Identifier\} is disabled"/Reply-Message := "NAS-Identifier %\{request:NAS-Identifier\} est desactive"/g;
+    s/Reply-Message := "Called-Station-Id %\{request:Called-Station-Id\} is disabled"/Reply-Message := "Called-Station-Id %\{request:Called-Station-Id\} est desactive"/g;
+    s/Reply-Message := "RADIUS client not allowed\. Contact server administrator"/Reply-Message := "Client RADIUS non autorise. Contactez l administrateur du serveur"/g;
+    s/Reply-Message := "The time for voucher %\{request:User-Name\} is depleted"/Reply-Message := "Le temps du voucher %\{request:User-Name\} est epuise"/g;
+    s/Reply-Message := "User %\{request:User-Name\} belongs to realm %\{control:Rd-Realm\} which cannot connect to %\{request:NAS-Identifier\}"/Reply-Message := "L utilisateur %\{request:User-Name\} appartient au realm %\{control:Rd-Realm\}, non autorise sur %\{request:NAS-Identifier\}"/g;
+    s/Reply-Message := "User %\{request:User-Name\} belongs to realm %\{control:Rd-Realm\} which cannot connect to %\{request:NAS-IP-Address\}"/Reply-Message := "L utilisateur %\{request:User-Name\} appartient au realm %\{control:Rd-Realm\}, non autorise sur %\{request:NAS-IP-Address\}"/g;
+    s/Reply-Message := "User %\{request:User-Name\} has not permission to connect through SSID: %\{control:Rd-Ssid-Value\}"/Reply-Message := "L utilisateur %\{request:User-Name\} n est pas autorise a se connecter via le SSID : %\{control:Rd-Ssid-Value\}"/g;
+    s/Reply-Message := "No SSID available to evaluate SSID restriction"/Reply-Message := "Aucun SSID disponible pour evaluer la restriction SSID"/g;
+    s/Reply-Message := "User %\{request:User-Name\} account disabled"/Reply-Message := "Compte %\{request:User-Name\} desactive"/g;
+    s/Reply-Message := "User %\{request:User-Name\} account suspended"/Reply-Message := "Compte %\{request:User-Name\} suspendu"/g;
+    s/Reply-Message := "User %\{request:User-Name\} account terminated"/Reply-Message := "Compte %\{request:User-Name\} resilie"/g;
+    s/Reply-Message := "User %\{request:User-Name\} invalid admin state: %\{control:Rd-Admin-State\}"/Reply-Message := "Etat administratif invalide pour %\{request:User-Name\} : %\{control:Rd-Admin-State\}"/g;
+    s/Reply-Message := "User %\{request:User-Name\} not registered"/Reply-Message := "Utilisateur %\{request:User-Name\} non enregistre"/g;
+    s/Reply-Message := "User %\{request:User-Name\} are not allowed to connect with a device containing MAC %\{request:Calling-Station-Id\}"/Reply-Message := "L utilisateur %\{request:User-Name\} n est pas autorise a se connecter avec l appareil MAC %\{request:Calling-Station-Id\}"/g;
+    s/Reply-Message := "Max Daily Sessions Reached"/Reply-Message := "Nombre maximal de sessions journalieres atteint"/g;
+    s/Reply-Message := "Max Monthly Sessions Reached"/Reply-Message := "Nombre maximal de sessions mensuelles atteint"/g;
+    s/Reply-Message := "Most likely PEAP failure\. Run in debug"/Reply-Message := "Echec PEAP probable. Lancez FreeRADIUS en mode debug"/g;
+    s/Reply-Message := "Simultaneous connections limited to %\{control:Simultaneous-Use\}"/Reply-Message := "Connexions simultanees limitees a %\{control:Simultaneous-Use\}"/g;
+  ' "${radius_policy}" \
+    /etc/freeradius/3.0/sites-available/radiusdesk-default \
+    /etc/freeradius/3.0/sites-available/radiusdesk-plain
+
+  for perl_file in \
+    "${perl_dir}/client_check_usage.pl" \
+    "${perl_dir}/logintime.pl" \
+    "${perl_dir}/check_usage_time.pl" \
+    "${perl_dir}/client_check_usage_data.pl" \
+    "${perl_dir}/check_usage.pl" \
+    "${perl_dir}/check_usage_data.pl" \
+    "${perl_dir}/check_activation.pl" \
+    "${perl_dir}/fup.pl" \
+    "${perl_dir}/ppsk.pl"; do
+    [[ -f "${perl_file}" ]] || continue
+    perl -0pi -e '
+      my @pairs = (
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Sorry.. the router has reached its monthly data limit";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Le routeur a atteint sa limite mensuelle de donnees";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Not Available To Use On " . $dt->day_name . " at " . $dt->hms('\'':'\'');!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Non disponible le " . $dt->day_name . " a " . $dt->hms('\'':'\'');!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Not Available To Use On ".$dt->day_name." at ".$dt->hms('\'':'\'');!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Non disponible le ".$dt->day_name." a ".$dt->hms('\'':'\'');!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Maximum $RAD_CHECK{'\''Rd-Reset-Type-Time'\''} usage exceeded";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Quota temps $RAD_CHECK{'\''Rd-Reset-Type-Time'\''} atteint";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Maximum $RAD_CHECK{'\''Rd-Reset-Type-Data'\''} usage exceeded";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Quota donnees $RAD_CHECK{'\''Rd-Reset-Type-Data'\''} atteint";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Maximum $RAD_CHECK{'\''Rd-Reset-Type'\''} usage exceeded";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Quota $RAD_CHECK{'\''Rd-Reset-Type'\''} atteint";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Maximum usage exceeded";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Quota d utilisation atteint";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Sorry... you have used your  $RAD_CHECK{'\''Rd-Reset-Type-Data'\''} data allowance";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Quota de donnees $RAD_CHECK{'\''Rd-Reset-Type-Data'\''} utilise";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Sorry... you have used all your data allowance ";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Vous avez utilise tout votre quota de donnees";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Account activate on ".$RAD_CHECK{'\''Rd-Account-Activation-Time'\''};!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Compte actif a partir de ".$RAD_CHECK{'\''Rd-Account-Activation-Time'\''};!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Denied access by rlm_perl function";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Acces refuse par la fonction rlm_perl";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "$row->{'\''if_condition'\''} of $row->{'\''data_amount'\''}$row->{'\''data_unit'\''} reached";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Limite ".$row->{'\''if_condition'\''}." de ".$row->{'\''data_amount'\''}.$row->{'\''data_unit'\''}." atteinte";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Required Request Attributes Missing";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Attributs obligatoires de la requete manquants";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Missing SSID in Called-Station-Id";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "SSID manquant dans Called-Station-Id";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "No PPSK Match Found";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Aucune correspondance PPSK trouvee";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Missing Cleartext Password For $row->{'\''username'\''}";!,
+        q!$RAD_REPLY{'\''Reply-Message'\''} = "Mot de passe Cleartext manquant pour $row->{'\''username'\''}";!,
+      );
+      while (@pairs) {
+        my $from = shift @pairs;
+        my $to = shift @pairs;
+        s/\Q$from\E/$to/g;
+      }
+    ' "${perl_file}"
+  done
+}
+
+harden_radiusdesk_voucher_data_never_counter() {
+  local radius_policy="/etc/freeradius/3.0/policy.d/radiusdesk"
+  local marker="#__ JUNE 2026 -- Voucher never data quota uses user_stats"
+
+  if [[ ! -f "${radius_policy}" ]]; then
+    log WARN "Policy RadiusDesk introuvable (${radius_policy}), durcissement quota data voucher ignore."
+    return
+  fi
+
+  if grep -qF "${marker}" "${radius_policy}"; then
+    log INFO "Durcissement quota data voucher deja present dans ${radius_policy}."
+    return
+  fi
+
+  log INFO "Application du durcissement quota data voucher reset=never dans ${radius_policy}."
+
+  perl -0pi -e "$(cat <<'PERL'
+    my $replacement = <<'RADIUSDESK_POLICY';
+        # Avoid reset-time helpers for "never"; always use total historical usage.
+        #__ JUNE 2026 -- Voucher never data quota uses user_stats
+        if(&control:Rd-Reset-Type-Data == 'never'){
+            if(&control:Rd-User-Type == 'voucher'){
+                if((&control:Rd-Mac-Counter-Data)&&(&request:Calling-Station-Id)){
+                    update control {
+                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'}"
+                    }
+                }
+                else{
+                    update control {
+                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username='%{request:User-Name}'}"
+                    }
+                }
+            }
+            else{
+                #Get the total usage of the user
+                if(&control:Rd-Tmp-Avail-Data){ #This indicates it it a device!
+                    update control {
+                        Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM radacct_history WHERE callingstationid='%{request:User-Name}'}"
+                    }
+                }
+                else{
+                    if((&control:Rd-Mac-Counter-Data)&&(&request:Calling-Station-Id)){
+                        update control {
+                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM radacct_history WHERE username='%{request:User-Name}' AND callingstationid='%{request:Calling-Station-Id}'}"
+                        }
+                    }
+                    else{
+                        update control {
+                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) FROM radacct_history WHERE username='%{request:User-Name}'}"
+                        }
+                    }
+                }
+            }
+        } else {
+RADIUSDESK_POLICY
+    my $count = s{        \# Avoid reset-time helpers for "never"; always use total historical usage\.\n        if\(&control:Rd-Reset-Type-Data == 'never'\)\{\n            \#Get the total usage of the user\n            if\(&control:Rd-Tmp-Avail-Data\)\{ \#This indicates it it a device!\n                update control \{\n                    Rd-Used-Data := "%\{sql:SELECT IFNULL\(SUM\(acctinputoctets\)\+SUM\(acctoutputoctets\),0\) FROM radacct_history WHERE callingstationid='%\{request:User-Name\}'\}"\n                \}\n            \}\n            else\{\n                if\(\(&control:Rd-Mac-Counter-Data\)&&\(&request:Calling-Station-Id\)\)\{\n                    update control \{\n                        Rd-Used-Data := "%\{sql:SELECT IFNULL\(SUM\(acctinputoctets\)\+SUM\(acctoutputoctets\),0\) FROM radacct_history WHERE username='%\{request:User-Name\}' AND callingstationid='%\{request:Calling-Station-Id\}'\}"\n                    \}\n                \}\n                else\{\n                    update control \{\n                        Rd-Used-Data := "%\{sql:SELECT IFNULL\(SUM\(acctinputoctets\)\+SUM\(acctoutputoctets\),0\) FROM radacct_history WHERE username='%\{request:User-Name\}'\}"\n                    \}\n                \}\n            \}\n        \} else \{\n}{$replacement};
+    die "RADIUSdesk_data_counter reset=never block not found\n" unless $count == 1;
+PERL
+  )" "${radius_policy}" || {
+    log ERROR "Echec du durcissement quota data voucher dans ${radius_policy}."
+    exit 1
+  }
+}
+
 update_sql_conf 'server = "[^"]*"' "server = \"${DB_HOST}\""
 if [[ "${DB_PORT}" != "3306" ]]; then
   if grep -q '^\s*#\s*port = 3306' "${SQL_CONF}"; then
@@ -167,6 +320,8 @@ if [[ -f "${CLIENTS_CONF}" ]]; then
 fi
 
 ensure_radiusdesk_dynamic_expiration_attrs
+localize_radiusdesk_reply_messages
+harden_radiusdesk_voucher_data_never_counter
 
 mkdir -p /var/log/freeradius/sqltrace
 chown -R freerad:freerad /var/log/freeradius

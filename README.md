@@ -49,7 +49,8 @@ Les logs se trouvent dans `/var/log/radiusdesk-install/*.log`.
 - `40_radiusdesk_app.sh` – rdcore, Composer (www-data), `app_local.php`,
   dossiers uploads, import `rd.sql` + patchs SQL `8.*.sql`, cron.
 - `50_freeradius.sh` – déploiement config officielle (tar), SQL backend, dynamic clients,
-  neutralisation `filter_username`, vérification `freeradius -C` et restart.
+  neutralisation `filter_username`, durcissement du quota data `never` pour vouchers,
+  vérification `freeradius -C` et restart.
 - `70_tls_certbot.sh` – installation certbot et obtention de certificat (optionnel).
 
 ## Rejouer des phases

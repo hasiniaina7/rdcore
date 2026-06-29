@@ -97,6 +97,11 @@ else
   log INFO "Fichier ${SITE_CONF} déjà présent, non modifié."
 fi
 
+if grep -qE 'fastcgi_pass unix:/var/run/php/php[0-9.]+-fpm\.sock;' "${SITE_CONF}"; then
+  log INFO "Mise à jour du socket PHP-FPM dans ${SITE_CONF}."
+  perl -0pi -e "s#fastcgi_pass unix:/var/run/php/php[0-9.]+-fpm\\.sock;#fastcgi_pass unix:${PHP_FPM_SOCK};#g" "${SITE_CONF}"
+fi
+
 if [[ -f /etc/nginx/sites-enabled/default ]]; then
   log INFO "Désactivation du site par défaut Nginx."
   rm -f /etc/nginx/sites-enabled/default

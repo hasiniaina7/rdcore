@@ -16,19 +16,22 @@ RD_SQL_DUMP="${CAKE_DB_DIR}/rd.sql"
 
 require_root
 
-MYSQL_ADMIN_USER="${DB_ADMIN_USER:-${DB_USER}}"
-MYSQL_ADMIN_PASS="${DB_ADMIN_PASS:-${DB_PASS:-}}"
-MYSQL_ADMIN_HOST="${DB_ADMIN_HOST:-${DB_HOST:-127.0.0.1}}"
-MYSQL_ADMIN_PORT="${DB_ADMIN_PORT:-${DB_PORT:-3306}}"
+MYSQL_ADMIN_USER="${DB_ADMIN_USER-${DB_USER}}"
+MYSQL_ADMIN_PASS="${DB_ADMIN_PASS-${DB_PASS:-}}"
+MYSQL_ADMIN_HOST="${DB_ADMIN_HOST-${DB_HOST:-127.0.0.1}}"
+MYSQL_ADMIN_PORT="${DB_ADMIN_PORT-${DB_PORT:-3306}}"
 
-if [[ "${MYSQL_ADMIN_USER}" == "root" && -z "${MYSQL_ADMIN_PASS}" && "${MYSQL_ADMIN_HOST}" == "127.0.0.1" ]]; then
-  log WARN "Connexion MySQL root sans mot de passe avec DB_ADMIN_HOST=127.0.0.1 → bascule sur localhost pour utiliser le socket."
-  MYSQL_ADMIN_HOST="localhost"
+MYSQL_USE_SOCKET=0
+if [[ "${MYSQL_ADMIN_USER}" == "root" && -z "${MYSQL_ADMIN_PASS}" && ( "${MYSQL_ADMIN_HOST}" == "127.0.0.1" || "${MYSQL_ADMIN_HOST}" == "localhost" ) ]]; then
+  log WARN "Connexion MySQL root sans mot de passe en socket local."
+  MYSQL_USE_SOCKET=1
 fi
 
 MYSQL_ARGS=(--batch --skip-column-names -u "${MYSQL_ADMIN_USER}")
-[[ -n "${MYSQL_ADMIN_HOST:-}" ]] && MYSQL_ARGS+=(-h "${MYSQL_ADMIN_HOST}")
-[[ -n "${MYSQL_ADMIN_PORT:-}" ]] && MYSQL_ARGS+=(-P "${MYSQL_ADMIN_PORT}")
+if [[ "${MYSQL_USE_SOCKET}" -ne 1 ]]; then
+  [[ -n "${MYSQL_ADMIN_HOST:-}" ]] && MYSQL_ARGS+=(-h "${MYSQL_ADMIN_HOST}")
+  [[ -n "${MYSQL_ADMIN_PORT:-}" ]] && MYSQL_ARGS+=(-P "${MYSQL_ADMIN_PORT}")
+fi
 
 log INFO "MySQL admin cible: ${MYSQL_ADMIN_USER}@${MYSQL_ADMIN_HOST}:${MYSQL_ADMIN_PORT}"
 

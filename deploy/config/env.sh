@@ -21,10 +21,10 @@ DB_PASS="${DB_PASS:-rd}"
 
 # Credentials utilisés pour les opérations d'administration (import SQL, patchs).
 # Par défaut on réutilise le compte applicatif pour préserver la compatibilité.
-DB_ADMIN_USER="${DB_ADMIN_USER:-${DB_USER}}"
-DB_ADMIN_PASS="${DB_ADMIN_PASS:-${DB_PASS}}"
-DB_ADMIN_HOST="${DB_ADMIN_HOST:-${DB_HOST}}"
-DB_ADMIN_PORT="${DB_ADMIN_PORT:-${DB_PORT}}"
+DB_ADMIN_USER="${DB_ADMIN_USER-${DB_USER}}"
+DB_ADMIN_PASS="${DB_ADMIN_PASS-${DB_PASS}}"
+DB_ADMIN_HOST="${DB_ADMIN_HOST-${DB_HOST}}"
+DB_ADMIN_PORT="${DB_ADMIN_PORT-${DB_PORT}}"
 
 # Si positionné à 1, 40_radiusdesk_app affichera des instructions de création
 # d'utilisateur admin lorsque la connexion MySQL échoue.
