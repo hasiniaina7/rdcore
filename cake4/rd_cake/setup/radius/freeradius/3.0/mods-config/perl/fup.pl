@@ -160,6 +160,9 @@ sub _prepare_statements {
 
     $stmt_nas_type = $dbh->prepare(q{
         SELECT type FROM dynamic_clients WHERE nasidentifier=?
+        UNION
+        SELECT type FROM nas WHERE (nasidentifier=? AND nasidentifier <> '') OR nasname=?
+        LIMIT 1
     });
 
     $stmt_user_profile = $dbh->prepare(q{
@@ -198,7 +201,7 @@ sub authorize {
     #Reset these values to sane defaults
     $default_tz  = 'Africa/Johannesburg';
     $return      = RLM_MODULE_NOOP;
-    $client_type = 'Mikrotik-API'; #Maybe future feature to decide what to reply ...
+    $client_type = 'other';
     
     &fup;
 
@@ -607,11 +610,20 @@ sub formulate_reply{
     #Check if we can find the type
     if (defined $RAD_REQUEST{'NAS-Identifier'} && length $RAD_REQUEST{'NAS-Identifier'} > 0) {
         _ensure_dbh() or return RLM_MODULE_FAIL;
-        $stmt_nas_type->execute($RAD_REQUEST{'NAS-Identifier'});
+        my $nas_ip = $RAD_REQUEST{'NAS-IP-Address'} // '';
+        $stmt_nas_type->execute($RAD_REQUEST{'NAS-Identifier'}, $RAD_REQUEST{'NAS-Identifier'}, $nas_ip);
         my $r_nas_type = $stmt_nas_type->fetchrow_hashref();
         if($r_nas_type){
             $client_type = $r_nas_type->{'type'};
         }   
+    }
+    elsif (defined $RAD_REQUEST{'NAS-IP-Address'} && length $RAD_REQUEST{'NAS-IP-Address'} > 0) {
+        _ensure_dbh() or return RLM_MODULE_FAIL;
+        $stmt_nas_type->execute('', '', $RAD_REQUEST{'NAS-IP-Address'});
+        my $r_nas_type = $stmt_nas_type->fetchrow_hashref();
+        if($r_nas_type){
+            $client_type = $r_nas_type->{'type'};
+        }
     }
     
     #If there is no personal VLAN and there is a VLAN defined; assign it 
@@ -684,16 +696,18 @@ sub formulate_reply{
         $down_value = int($down_value);
         
         $RAD_REPLY{'Mikrotik-Rate-Limit'} = "$up_value$up_suffix/$down_value$down_suffix";
-        if($RAD_CONFIG{'Rd-Fup-Burst-Limit'}){        
+        {
             #20M Down 5M Up Burst 40M Down for 10s
             #5M/20M 10M/40M 7M/35M 10/10
             #Mikrotik-Rate-Limit
-            my $burst_down = int($down_value+($down_value*($RAD_CONFIG{'Rd-Fup-Burst-Limit'}/100)));
-            my $burst_up   = int($up_value+($up_value*($RAD_CONFIG{'Rd-Fup-Burst-Limit'}/100)));
-            my $burst_up_th= int($down_value+($down_value*($RAD_CONFIG{'Rd-Fup-Burst-Threshold'}/100)));
-            my $burst_down_th= int($up_value+($up_value*($RAD_CONFIG{'Rd-Fup-Burst-Threshold'}/100)));
-            my $burts_time = $RAD_CONFIG{'Rd-Fup-Burst-Time'};
-            $RAD_REPLY{'Mikrotik-Rate-Limit'} = "$up_value$up_suffix/$down_value$down_suffix $burst_up$up_suffix/$burst_down$up_suffix $burst_up_th$up_suffix/$burst_down_th$up_suffix $burts_time/$burts_time";
+            my $burst_limit = $RAD_CONFIG{'Rd-Fup-Burst-Limit'} // 100;
+            my $burst_threshold = $RAD_CONFIG{'Rd-Fup-Burst-Threshold'} // 100;
+            my $burts_time = $RAD_CONFIG{'Rd-Fup-Burst-Time'} // 30;
+            my $burst_down = int($down_value+($down_value*($burst_limit/100)));
+            my $burst_up   = int($up_value+($up_value*($burst_limit/100)));
+            my $burst_up_th= int($up_value*($burst_threshold/100));
+            my $burst_down_th= int($down_value*($burst_threshold/100));
+            $RAD_REPLY{'Mikrotik-Rate-Limit'} = "$up_value$up_suffix/$down_value$down_suffix $burst_up$up_suffix/$burst_down$down_suffix $burst_up_th$up_suffix/$burst_down_th$down_suffix $burts_time/$burts_time";
         }       
     }
     

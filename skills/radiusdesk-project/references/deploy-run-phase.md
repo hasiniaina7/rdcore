@@ -8,8 +8,8 @@ Local workspace:
 - `/home/mastershark-linux/dev/radiusdesk/installation-script`
 
 Remote server (observed):
-- installer repo: `/home/ubuntu/rdcore`
-- phase runner: `/home/ubuntu/rdcore/deploy/run-phase.sh`
+- installer repo: `/home/ubuntu/installation-script-repo`
+- phase runner: `/home/ubuntu/installation-script-repo/deploy/run-phase.sh`
 - app target: `/var/www/rdcore`
 
 ## Persistent custom fixes (important)
@@ -17,7 +17,7 @@ Remote server (observed):
 `run-phase.sh 40` does `git reset --hard origin/cake4` on `/var/www/rdcore`.
 To keep project-specific fixes permanent, store patch files in:
 
-- `/home/ubuntu/rdcore/deploy/templates/patches/*.patch`
+- `/home/ubuntu/installation-script-repo/deploy/templates/patches/*.patch`
 
 The phase script auto-applies them after sync.
 
@@ -28,8 +28,8 @@ For current production, keep at least:
 ## App redeploy flow (phase 40)
 
 ```bash
-cd /home/ubuntu/rdcore
-./deploy/clean-state.sh --phase 40 -y
+cd /home/ubuntu/installation-script-repo
+sudo ./deploy/clean-state.sh --phase 40 -y
 sudo ./deploy/run-phase.sh 40
 ```
 

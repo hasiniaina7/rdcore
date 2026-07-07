@@ -977,6 +977,7 @@ post-auth {
 	remove_reply_message_if_eap
 	
 	RADIUSdesk
+	pl_mikrotik_burst
 
 	#
 	#  Access-Reject packets are sent through the REJECT sub-section of the

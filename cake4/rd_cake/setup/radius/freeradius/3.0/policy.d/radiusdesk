@@ -77,6 +77,7 @@ RADIUSdesk.post-auth {
 	RADIUSdesk_last_accept
 	RADIUSdesk_post_auth
     RADIUSdesk_auto_devices_check
+    RADIUSdesk_mikrotik_burst
 }
 
 #____ RADIUSdesk policies __________
@@ -1201,6 +1202,15 @@ RADIUSdesk_auto_devices_check {
         if((&control:Rd-Auto-Mac)&&(&control:Rd-Auto-Mac == 1)){
             "%{sql:INSERT IGNORE INTO auto_devices SET auto_devices.username='%{request:User-Name}', auto_devices.mac='%{request:Calling-Station-Id}'}"
         }
+    }
+}
+
+RADIUSdesk_mikrotik_burst {
+    if((&reply:WISPr-Bandwidth-Max-Up)&&(&reply:WISPr-Bandwidth-Max-Down)&&(!&reply:Mikrotik-Rate-Limit)){
+        update control {
+            Tmp-String-0 := "%{sql:SELECT IFNULL((SELECT type FROM nas WHERE (nasidentifier='%{request:NAS-Identifier}' AND nasidentifier <> '') OR nasname='%{request:NAS-IP-Address}' LIMIT 1),'')}"
+        }
+        pl_mikrotik_burst
     }
 }
 

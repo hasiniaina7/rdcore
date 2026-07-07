@@ -1,0 +1,3 @@
+perl pl_mikrotik_burst {
+	filename = ${modconfdir}/perl/mikrotik_burst.pl
+}

@@ -140,3 +140,16 @@
   - validated config (`freeradius -CX`) and restarted FreeRADIUS.
 - Verification query:
   - `SELECT id,username,reply,nasname,authdate FROM radpostauth WHERE username IN ('waterreason','dyntest001--00001','dyntest002--00001','dyntest003--00001','dyntest004--00001') ORDER BY id DESC;`
+
+## 2026-07-07 - Mikrotik burst missing from dynamic queues
+- Symptom: Mikrotik dynamic queues had `max-limit` from RADIUS but `burst-limit=0/0`, while Omada relied on existing `WISPr-Bandwidth-Max-*`.
+- Root cause: FUP defaulted unknown NAS to `Mikrotik-API`, looked up only `dynamic_clients`, and emitted simple `Mikrotik-Rate-Limit` without burst when `Rd-Fup-Burst-*` was absent.
+- Files:
+  - `cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl`
+  - `cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/mikrotik_burst.pl`
+  - `cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk`
+  - `deploy/scripts/50_freeradius.sh`
+- Verification:
+  - Mikrotik radclient reply includes `Mikrotik-Rate-Limit = "4M/12M 8M/24M 4M/12M 30/30"`.
+  - Omada-style radclient reply keeps `WISPr-Bandwidth-Max-*` and does not include `Mikrotik-Rate-Limit`.
+  - Existing Mikrotik queues keep old burst values until user reconnects.

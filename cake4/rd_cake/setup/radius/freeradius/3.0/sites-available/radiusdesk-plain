@@ -72,6 +72,7 @@ server radiusdesk-plain {
     post-auth {
     
         RADIUSdesk       
+        pl_mikrotik_burst
         Post-Auth-Type REJECT {
 		    attr_filter.access_reject
 
