@@ -1,0 +1,201 @@
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/mods-available/pl_mikrotik_burst b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-available/pl_mikrotik_burst
+new file mode 100644
+index 00000000..26d6eae0
+--- /dev/null
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-available/pl_mikrotik_burst
+@@ -0,0 +1,3 @@
++perl pl_mikrotik_burst {
++	filename = ${modconfdir}/perl/mikrotik_burst.pl
++}
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl
+index 0aab5997..b4d71904 100644
+--- a/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl
+@@ -160,6 +160,9 @@ sub _prepare_statements {
+ 
+     $stmt_nas_type = $dbh->prepare(q{
+         SELECT type FROM dynamic_clients WHERE nasidentifier=?
++        UNION
++        SELECT type FROM nas WHERE (nasidentifier=? AND nasidentifier <> '') OR nasname=?
++        LIMIT 1
+     });
+ 
+     $stmt_user_profile = $dbh->prepare(q{
+@@ -198,7 +201,7 @@ sub authorize {
+     #Reset these values to sane defaults
+     $default_tz  = 'Africa/Johannesburg';
+     $return      = RLM_MODULE_NOOP;
+-    $client_type = 'Mikrotik-API'; #Maybe future feature to decide what to reply ...
++    $client_type = 'other';
+     
+     &fup;
+ 
+@@ -607,12 +610,21 @@ sub formulate_reply{
+     #Check if we can find the type
+     if (defined $RAD_REQUEST{'NAS-Identifier'} && length $RAD_REQUEST{'NAS-Identifier'} > 0) {
+         _ensure_dbh() or return RLM_MODULE_FAIL;
+-        $stmt_nas_type->execute($RAD_REQUEST{'NAS-Identifier'});
++        my $nas_ip = $RAD_REQUEST{'NAS-IP-Address'} // '';
++        $stmt_nas_type->execute($RAD_REQUEST{'NAS-Identifier'}, $RAD_REQUEST{'NAS-Identifier'}, $nas_ip);
+         my $r_nas_type = $stmt_nas_type->fetchrow_hashref();
+         if($r_nas_type){
+             $client_type = $r_nas_type->{'type'};
+         }   
+     }
++    elsif (defined $RAD_REQUEST{'NAS-IP-Address'} && length $RAD_REQUEST{'NAS-IP-Address'} > 0) {
++        _ensure_dbh() or return RLM_MODULE_FAIL;
++        $stmt_nas_type->execute('', '', $RAD_REQUEST{'NAS-IP-Address'});
++        my $r_nas_type = $stmt_nas_type->fetchrow_hashref();
++        if($r_nas_type){
++            $client_type = $r_nas_type->{'type'};
++        }
++    }
+     
+     #If there is no personal VLAN and there is a VLAN defined; assign it 
+     if(!defined $RAD_REPLY{'Tunnel-Private-Group-ID'} && $RAD_CONFIG{'Rd-Fup-Vlan'}){
+@@ -684,16 +696,18 @@ sub formulate_reply{
+         $down_value = int($down_value);
+         
+         $RAD_REPLY{'Mikrotik-Rate-Limit'} = "$up_value$up_suffix/$down_value$down_suffix";
+-        if($RAD_CONFIG{'Rd-Fup-Burst-Limit'}){        
++        {
+             #20M Down 5M Up Burst 40M Down for 10s
+             #5M/20M 10M/40M 7M/35M 10/10
+             #Mikrotik-Rate-Limit
+-            my $burst_down = int($down_value+($down_value*($RAD_CONFIG{'Rd-Fup-Burst-Limit'}/100)));
+-            my $burst_up   = int($up_value+($up_value*($RAD_CONFIG{'Rd-Fup-Burst-Limit'}/100)));
+-            my $burst_up_th= int($down_value+($down_value*($RAD_CONFIG{'Rd-Fup-Burst-Threshold'}/100)));
+-            my $burst_down_th= int($up_value+($up_value*($RAD_CONFIG{'Rd-Fup-Burst-Threshold'}/100)));
+-            my $burts_time = $RAD_CONFIG{'Rd-Fup-Burst-Time'};
+-            $RAD_REPLY{'Mikrotik-Rate-Limit'} = "$up_value$up_suffix/$down_value$down_suffix $burst_up$up_suffix/$burst_down$up_suffix $burst_up_th$up_suffix/$burst_down_th$up_suffix $burts_time/$burts_time";
++            my $burst_limit = $RAD_CONFIG{'Rd-Fup-Burst-Limit'} // 100;
++            my $burst_threshold = $RAD_CONFIG{'Rd-Fup-Burst-Threshold'} // 100;
++            my $burts_time = $RAD_CONFIG{'Rd-Fup-Burst-Time'} // 30;
++            my $burst_down = int($down_value+($down_value*($burst_limit/100)));
++            my $burst_up   = int($up_value+($up_value*($burst_limit/100)));
++            my $burst_up_th= int($up_value*($burst_threshold/100));
++            my $burst_down_th= int($down_value*($burst_threshold/100));
++            $RAD_REPLY{'Mikrotik-Rate-Limit'} = "$up_value$up_suffix/$down_value$down_suffix $burst_up$up_suffix/$burst_down$down_suffix $burst_up_th$up_suffix/$burst_down_th$down_suffix $burts_time/$burts_time";
+         }       
+     }
+     
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/mikrotik_burst.pl b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/mikrotik_burst.pl
+new file mode 100644
+index 00000000..87dc2b4a
+--- /dev/null
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/mikrotik_burst.pl
+@@ -0,0 +1,62 @@
++use strict;
++use warnings;
++
++use constant RLM_MODULE_OK => 2;
++use constant RLM_MODULE_NOOP => 7;
++
++our (%RAD_REQUEST, %RAD_REPLY, %RAD_CHECK);
++
++my $DEFAULT_BURST_LIMIT_PERCENT = 100;
++my $DEFAULT_BURST_THRESHOLD_PERCENT = 100;
++my $DEFAULT_BURST_TIME = 30;
++
++sub authorize { return RLM_MODULE_NOOP; }
++sub authenticate { return RLM_MODULE_NOOP; }
++sub accounting { return RLM_MODULE_NOOP; }
++sub preacct { return RLM_MODULE_NOOP; }
++sub detach { return RLM_MODULE_OK; }
++
++sub post_auth {
++    return RLM_MODULE_NOOP if defined $RAD_REPLY{'Mikrotik-Rate-Limit'};
++    return RLM_MODULE_NOOP if !defined $RAD_CHECK{'Tmp-String-0'};
++    return RLM_MODULE_NOOP if $RAD_CHECK{'Tmp-String-0'} ne 'Mikrotik-API';
++    return RLM_MODULE_NOOP if !defined $RAD_REPLY{'WISPr-Bandwidth-Max-Up'};
++    return RLM_MODULE_NOOP if !defined $RAD_REPLY{'WISPr-Bandwidth-Max-Down'};
++
++    my $up_bps = int($RAD_REPLY{'WISPr-Bandwidth-Max-Up'});
++    my $down_bps = int($RAD_REPLY{'WISPr-Bandwidth-Max-Down'});
++    return RLM_MODULE_NOOP if $up_bps <= 0 || $down_bps <= 0;
++
++    my ($up_value, $up_suffix) = _format_mikrotik_rate($up_bps);
++    my ($down_value, $down_suffix) = _format_mikrotik_rate($down_bps);
++
++    my $burst_up = int($up_value + ($up_value * ($DEFAULT_BURST_LIMIT_PERCENT / 100)));
++    my $burst_down = int($down_value + ($down_value * ($DEFAULT_BURST_LIMIT_PERCENT / 100)));
++    my $threshold_up = int($up_value * ($DEFAULT_BURST_THRESHOLD_PERCENT / 100));
++    my $threshold_down = int($down_value * ($DEFAULT_BURST_THRESHOLD_PERCENT / 100));
++
++    $RAD_REPLY{'Mikrotik-Rate-Limit'} =
++        "$up_value$up_suffix/$down_value$down_suffix " .
++        "$burst_up$up_suffix/$burst_down$down_suffix " .
++        "$threshold_up$up_suffix/$threshold_down$down_suffix " .
++        "$DEFAULT_BURST_TIME/$DEFAULT_BURST_TIME";
++
++    return RLM_MODULE_OK;
++}
++
++sub _format_mikrotik_rate {
++    my ($bps) = @_;
++    my $value = int($bps);
++    my $suffix = '';
++
++    if (($value / 1024) >= 1) {
++        $value = $value / 1024;
++        $suffix = 'k';
++    }
++    if (($value / 1024) >= 1) {
++        $value = $value / 1024;
++        $suffix = 'M';
++    }
++
++    return (int($value), $suffix);
++}
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk b/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk
+index aa30db68..1c2ef5a4 100644
+--- a/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk
+@@ -77,6 +77,7 @@ RADIUSdesk.post-auth {
+ 	RADIUSdesk_last_accept
+ 	RADIUSdesk_post_auth
+     RADIUSdesk_auto_devices_check
++    RADIUSdesk_mikrotik_burst
+ }
+ 
+ #____ RADIUSdesk policies __________
+@@ -1204,6 +1205,15 @@ RADIUSdesk_auto_devices_check {
+     }
+ }
+ 
++RADIUSdesk_mikrotik_burst {
++    if((&reply:WISPr-Bandwidth-Max-Up)&&(&reply:WISPr-Bandwidth-Max-Down)&&(!&reply:Mikrotik-Rate-Limit)){
++        update control {
++            Tmp-String-0 := "%{sql:SELECT IFNULL((SELECT type FROM nas WHERE (nasidentifier='%{request:NAS-Identifier}' AND nasidentifier <> '') OR nasname='%{request:NAS-IP-Address}' LIMIT 1),'')}"
++        }
++        pl_mikrotik_burst
++    }
++}
++
+ 
+ RADIUSdesk_preacct {
+ 
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-default b/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-default
+index f640d99e..f31e636a 100644
+--- a/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-default
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-default
+@@ -977,6 +977,7 @@ post-auth {
+ 	remove_reply_message_if_eap
+ 	
+ 	RADIUSdesk
++	pl_mikrotik_burst
+ 
+ 	#
+ 	#  Access-Reject packets are sent through the REJECT sub-section of the
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-plain b/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-plain
+index 75dabe3e..04cda553 100644
+--- a/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-plain
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/sites-available/radiusdesk-plain
+@@ -72,6 +72,7 @@ server radiusdesk-plain {
+     post-auth {
+     
+         RADIUSdesk       
++        pl_mikrotik_burst
+         Post-Auth-Type REJECT {
+ 		    attr_filter.access_reject
+ 

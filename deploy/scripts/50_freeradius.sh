@@ -272,6 +272,127 @@ PERL
   }
 }
 
+ensure_mikrotik_burst_policy() {
+  local perl_dir="/etc/freeradius/3.0/mods-config/perl"
+  local mods_available="/etc/freeradius/3.0/mods-available"
+  local mods_enabled="/etc/freeradius/3.0/mods-enabled"
+  local radius_policy="/etc/freeradius/3.0/policy.d/radiusdesk"
+  local default_site="/etc/freeradius/3.0/sites-available/radiusdesk-default"
+  local plain_site="/etc/freeradius/3.0/sites-available/radiusdesk-plain"
+  local fup_file="${perl_dir}/fup.pl"
+
+  mkdir -p "${perl_dir}" "${mods_available}" "${mods_enabled}"
+
+  log INFO "Activation du burst Mikrotik derive des attributs WISPr, sans modifier Omada."
+
+  cat > "${mods_available}/pl_mikrotik_burst" <<'EOF'
+perl pl_mikrotik_burst {
+	filename = ${modconfdir}/perl/mikrotik_burst.pl
+}
+EOF
+
+  cat > "${perl_dir}/mikrotik_burst.pl" <<'EOF'
+use strict;
+use warnings;
+
+use constant RLM_MODULE_OK => 2;
+use constant RLM_MODULE_NOOP => 7;
+
+our (%RAD_REQUEST, %RAD_REPLY, %RAD_CHECK);
+
+my $DEFAULT_BURST_LIMIT_PERCENT = 100;
+my $DEFAULT_BURST_THRESHOLD_PERCENT = 100;
+my $DEFAULT_BURST_TIME = 30;
+
+sub authorize { return RLM_MODULE_NOOP; }
+sub authenticate { return RLM_MODULE_NOOP; }
+sub accounting { return RLM_MODULE_NOOP; }
+sub preacct { return RLM_MODULE_NOOP; }
+sub detach { return RLM_MODULE_OK; }
+
+sub post_auth {
+    return RLM_MODULE_NOOP if defined $RAD_REPLY{'Mikrotik-Rate-Limit'};
+    return RLM_MODULE_NOOP if !defined $RAD_CHECK{'Tmp-String-0'};
+    return RLM_MODULE_NOOP if $RAD_CHECK{'Tmp-String-0'} ne 'Mikrotik-API';
+    return RLM_MODULE_NOOP if !defined $RAD_REPLY{'WISPr-Bandwidth-Max-Up'};
+    return RLM_MODULE_NOOP if !defined $RAD_REPLY{'WISPr-Bandwidth-Max-Down'};
+
+    my $up_bps = int($RAD_REPLY{'WISPr-Bandwidth-Max-Up'});
+    my $down_bps = int($RAD_REPLY{'WISPr-Bandwidth-Max-Down'});
+    return RLM_MODULE_NOOP if $up_bps <= 0 || $down_bps <= 0;
+
+    my ($up_value, $up_suffix) = _format_mikrotik_rate($up_bps);
+    my ($down_value, $down_suffix) = _format_mikrotik_rate($down_bps);
+
+    my $burst_up = int($up_value + ($up_value * ($DEFAULT_BURST_LIMIT_PERCENT / 100)));
+    my $burst_down = int($down_value + ($down_value * ($DEFAULT_BURST_LIMIT_PERCENT / 100)));
+    my $threshold_up = int($up_value * ($DEFAULT_BURST_THRESHOLD_PERCENT / 100));
+    my $threshold_down = int($down_value * ($DEFAULT_BURST_THRESHOLD_PERCENT / 100));
+
+    $RAD_REPLY{'Mikrotik-Rate-Limit'} =
+        "$up_value$up_suffix/$down_value$down_suffix " .
+        "$burst_up$up_suffix/$burst_down$down_suffix " .
+        "$threshold_up$up_suffix/$threshold_down$down_suffix " .
+        "$DEFAULT_BURST_TIME/$DEFAULT_BURST_TIME";
+
+    return RLM_MODULE_OK;
+}
+
+sub _format_mikrotik_rate {
+    my ($bps) = @_;
+    my $value = int($bps);
+    my $suffix = '';
+
+    if (($value / 1024) >= 1) {
+        $value = $value / 1024;
+        $suffix = 'k';
+    }
+    if (($value / 1024) >= 1) {
+        $value = $value / 1024;
+        $suffix = 'M';
+    }
+
+    return (int($value), $suffix);
+}
+EOF
+
+  ln -sf ../mods-available/pl_mikrotik_burst "${mods_enabled}/pl_mikrotik_burst"
+
+  if [[ -f "${fup_file}" ]]; then
+    perl -0pi -e "$(cat <<'PERL'
+      s/SELECT type FROM dynamic_clients WHERE nasidentifier=\?/SELECT type FROM dynamic_clients WHERE nasidentifier=?\n        UNION\n        SELECT type FROM nas WHERE (nasidentifier=? AND nasidentifier <> '') OR nasname=?\n        LIMIT 1/g;
+      s/\$client_type = 'Mikrotik-API'; \#Maybe future feature to decide what to reply .../\$client_type = 'other';/g;
+      s/\$stmt_nas_type->execute\(\$RAD_REQUEST\{'NAS-Identifier'\}\);\n        my \$r_nas_type = \$stmt_nas_type->fetchrow_hashref\(\);\n        if\(\$r_nas_type\)\{\n            \$client_type = \$r_nas_type->\{'type'\};\n        \}   /\$stmt_nas_type->execute\(\$RAD_REQUEST\{'NAS-Identifier'\}, \$RAD_REQUEST\{'NAS-Identifier'\}, \$RAD_REQUEST\{'NAS-IP-Address'\} \/\/ ''\);\n        my \$r_nas_type = \$stmt_nas_type->fetchrow_hashref\(\);\n        if\(\$r_nas_type\)\{\n            \$client_type = \$r_nas_type->\{'type'\};\n        \}   /g;
+      s/(\n    if \(defined \$RAD_REQUEST\{'NAS-Identifier'\} && length \$RAD_REQUEST\{'NAS-Identifier'\} > 0\) \{\n        _ensure_dbh\(\) or return RLM_MODULE_FAIL;\n        \$stmt_nas_type->execute\(\$RAD_REQUEST\{'NAS-Identifier'\}, \$RAD_REQUEST\{'NAS-Identifier'\}, \$RAD_REQUEST\{'NAS-IP-Address'\} \/\/ ''\);\n        my \$r_nas_type = \$stmt_nas_type->fetchrow_hashref\(\);\n        if\(\$r_nas_type\)\{\n            \$client_type = \$r_nas_type->\{'type'\};\n        \}   \n    \})/$1\n    elsif (defined \$RAD_REQUEST{'NAS-IP-Address'} && length \$RAD_REQUEST{'NAS-IP-Address'} > 0) {\n        _ensure_dbh() or return RLM_MODULE_FAIL;\n        \$stmt_nas_type->execute('', '', \$RAD_REQUEST{'NAS-IP-Address'});\n        my \$r_nas_type = \$stmt_nas_type->fetchrow_hashref();\n        if(\$r_nas_type){\n            \$client_type = \$r_nas_type->{'type'};\n        }\n    }/s unless /elsif \(defined \$RAD_REQUEST\{'NAS-IP-Address'\}/;
+      s/if\(\$RAD_CONFIG\{'Rd-Fup-Burst-Limit'\}\)\{/if(1){/g;
+      s/my \$burst_down = int\(\$down_value\+\(\$down_value\*\(\$RAD_CONFIG\{'Rd-Fup-Burst-Limit'\}\/100\)\)\);\n            my \$burst_up   = int\(\$up_value\+\(\$up_value\*\(\$RAD_CONFIG\{'Rd-Fup-Burst-Limit'\}\/100\)\)\);/my \$burst_limit = \$RAD_CONFIG{'Rd-Fup-Burst-Limit'} \/\/ 100;\n            my \$burst_threshold = \$RAD_CONFIG{'Rd-Fup-Burst-Threshold'} \/\/ 100;\n            my \$burts_time = \$RAD_CONFIG{'Rd-Fup-Burst-Time'} \/\/ 30;\n            my \$burst_down = int\(\$down_value+\(\$down_value*\(\$burst_limit\/100\)\)\);\n            my \$burst_up   = int\(\$up_value+\(\$up_value*\(\$burst_limit\/100\)\)\);/g;
+      s/my \$burst_up_th= int\(\$down_value\+\(\$down_value\*\(\$RAD_CONFIG\{'Rd-Fup-Burst-Threshold'\}\/100\)\)\);/my \$burst_up_th= int\(\$up_value*\(\$burst_threshold\/100\)\);/g;
+      s/my \$burst_down_th= int\(\$up_value\+\(\$up_value\*\(\$RAD_CONFIG\{'Rd-Fup-Burst-Threshold'\}\/100\)\)\);/my \$burst_down_th= int\(\$down_value*\(\$burst_threshold\/100\)\);/g;
+      s/my \$burst_up_th= int\(\$up_value\*\(\$RAD_CONFIG\{'Rd-Fup-Burst-Threshold'\}\/100\)\);/my \$burst_up_th= int\(\$up_value*\(\$burst_threshold\/100\)\);/g;
+      s/my \$burst_down_th= int\(\$down_value\*\(\$RAD_CONFIG\{'Rd-Fup-Burst-Threshold'\}\/100\)\);/my \$burst_down_th= int\(\$down_value*\(\$burst_threshold\/100\)\);/g;
+      s/\n            my \$burts_time = \$RAD_CONFIG\{'Rd-Fup-Burst-Time'\};//g;
+      s/\$RAD_REPLY\{'Mikrotik-Rate-Limit'\} = "\$up_value\$up_suffix\/\$down_value\$down_suffix \$burst_up\$up_suffix\/\$burst_down\$up_suffix \$burst_up_th\$up_suffix\/\$burst_down_th\$up_suffix \$burts_time\/\$burts_time";/\$RAD_REPLY\{'Mikrotik-Rate-Limit'\} = "\$up_value\$up_suffix\/\$down_value\$down_suffix \$burst_up\$up_suffix\/\$burst_down\$down_suffix \$burst_up_th\$up_suffix\/\$burst_down_th\$down_suffix \$burts_time\/\$burts_time";/g;
+PERL
+    )" "${fup_file}"
+  fi
+
+  if [[ -f "${radius_policy}" ]]; then
+    if ! grep -q 'RADIUSdesk_mikrotik_burst' "${radius_policy}"; then
+      perl -0pi -e 's/(RADIUSdesk_auto_devices_check\n)/$1    RADIUSdesk_mikrotik_burst\n/' "${radius_policy}"
+      perl -0pi -e 's/\n\nRADIUSdesk_preacct \{/\n\nRADIUSdesk_mikrotik_burst {\n    if((&reply:WISPr-Bandwidth-Max-Up)&&(&reply:WISPr-Bandwidth-Max-Down)&&(!&reply:Mikrotik-Rate-Limit)){\n        update control {\n            Tmp-String-0 := "%{sql:SELECT IFNULL((SELECT type FROM nas WHERE (nasidentifier='\''%{request:NAS-Identifier}'\'' AND nasidentifier <> '\'''\'') OR nasname='\''%{request:NAS-IP-Address}'\'' LIMIT 1),'\'''\'')}"\n        }\n        pl_mikrotik_burst\n    }\n}\n\nRADIUSdesk_preacct {/s' "${radius_policy}"
+    fi
+  else
+    log WARN "Policy RadiusDesk introuvable (${radius_policy}), burst Mikrotik non insere dans la policy."
+  fi
+
+  if [[ -f "${default_site}" ]] && ! grep -q '^[[:space:]]*pl_mikrotik_burst[[:space:]]*$' "${default_site}"; then
+    perl -0pi -e 's/(\n\s*RADIUSdesk\n\n\s*#\n\s*#  Access-Reject)/\n\tRADIUSdesk\n\tpl_mikrotik_burst\n\n\t#\n\t#  Access-Reject/s' "${default_site}"
+  fi
+  if [[ -f "${plain_site}" ]] && ! grep -q '^[[:space:]]*pl_mikrotik_burst[[:space:]]*$' "${plain_site}"; then
+    perl -0pi -e 's/(\n\s*RADIUSdesk\s*\n\s*Post-Auth-Type REJECT)/\n        RADIUSdesk       \n        pl_mikrotik_burst\n        Post-Auth-Type REJECT/s' "${plain_site}"
+  fi
+}
+
 update_sql_conf 'server = "[^"]*"' "server = \"${DB_HOST}\""
 if [[ "${DB_PORT}" != "3306" ]]; then
   if grep -q '^\s*#\s*port = 3306' "${SQL_CONF}"; then
@@ -322,6 +443,7 @@ fi
 ensure_radiusdesk_dynamic_expiration_attrs
 localize_radiusdesk_reply_messages
 harden_radiusdesk_voucher_data_never_counter
+ensure_mikrotik_burst_policy
 
 mkdir -p /var/log/freeradius/sqltrace
 chown -R freerad:freerad /var/log/freeradius
