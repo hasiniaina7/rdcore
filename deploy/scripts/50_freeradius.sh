@@ -119,6 +119,149 @@ EOF
   fi
 }
 
+optimize_radiusdesk_usage_queries() {
+  local radius_policy="/etc/freeradius/3.0/policy.d/radiusdesk"
+  local legacy_created="UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}"
+  local legacy_timestamp="UNIX_TIMESTAMP(timestamp) >= %{control:Rd-Start-Time}"
+  local created_count=0
+  local timestamp_count=0
+
+  if [[ ! -f "${radius_policy}" ]]; then
+    log ERROR "Policy RadiusDesk introuvable (${radius_policy}), optimisation FUP impossible."
+    exit 1
+  fi
+
+  # Count exact legacy expressions so an upstream policy change cannot be patched silently.
+  created_count="$(awk -v needle="${legacy_created}" 'index($0, needle) { count++ } END { print count + 0 }' "${radius_policy}")"
+  timestamp_count="$(awk -v needle="${legacy_timestamp}" 'index($0, needle) { count++ } END { print count + 0 }' "${radius_policy}")"
+
+  if [[ "${created_count}" -eq 0 && "${timestamp_count}" -eq 0 ]]; then
+    if grep -qF 'created >= FROM_UNIXTIME(%{control:Rd-Start-Time})' "${radius_policy}" \
+      && grep -qF 'timestamp >= FROM_UNIXTIME(%{control:Rd-Start-Time})' "${radius_policy}"; then
+      log INFO "Requêtes FUP déjà compatibles avec les index dans ${radius_policy}."
+      return
+    fi
+    log ERROR "Expressions FUP attendues absentes; refus de modifier une policy inconnue."
+    exit 1
+  fi
+
+  if [[ "${created_count}" -ne 5 || "${timestamp_count}" -ne 1 ]]; then
+    log ERROR "Policy FUP inattendue: ${created_count} filtres created et ${timestamp_count} filtre timestamp (attendu: 5 et 1)."
+    exit 1
+  fi
+
+  log INFO "Optimisation des filtres temporels FUP pour les index MariaDB."
+  perl -0pi -e '
+    s/UNIX_TIMESTAMP\(created\) >= %\{control:Rd-Start-Time\}/created >= FROM_UNIXTIME(%{control:Rd-Start-Time})/g;
+    s/UNIX_TIMESTAMP\(timestamp\) >= %\{control:Rd-Start-Time\}/timestamp >= FROM_UNIXTIME(%{control:Rd-Start-Time})/g;
+  ' "${radius_policy}"
+
+  if grep -qF "${legacy_created}" "${radius_policy}" || grep -qF "${legacy_timestamp}" "${radius_policy}"; then
+    log ERROR "Une expression FUP non indexable subsiste dans ${radius_policy}."
+    exit 1
+  fi
+}
+
+optimize_radiusdesk_fup_perl_query() {
+  local fup_perl="/etc/freeradius/3.0/mods-config/perl/fup.pl"
+  local legacy_query='FROM user_stats WHERE username=? AND timestamp >= ?'
+  local optimized_query='FROM user_stats FORCE INDEX (us_username_timestamp) WHERE username=? AND timestamp >= FROM_UNIXTIME(?)'
+  local legacy_execute="\$stmt_data_used->execute(\$RAD_REQUEST{'User-Name'},\$time_start->rfc3339);"
+  local optimized_execute="\$stmt_data_used->execute(\$RAD_REQUEST{'User-Name'},\$time_start->epoch);"
+  local legacy_query_count=0
+  local optimized_query_count=0
+  local legacy_execute_count=0
+  local optimized_execute_count=0
+
+  if [[ ! -f "${fup_perl}" ]]; then
+    log ERROR "Module FUP Perl introuvable (${fup_perl}), optimisation impossible."
+    exit 1
+  fi
+
+  legacy_query_count="$(grep -cF "${legacy_query}" "${fup_perl}" || true)"
+  optimized_query_count="$(grep -cF "${optimized_query}" "${fup_perl}" || true)"
+  legacy_execute_count="$(grep -cF "${legacy_execute}" "${fup_perl}" || true)"
+  optimized_execute_count="$(grep -cF "${optimized_execute}" "${fup_perl}" || true)"
+
+  if [[ "${optimized_query_count}" -eq 1 && "${optimized_execute_count}" -eq 1 \
+    && "${legacy_query_count}" -eq 0 && "${legacy_execute_count}" -eq 0 ]]; then
+    log INFO "Requête du module FUP Perl déjà optimisée et compatible avec les fuseaux horaires."
+    return
+  fi
+
+  # Fail closed if upstream changes either half of this prepared-statement contract.
+  if [[ "${legacy_query_count}" -ne 1 || "${legacy_execute_count}" -ne 1 \
+    || "${optimized_query_count}" -ne 0 || "${optimized_execute_count}" -ne 0 ]]; then
+    log ERROR "Structure FUP Perl inattendue; refus d'appliquer une transformation partielle."
+    exit 1
+  fi
+
+  log INFO "Optimisation de la requête FUP Perl avec epoch et index temporel dédié."
+  LEGACY_QUERY="${legacy_query}" OPTIMIZED_QUERY="${optimized_query}" \
+    LEGACY_EXECUTE="${legacy_execute}" OPTIMIZED_EXECUTE="${optimized_execute}" \
+    perl -0pi -e '
+      s/\Q$ENV{LEGACY_QUERY}\E/$ENV{OPTIMIZED_QUERY}/g;
+      s/\Q$ENV{LEGACY_EXECUTE}\E/$ENV{OPTIMIZED_EXECUTE}/g;
+    ' "${fup_perl}"
+
+  if [[ "$(grep -cF "${optimized_query}" "${fup_perl}" || true)" -ne 1 \
+    || "$(grep -cF "${optimized_execute}" "${fup_perl}" || true)" -ne 1 \
+    || "$(grep -cF "${legacy_query}" "${fup_perl}" || true)" -ne 0 \
+    || "$(grep -cF "${legacy_execute}" "${fup_perl}" || true)" -ne 0 ]]; then
+    log ERROR "Validation de la requête FUP Perl optimisée échouée."
+    exit 1
+  fi
+}
+
+harden_freeradius_resource_limits() {
+  local radius_conf="/etc/freeradius/3.0/radiusd.conf"
+  local override_dir="/etc/systemd/system/freeradius.service.d"
+  local override_file="${override_dir}/20-radiusdesk-resource-guard.conf"
+
+  if [[ ! -f "${radius_conf}" ]]; then
+    log ERROR "Configuration FreeRADIUS introuvable (${radius_conf}), limites de ressources impossibles."
+    exit 1
+  fi
+
+  # Eight workers are sufficient for two CPUs and keep Perl interpreters within 2 GiB RAM.
+  perl -0pi -e '
+    s/^[ \t]*start_servers[ \t]*=[ \t]*\d+[ \t]*$/\tstart_servers = 2/m;
+    s/^[ \t]*max_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmax_servers = 8/m;
+    s/^[ \t]*min_spare_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmin_spare_servers = 2/m;
+    s/^[ \t]*max_spare_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmax_spare_servers = 4/m;
+    s/^[ \t]*#[ \t]*max_queue_size[ \t]*=[ \t]*65536[ \t]*$/\tmax_queue_size = 1024/m;
+    s/^[ \t]*max_requests_per_server[ \t]*=[ \t]*\d+[ \t]*$/\tmax_requests_per_server = 5000/m;
+  ' "${radius_conf}"
+
+  for expected in \
+    'start_servers = 2' \
+    'max_servers = 8' \
+    'min_spare_servers = 2' \
+    'max_spare_servers = 4' \
+    'max_queue_size = 1024' \
+    'max_requests_per_server = 5000'; do
+    if [[ "$(grep -cF "${expected}" "${radius_conf}")" -ne 1 ]]; then
+      log ERROR "Limite FreeRADIUS absente ou ambiguë après génération: ${expected}."
+      exit 1
+    fi
+  done
+
+  install -d -m 0755 "${override_dir}"
+  cat > "${override_file}" <<'EOF'
+[Unit]
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+MemoryHigh=384M
+MemoryMax=512M
+RestartSec=15s
+EOF
+  chmod 0644 "${override_file}"
+  systemctl daemon-reload
+  log INFO "Pool FreeRADIUS borné à 8 workers et mémoire du service limitée à 512 Mio."
+}
+
 localize_radiusdesk_reply_messages() {
   local radius_policy="/etc/freeradius/3.0/policy.d/radiusdesk"
   local perl_dir="/etc/freeradius/3.0/mods-config/perl"
@@ -441,6 +584,9 @@ if [[ -f "${CLIENTS_CONF}" ]]; then
 fi
 
 ensure_radiusdesk_dynamic_expiration_attrs
+optimize_radiusdesk_usage_queries
+optimize_radiusdesk_fup_perl_query
+harden_freeradius_resource_limits
 localize_radiusdesk_reply_messages
 harden_radiusdesk_voucher_data_never_counter
 ensure_mikrotik_burst_policy

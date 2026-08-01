@@ -1,0 +1,94 @@
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk b/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk
+--- a/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/policy.d/radiusdesk
+@@ -574,7 +574,7 @@ RADIUSdesk_data_counter {
+                 # we can now use it in a query
+                 if(&control:Rd-Tmp-Avail-Data){ #This indicates it it a device!
+                     update control {
+-                        Rd-Used-Data := "{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND UNIX_TIMESTAMP(timestamp) >= %{control:Rd-Start-Time}}"
++                        Rd-Used-Data := "{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND timestamp >= FROM_UNIXTIME(%{control:Rd-Start-Time})}"
+                     }
+                 }
+                 else{ 
+@@ -581,12 +581,12 @@ RADIUSdesk_data_counter {
+                     #Here we need to see if the counter is to be applied on the device level and there is a device present in the request
+                     if((&control:Rd-Mac-Counter-Data)&&(&request:Calling-Station-Id)){
+                         update control {
+-                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
++                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND created >= FROM_UNIXTIME(%{control:Rd-Start-Time})}"
+                         }
+                     }
+                     else{
+                         update control {
+-                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
++                            Rd-Used-Data := "%{sql:SELECT IFNULL(SUM(acctinputoctets + acctoutputoctets), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND created >= FROM_UNIXTIME(%{control:Rd-Start-Time})}"
+                         }
+                     }
+                 }
+@@ -628,7 +628,7 @@ RADIUSdesk_time_counter {
+                 # we can now use it in a query
+                 if(&control:Rd-Tmp-Avail-Time){ #This indicates it it a device!
+                     update control {
+-						Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
++						Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE callingstationid = '%{request:User-Name}' AND created >= FROM_UNIXTIME(%{control:Rd-Start-Time})}"
+                     }
+                 }
+                 else{
+@@ -635,12 +635,12 @@ RADIUSdesk_time_counter {
+                     #Here we need to see if the counter is to be applied on the device level and there is a device present in the request
+                     if((&control:Rd-Mac-Counter-Time)&&(&request:Calling-Station-Id)){
+                         update control {
+-                            Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
++                            Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND callingstationid = '%{request:Calling-Station-Id}' AND created >= FROM_UNIXTIME(%{control:Rd-Start-Time})}"
+                         }
+                     }
+                     else{
+                         update control {
+-                            Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND UNIX_TIMESTAMP(created) >= %{control:Rd-Start-Time}}"
++                            Rd-Used-Time := "%{sql:SELECT IFNULL(SUM(TIMESTAMPDIFF(SECOND, created, timestamp)), 0) FROM user_stats WHERE username = '%{request:User-Name}' AND created >= FROM_UNIXTIME(%{control:Rd-Start-Time})}"
+                         }
+                     }
+                 }
+diff --git a/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl
+--- a/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl
++++ b/cake4/rd_cake/setup/radius/freeradius/3.0/mods-config/perl/fup.pl
+@@ -134,7 +134,7 @@ sub _prepare_statements {
+ 
+     $stmt_data_used = $dbh->prepare(q{
+         SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) AS data_used
+-        FROM user_stats WHERE username=? AND timestamp >= ?
++        FROM user_stats FORCE INDEX (us_username_timestamp) WHERE username=? AND timestamp >= FROM_UNIXTIME(?)
+     });
+ 
+     $stmt_fnd_appl = $dbh->prepare(q{
+@@ -487,9 +487,9 @@
+ sub check_usage {
+     my($row)        = @_;
+     my $time_start  = get_start_of($row->{'if_condition'});
+-    #say $time_start->rfc3339;
++    # Pass an epoch so MariaDB preserves the client timezone instant and can use the timestamp index.
+     _ensure_dbh() or return RLM_MODULE_FAIL;
+-    $stmt_data_used->execute($RAD_REQUEST{'User-Name'},$time_start->rfc3339);
++    $stmt_data_used->execute($RAD_REQUEST{'User-Name'},$time_start->epoch);
+     my $result      = $stmt_data_used->fetchrow_hashref();
+     $stmt_data_used->finish();
+ 
+diff --git a/cake4/rd_cake/src/Shell/FupShell.php b/cake4/rd_cake/src/Shell/FupShell.php
+--- a/cake4/rd_cake/src/Shell/FupShell.php
++++ b/cake4/rd_cake/src/Shell/FupShell.php
+@@ -323,12 +323,13 @@
+ 	private function check_usage($username,$row,$timezone, $billing_cycle=false){
+ 
+     	$time_start = $this->get_start_of($row->{'if_condition'},$timezone,$billing_cycle);
++    	$period_start_epoch = $time_start->getTimestamp();
+     	$nice = $time_start->toIso8601String();
+     	$this->out("<info>TIME START $nice </info>");
+-    	$sql_usage 	= "SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) AS data_used FROM user_stats WHERE username=:username AND timestamp >=:timestamp";
++    	$sql_usage 	= "SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) AS data_used FROM user_stats FORCE INDEX (us_username_timestamp) WHERE username=:username AND timestamp >= FROM_UNIXTIME(:period_start_epoch)";
+     	$connection = ConnectionManager::get('default');          
+       	$results = $connection
+-    		->execute($sql_usage , ['username' => $username,'timestamp' => $nice])
++    		->execute($sql_usage , ['username' => $username,'period_start_epoch' => $period_start_epoch])
+     		->fetchAll('assoc');
+     	$data_used 	= $results[0]['data_used'];
+     	$this->out("<info>DATA USED $data_used</info>");

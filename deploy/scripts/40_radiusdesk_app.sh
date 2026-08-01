@@ -10,6 +10,7 @@ source "${BASE_DIR}/lib/common.sh"
 CURRENT_LOG="${LOG_DIR}/40_radiusdesk_app.log"
 STEP_NAME="40_radiusdesk_app"
 PATCHES_DIR="${BASE_DIR}/templates/patches"
+SQL_TEMPLATES_DIR="${BASE_DIR}/templates/sql"
 RDCORE_PATH="/var/www/rdcore"
 CAKE_DB_DIR="${RDCORE_PATH}/cake4/rd_cake/setup/db"
 RD_SQL_DUMP="${CAKE_DB_DIR}/rd.sql"
@@ -190,6 +191,15 @@ apply_local_patches() {
   fi
 }
 
+install_local_sql_patches() {
+  if compgen -G "${SQL_TEMPLATES_DIR}/*.sql" >/dev/null 2>&1; then
+    while IFS= read -r sql_template; do
+      log INFO "Installation du patch SQL local $(basename "${sql_template}")."
+      install -m 0644 "${sql_template}" "${CAKE_DB_DIR}/$(basename "${sql_template}")"
+    done < <(find "${SQL_TEMPLATES_DIR}" -maxdepth 1 -type f -name '*.sql' -print | sort)
+  fi
+}
+
 if already_done "$STEP_NAME"; then
   log INFO "Étape ${STEP_NAME} déjà marquée comme faite, on saute."
   exit 0
@@ -246,6 +256,7 @@ else
 fi
 
 apply_local_patches
+install_local_sql_patches
 
 log INFO "Création des liens symboliques dans /var/www/html."
 mkdir -p /var/www/html
