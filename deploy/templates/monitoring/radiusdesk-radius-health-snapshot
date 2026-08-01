@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+# Collect one compact, secret-free RadiusDesk/FreeRADIUS health sample.
+set -euo pipefail
+IFS=$'\n\t'
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+DATA_DIR="${RADIUS_HEALTH_DATA_DIR:-/var/log/radiusdesk-radius-health}"
+STATE_DIR="${RADIUS_HEALTH_STATE_DIR:-/var/lib/radiusdesk-radius-health}"
+LOCK_FILE="${RADIUS_HEALTH_LOCK_FILE:-/run/lock/radiusdesk-radius-health.lock}"
+DATA_FILE="${DATA_DIR}/samples.tsv"
+CURSOR_FILE="${STATE_DIR}/radius-log.cursor"
+RADIUS_LOG="${RADIUS_HEALTH_RADIUS_LOG:-/var/log/freeradius/radius.log}"
+CGROUP_DIR="${RADIUS_HEALTH_CGROUP_DIR:-/sys/fs/cgroup/system.slice/freeradius.service}"
+RETENTION_SECONDS=43200
+MAX_ROWS=145
+MAX_LOG_READ_BYTES=1048576
+INITIAL_LOG_CONTEXT_BYTES=262144
+HEADER=$'epoch\tiso_utc\tfreeradius_active\trestarts\tmemory_current_bytes\tmemory_peak_bytes\tmemory_high_bytes\tmemory_max_bytes\ttasks\tpid_rss_kb\tcpu_ticks\tcgroup_high\tcgroup_max\tcgroup_oom\tcgroup_oom_kill\tsock_throttled\tpsi_some_avg10\tpsi_full_avg10\trecvq_1812\trecvq_1813\tload1\tmem_available_kb\tswap_free_kb\tdb_ok\tdb_threads_connected\tdb_threads_running\tdb_slow_queries\tdb_aborted_connects\tradpostauth_id\tlast_auth_epoch\tlast_auth_reply\tradacct_id\tradius_log_bytes\tlog_new_bytes\tlog_cursor_reset\tlog_truncated\terrors_blocking\terrors_duplicate\terrors_unknown_client\terrors_invalid_ma\terrors_sql\tkernel_oom_recent\thttp_code\troot_disk_used_pct'
+
+install -d -m 0750 "${DATA_DIR}" "${STATE_DIR}"
+install -d -m 0755 "$(dirname "${LOCK_FILE}")"
+exec 9>"${LOCK_FILE}"
+flock -n 9 || exit 0
+
+numeric_or_zero() {
+  local value="${1:-}"
+  [[ "${value}" =~ ^[0-9]+([.][0-9]+)?$ ]] && printf '%s' "${value}" || printf '0'
+}
+
+cgroup_event() {
+  local key="$1"
+  local value=""
+  if [[ -r "${CGROUP_DIR}/memory.events" ]]; then
+    value="$(awk -v key="${key}" '$1 == key { print $2; exit }' "${CGROUP_DIR}/memory.events")"
+  fi
+  numeric_or_zero "${value}"
+}
+
+psi_avg10() {
+  local pressure_type="$1"
+  local value=""
+  if [[ -r "${CGROUP_DIR}/memory.pressure" ]]; then
+    value="$(awk -v pressure_type="${pressure_type}" '
+      $1 == pressure_type {
+        for (i = 2; i <= NF; i++) {
+          if ($i ~ /^avg10=/) { split($i, pair, "="); print pair[2]; exit }
+        }
+      }
+    ' "${CGROUP_DIR}/memory.pressure")"
+  fi
+  numeric_or_zero "${value}"
+}
+
+systemd_value() {
+  local properties="$1"
+  local key="$2"
+  local value=""
+  value="$(awk -F= -v key="${key}" '$1 == key { print $2; exit }' <<<"${properties}")"
+  numeric_or_zero "${value}"
+}
+
+count_pattern() {
+  local pattern="$1"
+  local content="$2"
+  local count=""
+  count="$(grep -Eic "${pattern}" <<<"${content}" || true)"
+  numeric_or_zero "${count}"
+}
+
+now_epoch="$(date -u +%s)"
+iso_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+if systemctl is-active --quiet freeradius; then freeradius_active=1; else freeradius_active=0; fi
+
+properties="$(systemctl show freeradius \
+  -p MainPID -p NRestarts -p MemoryCurrent -p MemoryPeak \
+  -p MemoryHigh -p MemoryMax -p TasksCurrent 2>/dev/null || true)"
+main_pid="$(systemd_value "${properties}" MainPID)"
+restarts="$(systemd_value "${properties}" NRestarts)"
+memory_current="$(systemd_value "${properties}" MemoryCurrent)"
+memory_peak="$(systemd_value "${properties}" MemoryPeak)"
+memory_high="$(systemd_value "${properties}" MemoryHigh)"
+memory_max="$(systemd_value "${properties}" MemoryMax)"
+tasks="$(systemd_value "${properties}" TasksCurrent)"
+
+pid_rss_kb=0
+cpu_ticks=0
+if [[ "${main_pid}" -gt 0 && -r "/proc/${main_pid}/status" ]]; then
+  pid_rss_kb="$(awk '$1 == "VmRSS:" { print $2; exit }' "/proc/${main_pid}/status")"
+  cpu_ticks="$(awk '{ print $14 + $15 }' "/proc/${main_pid}/stat")"
+fi
+pid_rss_kb="$(numeric_or_zero "${pid_rss_kb}")"
+cpu_ticks="$(numeric_or_zero "${cpu_ticks}")"
+
+cgroup_high="$(cgroup_event high)"
+cgroup_max="$(cgroup_event max)"
+cgroup_oom="$(cgroup_event oom)"
+cgroup_oom_kill="$(cgroup_event oom_kill)"
+sock_throttled="$(cgroup_event sock_throttled)"
+psi_some_avg10="$(psi_avg10 some)"
+psi_full_avg10="$(psi_avg10 full)"
+
+socket_rows="$(ss -H -lun 2>/dev/null || true)"
+recvq_1812="$(awk '$4 ~ /:1812$/ { sum += $2 } END { print sum + 0 }' <<<"${socket_rows}")"
+recvq_1813="$(awk '$4 ~ /:1813$/ { sum += $2 } END { print sum + 0 }' <<<"${socket_rows}")"
+load1="$(awk '{ print $1 }' /proc/loadavg)"
+mem_available_kb="$(awk '$1 == "MemAvailable:" { print $2; exit }' /proc/meminfo)"
+swap_free_kb="$(awk '$1 == "SwapFree:" { print $2; exit }' /proc/meminfo)"
+root_disk_used_pct="$(df -P / | awk 'NR == 2 { gsub(/%/, "", $5); print $5 }')"
+
+db_ok=0
+db_threads_connected=0
+db_threads_running=0
+db_slow_queries=0
+db_aborted_connects=0
+radpostauth_id=0
+last_auth_epoch=0
+last_auth_reply=none
+radacct_id=0
+sql_config=/etc/freeradius/3.0/mods-enabled/sql
+if [[ -r "${sql_config}" ]]; then
+  db_host="$(perl -ne 'if (/^\s*server\s*=\s*"([^"]*)"/) { print $1; exit }' "${sql_config}")"
+  db_port="$(perl -ne 'if (/^\s*port\s*=\s*([0-9]+)/) { print $1; exit }' "${sql_config}")"
+  db_user="$(perl -ne 'if (/^\s*login\s*=\s*"([^"]*)"/) { print $1; exit }' "${sql_config}")"
+  db_pass="$(perl -ne 'if (/^\s*password\s*=\s*"([^"]*)"/) { print $1; exit }' "${sql_config}")"
+  db_name="$(perl -ne 'if (/^\s*radius_db\s*=\s*"([^"]*)"/) { print $1; exit }' "${sql_config}")"
+  db_port="${db_port:-3306}"
+  if [[ -n "${db_host}" && -n "${db_user}" && -n "${db_name}" ]]; then
+    db_output="$(MYSQL_PWD="${db_pass}" mysql --connect-timeout=2 \
+      --host="${db_host}" --port="${db_port}" --user="${db_user}" --database="${db_name}" \
+      --batch --skip-column-names --execute="
+        SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Threads_running','Slow_queries','Aborted_connects');
+        SELECT 'RADPOSTAUTH',id,UNIX_TIMESTAMP(authdate),reply FROM radpostauth ORDER BY id DESC LIMIT 1;
+        SELECT 'RADACCT',COALESCE(MAX(radacctid),0) FROM radacct;
+      " 2>/dev/null || true)"
+    if [[ -n "${db_output}" ]]; then
+      db_ok=1
+      while IFS=$'\t' read -r key value extra reply; do
+        case "${key}" in
+          Threads_connected) db_threads_connected="$(numeric_or_zero "${value}")" ;;
+          Threads_running) db_threads_running="$(numeric_or_zero "${value}")" ;;
+          Slow_queries) db_slow_queries="$(numeric_or_zero "${value}")" ;;
+          Aborted_connects) db_aborted_connects="$(numeric_or_zero "${value}")" ;;
+          RADPOSTAUTH)
+            radpostauth_id="$(numeric_or_zero "${value}")"
+            last_auth_epoch="$(numeric_or_zero "${extra}")"
+            last_auth_reply="$(tr -cd '[:alnum:]_-' <<<"${reply:-none}")"
+            last_auth_reply="${last_auth_reply:-none}"
+            ;;
+          RADACCT) radacct_id="$(numeric_or_zero "${value}")" ;;
+        esac
+      done <<<"${db_output}"
+    fi
+  fi
+fi
+
+radius_log_bytes=0
+log_new_bytes=0
+log_cursor_reset=1
+log_truncated=0
+new_log_content=""
+if [[ -r "${RADIUS_LOG}" ]]; then
+  radius_log_inode="$(stat -c %i "${RADIUS_LOG}")"
+  radius_log_bytes="$(stat -c %s "${RADIUS_LOG}")"
+  previous_inode=0
+  previous_size=0
+  if [[ -r "${CURSOR_FILE}" ]]; then
+    IFS=' ' read -r previous_inode previous_size < "${CURSOR_FILE}" || true
+  fi
+  if [[ "${radius_log_inode}" == "${previous_inode}" && "${radius_log_bytes}" -ge "${previous_size}" ]]; then
+    log_cursor_reset=0
+    log_new_bytes=$((radius_log_bytes - previous_size))
+  else
+    log_new_bytes="${radius_log_bytes}"
+  fi
+  read_bytes="${log_new_bytes}"
+  if [[ "${log_cursor_reset}" -eq 1 && "${read_bytes}" -gt "${INITIAL_LOG_CONTEXT_BYTES}" ]]; then
+    read_bytes="${INITIAL_LOG_CONTEXT_BYTES}"
+  fi
+  if [[ "${read_bytes}" -gt "${MAX_LOG_READ_BYTES}" ]]; then
+    read_bytes="${MAX_LOG_READ_BYTES}"
+    log_truncated=1
+  fi
+  if [[ "${read_bytes}" -gt 0 ]]; then
+    new_log_content="$(tail -c "${read_bytes}" "${RADIUS_LOG}" 2>/dev/null || true)"
+  fi
+  printf '%s %s\n' "${radius_log_inode}" "${radius_log_bytes}" > "${CURSOR_FILE}.tmp"
+  chmod 0640 "${CURSOR_FILE}.tmp"
+  mv -f "${CURSOR_FILE}.tmp" "${CURSOR_FILE}"
+fi
+
+errors_blocking="$(count_pattern 'Something is blocking the server' "${new_log_content}")"
+errors_duplicate="$(count_pattern 'Ignoring duplicate packet' "${new_log_content}")"
+errors_unknown_client="$(count_pattern 'unknown client|Ignoring request from unknown client' "${new_log_content}")"
+errors_invalid_ma="$(count_pattern 'Invalid Message-Authenticator|Message-Authenticator.*(invalid|missing)' "${new_log_content}")"
+errors_sql="$(count_pattern '(sql|mariadb|mysql).*(error|fail|timeout)|rlm_sql.*(error|fail)' "${new_log_content}")"
+kernel_oom_recent="$(journalctl -k --since '-6 minutes' --no-pager -q 2>/dev/null \
+  | grep -Eic 'oom-kill|Out of memory|Killed process' || true)"
+kernel_oom_recent="$(numeric_or_zero "${kernel_oom_recent}")"
+http_code="$(curl --silent --show-error --output /dev/null --max-time 3 \
+  --write-out '%{http_code}' http://127.0.0.1/rd/ 2>/dev/null || true)"
+http_code="$(numeric_or_zero "${http_code}")"
+
+printf -v sample '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+  "${now_epoch}" "${iso_utc}" "${freeradius_active}" "${restarts}" \
+  "${memory_current}" "${memory_peak}" "${memory_high}" "${memory_max}" \
+  "${tasks}" "${pid_rss_kb}" "${cpu_ticks}" "${cgroup_high}" "${cgroup_max}" \
+  "${cgroup_oom}" "${cgroup_oom_kill}" "${sock_throttled}" "${psi_some_avg10}" \
+  "${psi_full_avg10}" "${recvq_1812}" "${recvq_1813}" "${load1}" \
+  "${mem_available_kb}" "${swap_free_kb}" "${db_ok}" "${db_threads_connected}" \
+  "${db_threads_running}" "${db_slow_queries}" "${db_aborted_connects}" \
+  "${radpostauth_id}" "${last_auth_epoch}" "${last_auth_reply}" "${radacct_id}" \
+  "${radius_log_bytes}" "${log_new_bytes}" "${log_cursor_reset}" "${log_truncated}" \
+  "${errors_blocking}" "${errors_duplicate}" "${errors_unknown_client}" \
+  "${errors_invalid_ma}" "${errors_sql}" "${kernel_oom_recent}" "${http_code}" \
+  "${root_disk_used_pct}"
+
+cutoff=$((now_epoch - RETENTION_SECONDS))
+tmp_file="$(mktemp "${DATA_FILE}.tmp.XXXXXX")"
+{
+  printf '%s\n' "${HEADER}"
+  if [[ -r "${DATA_FILE}" ]] && [[ "$(head -n 1 "${DATA_FILE}")" == "${HEADER}" ]]; then
+    awk -F '\t' -v cutoff="${cutoff}" 'NR > 1 && $1 >= cutoff' "${DATA_FILE}" | tail -n $((MAX_ROWS - 1))
+  fi
+  printf '%s\n' "${sample}"
+} > "${tmp_file}"
+chmod 0640 "${tmp_file}"
+mv -f "${tmp_file}" "${DATA_FILE}"

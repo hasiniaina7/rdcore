@@ -54,6 +54,7 @@ apt-get install -y freeradius freeradius-mysql freeradius-utils \
   libdatetime-perl libdbd-mysql-perl libdigest-hmac-perl libdatetime-format-rfc3339-perl eapoltest
 
 systemctl enable freeradius
+systemctl stop radiusdesk-radius-health.timer 2>/dev/null || true
 systemctl stop freeradius || true
 
 RAD_TAR="/var/www/rdcore/cake4/rd_cake/setup/radius/freeradius-radiusdesk.tar.gz"
@@ -262,6 +263,31 @@ EOF
   chmod 0644 "${override_file}"
   systemctl daemon-reload
   log INFO "Pool FreeRADIUS borné à 8 workers; seuil souple 512 Mio et limite dure 576 Mio."
+}
+
+install_freeradius_health_monitor() {
+  local monitoring_dir="${BASE_DIR}/templates/monitoring"
+  local snapshot_source="${monitoring_dir}/radiusdesk-radius-health-snapshot"
+  local report_source="${monitoring_dir}/radiusdesk-radius-health-report"
+  local service_source="${monitoring_dir}/radiusdesk-radius-health.service"
+  local timer_source="${monitoring_dir}/radiusdesk-radius-health.timer"
+
+  for required_file in \
+    "${snapshot_source}" "${report_source}" "${service_source}" "${timer_source}"; do
+    if [[ ! -f "${required_file}" ]]; then
+      log ERROR "Template de surveillance manquant: ${required_file}."
+      exit 1
+    fi
+  done
+
+  log INFO "Installation de la surveillance FreeRADIUS compacte avec rétention de 12 heures."
+  install -D -m 0755 "${snapshot_source}" /usr/local/sbin/radiusdesk-radius-health-snapshot
+  install -D -m 0755 "${report_source}" /usr/local/sbin/radiusdesk-radius-health-report
+  install -D -m 0644 "${service_source}" /etc/systemd/system/radiusdesk-radius-health.service
+  install -D -m 0644 "${timer_source}" /etc/systemd/system/radiusdesk-radius-health.timer
+  install -d -m 0750 /var/log/radiusdesk-radius-health /var/lib/radiusdesk-radius-health
+  systemctl daemon-reload
+  systemctl enable radiusdesk-radius-health.timer
 }
 
 localize_radiusdesk_reply_messages() {
@@ -589,6 +615,7 @@ ensure_radiusdesk_dynamic_expiration_attrs
 optimize_radiusdesk_usage_queries
 optimize_radiusdesk_fup_perl_query
 harden_freeradius_resource_limits
+install_freeradius_health_monitor
 localize_radiusdesk_reply_messages
 harden_radiusdesk_voucher_data_never_counter
 ensure_mikrotik_burst_policy
@@ -601,6 +628,14 @@ freeradius -C || { log ERROR "freeradius -C a échoué."; exit 1; }
 
 log INFO "Redémarrage de FreeRADIUS."
 systemctl restart freeradius
+
+log INFO "Activation et validation de la surveillance FreeRADIUS."
+systemctl enable --now radiusdesk-radius-health.timer
+systemctl start radiusdesk-radius-health.service
+systemctl is-active --quiet radiusdesk-radius-health.timer \
+  || { log ERROR "Timer de surveillance FreeRADIUS inactif."; exit 1; }
+[[ -s /var/log/radiusdesk-radius-health/samples.tsv ]] \
+  || { log ERROR "Premier échantillon de surveillance absent."; exit 1; }
 
 mark_done "$STEP_NAME"
 log INFO "Étape ${STEP_NAME} terminée."

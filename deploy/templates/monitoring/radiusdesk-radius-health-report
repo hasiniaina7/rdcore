@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Summarize the retained 12-hour health window without exposing credentials.
+set -euo pipefail
+IFS=$'\n\t'
+
+DATA_FILE="${1:-/var/log/radiusdesk-radius-health/samples.tsv}"
+if [[ ! -r "${DATA_FILE}" ]]; then
+  echo "Aucun échantillon disponible: ${DATA_FILE}" >&2
+  exit 1
+fi
+
+awk -F '\t' '
+  NR == 1 {
+    for (i = 1; i <= NF; i++) column[$i] = i
+    next
+  }
+  {
+    samples++
+    first_iso = (samples == 1 ? $(column["iso_utc"]) : first_iso)
+    last_iso = $(column["iso_utc"])
+    active = $(column["freeradius_active"]) + 0
+    memory = $(column["memory_current_bytes"]) + 0
+    memory_high = $(column["memory_high_bytes"]) + 0
+    tasks = $(column["tasks"]) + 0
+    queue = $(column["recvq_1812"]) + $(column["recvq_1813"])
+    psi = $(column["psi_full_avg10"]) + 0
+    db_running = $(column["db_threads_running"]) + 0
+    auth_id = $(column["radpostauth_id"]) + 0
+    last_auth_epoch = $(column["last_auth_epoch"]) + 0
+    http_code = $(column["http_code"]) + 0
+
+    if (!active) inactive_samples++
+    if ($(column["db_ok"]) + 0 == 0) db_failed_samples++
+    if (http_code != 200) http_failed_samples++
+    if ($(column["log_truncated"]) + 0 > 0) truncated_samples++
+    if ($(column["kernel_oom_recent"]) + 0 > 0) kernel_oom_samples++
+    if (memory > max_memory) max_memory = memory
+    if (memory_high > 0) last_memory_high = memory_high
+    if (tasks > max_tasks) max_tasks = tasks
+    if (queue > max_queue) max_queue = queue
+    if (psi > max_psi) max_psi = psi
+    if (db_running > max_db_running) max_db_running = db_running
+    if (last_auth_epoch > newest_auth_epoch) newest_auth_epoch = last_auth_epoch
+    if (samples == 1) first_auth_id = auth_id
+    last_auth_id = auth_id
+
+    high = $(column["cgroup_high"]) + 0
+    max_event = $(column["cgroup_max"]) + 0
+    oom = $(column["cgroup_oom"]) + 0
+    oom_kill = $(column["cgroup_oom_kill"]) + 0
+    restarts = $(column["restarts"]) + 0
+    if (samples > 1) {
+      high_events += (high >= previous_high ? high - previous_high : high)
+      max_events += (max_event >= previous_max ? max_event - previous_max : max_event)
+      oom_events += (oom >= previous_oom ? oom - previous_oom : oom)
+      oom_kills += (oom_kill >= previous_oom_kill ? oom_kill - previous_oom_kill : oom_kill)
+      restart_events += (restarts >= previous_restarts ? restarts - previous_restarts : restarts)
+    }
+    previous_high = high
+    previous_max = max_event
+    previous_oom = oom
+    previous_oom_kill = oom_kill
+    previous_restarts = restarts
+
+    if ($(column["log_cursor_reset"]) + 0 == 0) {
+      blocking_errors += $(column["errors_blocking"]) + 0
+      duplicate_errors += $(column["errors_duplicate"]) + 0
+      unknown_client_errors += $(column["errors_unknown_client"]) + 0
+      invalid_ma_errors += $(column["errors_invalid_ma"]) + 0
+      sql_errors += $(column["errors_sql"]) + 0
+    } else {
+      cursor_resets++
+    }
+  }
+  END {
+    if (samples == 0) {
+      print "Aucun échantillon exploitable." > "/dev/stderr"
+      exit 1
+    }
+    decision = "OK"
+    if (high_events || max_queue || db_failed_samples || http_failed_samples || duplicate_errors || unknown_client_errors || invalid_ma_errors || sql_errors || truncated_samples) decision = "ATTENTION"
+    if (inactive_samples || max_events || oom_events || oom_kills || blocking_errors || kernel_oom_samples || restart_events) decision = "INCIDENT"
+    auth_delta = last_auth_id >= first_auth_id ? last_auth_id - first_auth_id : last_auth_id
+    auth_age = newest_auth_epoch > 0 ? systime() - newest_auth_epoch : -1
+    memory_pct = last_memory_high > 0 ? (100 * max_memory / last_memory_high) : 0
+
+    printf "decision=%s\n", decision
+    printf "fenetre=%s -> %s\n", first_iso, last_iso
+    printf "echantillons=%d\n", samples
+    printf "freeradius_inactif=%d redemarrages=%d\n", inactive_samples + 0, restart_events + 0
+    printf "memoire_max_mib=%.1f pourcentage_seuil_high=%.1f%% tasks_max=%d pression_full_max=%.2f\n", max_memory / 1048576, memory_pct, max_tasks, max_psi
+    printf "cgroup_high=%d cgroup_max=%d oom=%d oom_kill=%d kernel_oom_samples=%d\n", high_events + 0, max_events + 0, oom_events + 0, oom_kills + 0, kernel_oom_samples + 0
+    printf "file_udp_max=%d erreurs_blocage=%d doublons=%d\n", max_queue, blocking_errors + 0, duplicate_errors + 0
+    printf "clients_inconnus=%d message_authenticator_invalide=%d erreurs_sql=%d\n", unknown_client_errors + 0, invalid_ma_errors + 0, sql_errors + 0
+    printf "db_indisponible=%d db_threads_running_max=%d http_non_200=%d\n", db_failed_samples + 0, max_db_running, http_failed_samples + 0
+    printf "nouvelles_authentifications=%d age_derniere_auth_s=%d\n", auth_delta, auth_age
+    printf "lectures_log_tronquees=%d resets_curseur_log=%d\n", truncated_samples + 0, cursor_resets + 0
+  }
+' "${DATA_FILE}"

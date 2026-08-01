@@ -1,0 +1,24 @@
+[Unit]
+Description=Compact RadiusDesk and FreeRADIUS health snapshot
+After=freeradius.service mariadb.service nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/radiusdesk-radius-health-snapshot
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=10%
+MemoryMax=96M
+TimeoutStartSec=25s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/log/radiusdesk-radius-health /var/lib/radiusdesk-radius-health /run/lock
+StandardOutput=null
+StandardError=journal
