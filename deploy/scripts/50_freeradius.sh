@@ -253,13 +253,15 @@ StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
-MemoryHigh=384M
-MemoryMax=512M
+# Keep the normal eight-worker footprint below the throttling threshold.
+# The hard cap still prevents a Perl/FUP regression from exhausting the host.
+MemoryHigh=512M
+MemoryMax=576M
 RestartSec=15s
 EOF
   chmod 0644 "${override_file}"
   systemctl daemon-reload
-  log INFO "Pool FreeRADIUS borné à 8 workers et mémoire du service limitée à 512 Mio."
+  log INFO "Pool FreeRADIUS borné à 8 workers; seuil souple 512 Mio et limite dure 576 Mio."
 }
 
 localize_radiusdesk_reply_messages() {
