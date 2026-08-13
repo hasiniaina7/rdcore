@@ -153,3 +153,15 @@
   - Mikrotik radclient reply includes `Mikrotik-Rate-Limit = "4M/12M 8M/24M 4M/12M 30/30"`.
   - Omada-style radclient reply keeps `WISPr-Bandwidth-Max-*` and does not include `Mikrotik-Rate-Limit`.
   - Existing Mikrotik queues keep old burst values until user reconnects.
+
+## 2026-08-13 - FreeRADIUS memory throttle stalls RADIUS replies
+- Symptom: local `radtest` and NAS requests timed out; UDP ports 1812/1813 accumulated backlog and FreeRADIUS logged blocked queues plus duplicate requests.
+- Root cause: the eight-worker pool loaded Perl policy modules above `MemoryHigh=512M` on the 2 GiB host. The cgroup throttle blocked workers in `mem_cgroup_handle_over_high`; retransmitted Access-Requests were a consequence, not a traffic flood.
+- Source fix:
+  - `installation-script/deploy/scripts/50_freeradius.sh`
+  - reduce `start_servers/max_servers/min_spare_servers/max_spare_servers` to `1/4/1/2`
+  - install `radiusdesk-radius-recovery-guard`, which restarts only after two consecutive samples with both at least 480 MiB of cgroup memory and 64 KiB UDP backlog.
+- Verification:
+  - `freeradius -C` succeeds; `radtest` returns `Access-Accept`.
+  - `ss -H -lun` reports zero receive queue on ports 1812/1813.
+  - `cat /sys/fs/cgroup/system.slice/freeradius.service/memory.events` reports `high=0`, `max=0`, `oom=0`, and `oom_kill=0` after deployment.
