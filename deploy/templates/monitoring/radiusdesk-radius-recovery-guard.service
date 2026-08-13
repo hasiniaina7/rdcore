@@ -1,0 +1,24 @@
+[Unit]
+Description=Recover FreeRADIUS from confirmed memory and UDP queue stall
+After=freeradius.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/radiusdesk-radius-recovery-guard
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=10%
+MemoryMax=32M
+TimeoutStartSec=15s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/lib/radiusdesk-radius-recovery-guard /run/lock
+StandardOutput=null
+StandardError=journal

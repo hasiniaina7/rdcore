@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Recover FreeRADIUS only from the proven memory-throttling plus queue-stall state.
+set -euo pipefail
+IFS=$'\n\t'
+
+CGROUP_DIR="${RADIUS_RECOVERY_CGROUP_DIR:-/sys/fs/cgroup/system.slice/freeradius.service}"
+STATE_DIR="${RADIUS_RECOVERY_STATE_DIR:-/var/lib/radiusdesk-radius-recovery-guard}"
+STATE_FILE="${STATE_DIR}/consecutive-stalls"
+MEMORY_TRIGGER_BYTES="${RADIUS_RECOVERY_MEMORY_TRIGGER_BYTES:-503316480}" # 480 MiB
+QUEUE_TRIGGER_BYTES="${RADIUS_RECOVERY_QUEUE_TRIGGER_BYTES:-65536}" # 64 KiB
+REQUIRED_CONSECUTIVE="${RADIUS_RECOVERY_REQUIRED_CONSECUTIVE:-2}"
+
+numeric_or_zero() {
+  [[ "${1:-}" =~ ^[0-9]+$ ]] && printf '%s\n' "$1" || printf '0\n'
+}
+
+mkdir -p -m 0750 "${STATE_DIR}"
+memory_current="$(numeric_or_zero "$(cat "${CGROUP_DIR}/memory.current" 2>/dev/null || true)")"
+socket_rows="$(ss -H -lun 2>/dev/null || true)"
+udp_backlog="$(awk '$4 ~ /:(1812|1813)$/ { total += $2 } END { print total + 0 }' <<<"${socket_rows}")"
+
+if (( memory_current < MEMORY_TRIGGER_BYTES || udp_backlog < QUEUE_TRIGGER_BYTES )); then
+  rm -f "${STATE_FILE}"
+  exit 0
+fi
+
+previous="$(numeric_or_zero "$(cat "${STATE_FILE}" 2>/dev/null || true)")"
+consecutive=$((previous + 1))
+printf '%s\n' "${consecutive}" > "${STATE_FILE}"
+
+if (( consecutive < REQUIRED_CONSECUTIVE )); then
+  logger -t radiusdesk-radius-recovery-guard \
+    "warning: memory=${memory_current}B udp_backlog=${udp_backlog}B sample=${consecutive}/${REQUIRED_CONSECUTIVE}"
+  exit 0
+fi
+
+logger -t radiusdesk-radius-recovery-guard \
+  "restarting freeradius: memory=${memory_current}B udp_backlog=${udp_backlog}B after ${consecutive} consecutive stalled samples"
+rm -f "${STATE_FILE}"
+systemctl restart freeradius

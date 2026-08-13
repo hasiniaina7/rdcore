@@ -55,6 +55,7 @@ apt-get install -y freeradius freeradius-mysql freeradius-utils \
 
 systemctl enable freeradius
 systemctl stop radiusdesk-radius-health.timer 2>/dev/null || true
+systemctl stop radiusdesk-radius-recovery-guard.timer 2>/dev/null || true
 systemctl stop freeradius || true
 
 RAD_TAR="/var/www/rdcore/cake4/rd_cake/setup/radius/freeradius-radiusdesk.tar.gz"
@@ -224,21 +225,23 @@ harden_freeradius_resource_limits() {
     exit 1
   fi
 
-  # Eight workers are sufficient for two CPUs and keep Perl interpreters within 2 GiB RAM.
+  # Each FreeRADIUS worker loads the RadiusDesk Perl policy modules. Four workers
+  # fit below the service memory threshold on this 2 GiB host while preserving
+  # enough concurrency for the measured PPPoE accounting flow.
   perl -0pi -e '
-    s/^[ \t]*start_servers[ \t]*=[ \t]*\d+[ \t]*$/\tstart_servers = 2/m;
-    s/^[ \t]*max_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmax_servers = 8/m;
-    s/^[ \t]*min_spare_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmin_spare_servers = 2/m;
-    s/^[ \t]*max_spare_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmax_spare_servers = 4/m;
+    s/^[ \t]*start_servers[ \t]*=[ \t]*\d+[ \t]*$/\tstart_servers = 1/m;
+    s/^[ \t]*max_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmax_servers = 4/m;
+    s/^[ \t]*min_spare_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmin_spare_servers = 1/m;
+    s/^[ \t]*max_spare_servers[ \t]*=[ \t]*\d+[ \t]*$/\tmax_spare_servers = 2/m;
     s/^[ \t]*#[ \t]*max_queue_size[ \t]*=[ \t]*65536[ \t]*$/\tmax_queue_size = 1024/m;
     s/^[ \t]*max_requests_per_server[ \t]*=[ \t]*\d+[ \t]*$/\tmax_requests_per_server = 5000/m;
   ' "${radius_conf}"
 
   for expected in \
-    'start_servers = 2' \
-    'max_servers = 8' \
-    'min_spare_servers = 2' \
-    'max_spare_servers = 4' \
+    'start_servers = 1' \
+    'max_servers = 4' \
+    'min_spare_servers = 1' \
+    'max_spare_servers = 2' \
     'max_queue_size = 1024' \
     'max_requests_per_server = 5000'; do
     if [[ "$(grep -cF "${expected}" "${radius_conf}")" -ne 1 ]]; then
@@ -262,7 +265,7 @@ RestartSec=15s
 EOF
   chmod 0644 "${override_file}"
   systemctl daemon-reload
-  log INFO "Pool FreeRADIUS borné à 8 workers; seuil souple 512 Mio et limite dure 576 Mio."
+  log INFO "Pool FreeRADIUS borné à 4 workers; seuil souple 512 Mio et limite dure 576 Mio."
 }
 
 install_freeradius_health_monitor() {
@@ -288,6 +291,30 @@ install_freeradius_health_monitor() {
   install -d -m 0750 /var/log/radiusdesk-radius-health /var/lib/radiusdesk-radius-health
   systemctl daemon-reload
   systemctl enable radiusdesk-radius-health.timer
+}
+
+install_freeradius_recovery_guard() {
+  local monitoring_dir="${BASE_DIR}/templates/monitoring"
+  local guard_source="${monitoring_dir}/radiusdesk-radius-recovery-guard"
+  local service_source="${monitoring_dir}/radiusdesk-radius-recovery-guard.service"
+  local timer_source="${monitoring_dir}/radiusdesk-radius-recovery-guard.timer"
+
+  for required_file in "${guard_source}" "${service_source}" "${timer_source}"; do
+    if [[ ! -f "${required_file}" ]]; then
+      log ERROR "Template de garde de recuperation manquant: ${required_file}."
+      exit 1
+    fi
+  done
+
+  # This guard restarts only after two consecutive samples show both memory
+  # pressure and a real UDP backlog; it never drops RADIUS packets itself.
+  log INFO "Installation de la garde de recuperation FreeRADIUS."
+  install -D -m 0755 "${guard_source}" /usr/local/sbin/radiusdesk-radius-recovery-guard
+  install -D -m 0644 "${service_source}" /etc/systemd/system/radiusdesk-radius-recovery-guard.service
+  install -D -m 0644 "${timer_source}" /etc/systemd/system/radiusdesk-radius-recovery-guard.timer
+  install -d -m 0750 /var/lib/radiusdesk-radius-recovery-guard
+  systemctl daemon-reload
+  systemctl enable radiusdesk-radius-recovery-guard.timer
 }
 
 localize_radiusdesk_reply_messages() {
@@ -616,6 +643,7 @@ optimize_radiusdesk_usage_queries
 optimize_radiusdesk_fup_perl_query
 harden_freeradius_resource_limits
 install_freeradius_health_monitor
+install_freeradius_recovery_guard
 localize_radiusdesk_reply_messages
 harden_radiusdesk_voucher_data_never_counter
 ensure_mikrotik_burst_policy
@@ -632,8 +660,11 @@ systemctl restart freeradius
 log INFO "Activation et validation de la surveillance FreeRADIUS."
 systemctl enable --now radiusdesk-radius-health.timer
 systemctl start radiusdesk-radius-health.service
+systemctl enable --now radiusdesk-radius-recovery-guard.timer
 systemctl is-active --quiet radiusdesk-radius-health.timer \
   || { log ERROR "Timer de surveillance FreeRADIUS inactif."; exit 1; }
+systemctl is-active --quiet radiusdesk-radius-recovery-guard.timer \
+  || { log ERROR "Timer de garde de recuperation FreeRADIUS inactif."; exit 1; }
 [[ -s /var/log/radiusdesk-radius-health/samples.tsv ]] \
   || { log ERROR "Premier échantillon de surveillance absent."; exit 1; }
 

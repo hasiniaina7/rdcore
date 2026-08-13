@@ -1,0 +1,13 @@
+[Unit]
+Description=Check every minute for a confirmed FreeRADIUS queue stall
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=10s
+RandomizedDelaySec=10s
+Persistent=true
+Unit=radiusdesk-radius-recovery-guard.service
+
+[Install]
+WantedBy=timers.target
