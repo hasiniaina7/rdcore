@@ -5,6 +5,7 @@
 
 namespace App\Shell;
 
+use App\Service\FupTransitionPolicy;
 use Cake\Console\Shell;
 use Cake\Console\ConsoleOptionParser;
 
@@ -13,6 +14,7 @@ use Cake\Datasource\ConnectionManager;
 use Cake\I18n\FrozenTime;
 use Cake\I18n\Time;
 use Cake\Http\Client;
+use Cake\Log\Log;
 
 class FupShell extends Shell {
 
@@ -65,7 +67,7 @@ class FupShell extends Shell {
     				$profile_id = $e_pu->profile_id;
     				$profile_name = $e_pu->profile;
     				$username	= $ra->username;
-    				$this->fup($username,$profile_id,$timezone,$e_pu->cloud_id,$billing_cycle,$profile_name);
+                    $this->fup($username,$profile_id,$timezone,$e_pu->cloud_id,$billing_cycle,$profile_name,(int)$ra->radacctid);
     			}
     		}
     	}
@@ -78,7 +80,7 @@ class FupShell extends Shell {
     				$timezone 	= $this->getTimezone($ra->nasidentifier);
     				$profile_id = $e_v->profile_id;
     				$username	= $ra->username;
-    				$this->fup($username,$profile_id,$timezone,$e_v->cloud_id);
+                    $this->fup($username,$profile_id,$timezone,$e_v->cloud_id,false,'',(int)$ra->radacctid);
     			}
     		}
     	}
@@ -94,7 +96,7 @@ class FupShell extends Shell {
     				//Need to find the Permanet User
     				$e_pu_d = $this->{'PermanentUsers'}->find()->where(['PermanentUsers.id' => $e_d->permanent_user_id])->first();
     				if($e_pu_d){
-    					$this->fup($username,$profile_id,$timezone,$e_pu_d->cloud_id);
+                        $this->fup($username,$profile_id,$timezone,$e_pu_d->cloud_id,false,'',(int)$ra->radacctid);
     				}
     			}
     		}
@@ -142,7 +144,7 @@ class FupShell extends Shell {
     	return $timezone;    
     }
     
-    private function fup($username,$profile_id,$timezone,$cloud_id,$billing_cycle = false,$profile_name = ''){
+    private function fup($username,$profile_id,$timezone,$cloud_id,$billing_cycle = false,$profile_name = '',$radacctid = null){
     
     	#Get the current active applied_fup_component for the user (Then compare it with the one which SHOULD apply)
     	#If different you then issue a disconnect request
@@ -229,18 +231,28 @@ class FupShell extends Shell {
 		    }
 		}
 
-		$this->out("<info>Current Applied $current_applied</info>");
-    	$this->out("<info>Should Apply $should_apply</info>");
-    	if($current_applied !== $should_apply){
-    		$e_cloud = $this->{'Clouds'}->find()->where(['Clouds.id' => $cloud_id])->first();
-    		if($e_cloud){
-    			$user_id = $e_cloud->user_id;
-    			$e_user = $this->{'Users'}->find()->where(['Users.id' => $user_id])->first();
-    			if($e_user){
-    			
-    				$token 	 = $e_user->token;
-    				$url 	 = 'http://127.0.0.1/cake4/rd_cake/radaccts/kick-active-username.json';
-    				$request = ['cloud_id' => $cloud_id,'username' => $username,'token' => $token];
+		$dispatch = $this->findTransitionDispatch((int)$cloud_id,(string)$username);
+		if(FupTransitionPolicy::shouldReconcile($current_applied,$should_apply,$dispatch)){
+			$this->reconcileTransitionDispatch((int)$cloud_id,(string)$username,$should_apply);
+			$this->logTransitionAudit('reconciled',[
+				'cloud_id' => (int)$cloud_id,
+				'username' => (string)$username,
+				'from_component_id' => (int)$current_applied,
+				'to_component_id' => (int)$should_apply,
+				'radacctid' => $radacctid,
+			]);
+		}
+
+        if(FupTransitionPolicy::shouldDispatch($current_applied,$should_apply,$dispatch)){
+            $e_cloud = $this->{'Clouds'}->find()->where(['Clouds.id' => $cloud_id])->first();
+            if($e_cloud){
+                $user_id = $e_cloud->user_id;
+                $e_user = $this->{'Users'}->find()->where(['Users.id' => $user_id])->first();
+                if($e_user){
+
+                    $token = $e_user->token;
+                    $url = 'http://127.0.0.1/cake4/rd_cake/radaccts/kick-active-username.json';
+                    $request = ['cloud_id' => $cloud_id,'username' => $username,'token' => $token];
     					
     				//===================================================================	
     				//-------------------------------------------------------------------
@@ -274,18 +286,111 @@ class FupShell extends Shell {
     				//---------------------------------------------------------------------
     				//=====================================================================
     			   			 				
-    				$http  = new Client();
-					$response = $http->get(
-					  $url,
-					  $request,
-					  ['type' => 'json']
-					);
-					$reply          = $response->getStringBody();
-					print($reply);
-					    			
-    			}    		
-    		}
-    	}  	   
+					// Persist before the call: an interrupted process must not create a kick loop.
+					$this->reserveTransitionDispatch((int)$cloud_id,(string)$username,$current_applied,$should_apply,$radacctid);
+					$this->logTransitionAudit('dispatch_pending',[
+						'cloud_id' => (int)$cloud_id,
+						'username' => (string)$username,
+						'from_component_id' => (int)$current_applied,
+						'to_component_id' => (int)$should_apply,
+						'radacctid' => $radacctid,
+					]);
+
+					$result = $this->requestTransitionKick($url,$request);
+					$status = $result['ack'] ? 'ack' : 'failed';
+					$this->completeTransitionDispatch((int)$cloud_id,(string)$username,$status,$result['error']);
+                    $this->logTransitionAudit($status,[
+						'cloud_id' => (int)$cloud_id,
+						'username' => (string)$username,
+						'from_component_id' => (int)$current_applied,
+						'to_component_id' => (int)$should_apply,
+						'radacctid' => $radacctid,
+						'http_code' => $result['http_code'],
+						'result_count' => $result['result_count'],
+						'error' => $result['error'],
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function findTransitionDispatch($cloudId,$username){
+        $connection = ConnectionManager::get('default');
+        $row = $connection->execute(
+            'SELECT from_component_id,to_component_id,status FROM fup_transition_dispatches WHERE cloud_id=:cloud_id AND username=:username LIMIT 1',
+            ['cloud_id' => $cloudId,'username' => $username]
+        )->fetch('assoc');
+        return $row ?: null;
+    }
+
+    private function reserveTransitionDispatch($cloudId,$username,$fromComponentId,$toComponentId,$radacctid){
+        $connection = ConnectionManager::get('default');
+        $connection->execute(
+            "INSERT INTO fup_transition_dispatches (cloud_id,username,from_component_id,to_component_id,radacctid,status,dispatched_at,created,modified)
+             VALUES (:cloud_id,:username,:from_component_id,:to_component_id,:radacctid,'pending',NOW(),NOW(),NOW())
+             ON DUPLICATE KEY UPDATE from_component_id=VALUES(from_component_id),to_component_id=VALUES(to_component_id),radacctid=VALUES(radacctid),status='pending',dispatched_at=NOW(),acknowledged_at=NULL,reconciled_at=NULL,last_error=NULL,modified=NOW()",
+            ['cloud_id' => $cloudId,'username' => $username,'from_component_id' => $fromComponentId,'to_component_id' => $toComponentId,'radacctid' => $radacctid]
+        );
+    }
+
+    private function completeTransitionDispatch($cloudId,$username,$status,$error){
+        $connection = ConnectionManager::get('default');
+        $connection->execute(
+            "UPDATE fup_transition_dispatches
+             SET status=:status, acknowledged_at=IF(:status = 'ack',NOW(),NULL), last_error=:last_error, modified=NOW()
+             WHERE cloud_id=:cloud_id AND username=:username",
+            ['status' => $status,'last_error' => $error,'cloud_id' => $cloudId,'username' => $username]
+        );
+    }
+
+    private function reconcileTransitionDispatch($cloudId,$username,$componentId){
+        $connection = ConnectionManager::get('default');
+        $connection->execute(
+            "UPDATE fup_transition_dispatches
+             SET status='reconciled', reconciled_at=NOW(), modified=NOW()
+             WHERE cloud_id=:cloud_id AND username=:username AND to_component_id=:component_id AND status <> 'reconciled'",
+            ['cloud_id' => $cloudId,'username' => $username,'component_id' => $componentId]
+        );
+    }
+
+    private function requestTransitionKick($url,$request){
+        try {
+            $http = new Client();
+            $response = $http->get($url,$request,['type' => 'json']);
+            $httpCode = $response->getStatusCode();
+            $payload = json_decode($response->getStringBody(),true);
+            $results = is_array($payload['results'] ?? null) ? $payload['results'] : [];
+            $ack = $httpCode >= 200 && $httpCode < 300 && ($payload['success'] ?? false) === true && count($results) > 0;
+            foreach($results as $result){
+                $isOmada = ($result['strategy'] ?? null) === 'omada-openapi-v1';
+                // Omada provides a real ACK; legacy Kicker routes only confirm that their command was sent.
+                $accepted = $isOmada
+                    ? (($result['status'] ?? null) === 'ack' && ($result['ack'] ?? false) === true)
+                    : in_array(($result['status'] ?? null),['ack','sent'],true);
+                if(!$accepted){
+                    $ack = false;
+                    break;
+                }
+            }
+            return [
+                'ack' => $ack,
+                'http_code' => $httpCode,
+                'result_count' => count($results),
+                'error' => $ack ? null : 'kick_not_acknowledged',
+            ];
+        } catch (\Throwable $exception) {
+            return [
+                'ack' => false,
+                'http_code' => null,
+                'result_count' => 0,
+                'error' => substr($exception->getMessage(),0,255),
+            ];
+        }
+    }
+
+    private function logTransitionAudit($event,$details){
+        $payload = array_merge(['timestamp' => gmdate('c'),'event' => $event],$details);
+        Log::info('[FupTransitionAudit] '.json_encode($payload,JSON_UNESCAPED_SLASHES));
     }
     
     private function check_time_of_day($row,$timezone) {

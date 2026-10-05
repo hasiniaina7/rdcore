@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Controller\Component\KickerComponent;
+use App\Service\OmadaQuotaPolicy;
 use Cake\Cache\Cache;
 use Cake\Console\Arguments;
 use Cake\Console\Command;
@@ -50,11 +51,18 @@ class EnforceOmadaQuotaCommand extends Command
         $checked = 0;
         $kicked = 0;
         $skipped = 0;
+        $fupManagedSkipped = 0;
         foreach ($sessions as $session) {
             $checked++;
             $username = (string)$session->username;
             if ($username === '') {
                 $skipped++;
+                continue;
+            }
+
+            if ($this->isFupManagedUsername($username)) {
+                $skipped++;
+                $fupManagedSkipped++;
                 continue;
             }
 
@@ -69,6 +77,11 @@ class EnforceOmadaQuotaCommand extends Command
             $state = Cache::read($cacheKey, 'default');
             if (!is_array($state)) {
                 $state = ['attempts' => 0, 'last_try' => 0, 'last_status' => null];
+            }
+
+            if (OmadaQuotaPolicy::isAcknowledged($state)) {
+                $skipped++;
+                continue;
             }
 
             $nowTs = time();
@@ -97,14 +110,19 @@ class EnforceOmadaQuotaCommand extends Command
                 'last_status' => $status,
             ];
 
-            if ($status === 'ack') {
-                Cache::delete($cacheKey, 'default');
-            } else {
-                Cache::write($cacheKey, $state, 'default');
-            }
+            // Keep an ACK for this radacctid so an open accounting row cannot be kicked again.
+            Cache::write($cacheKey, $state, 'default');
 
             $this->logQuotaAudit($session, $status, $breaches, $kick);
             $kicked++;
+        }
+
+        if ($fupManagedSkipped > 0) {
+            Log::info('[QuotaFupSkipAudit] ' . json_encode([
+                'timestamp' => gmdate('c'),
+                'sessions_skipped' => $fupManagedSkipped,
+                'reason' => 'fup_profile_owned_by_fup_shell',
+            ], JSON_UNESCAPED_SLASHES));
         }
 
         $io->success("checked={$checked} kicked={$kicked} skipped={$skipped} window={$windowSeconds}s");
@@ -200,6 +218,28 @@ class EnforceOmadaQuotaCommand extends Command
         return $counters;
     }
 
+    private function isFupManagedUsername(string $username): bool
+    {
+        $radusergroups = TableRegistry::getTableLocator()->get('Radusergroups');
+        $radchecks = TableRegistry::getTableLocator()->get('Radchecks');
+
+        $profileName = $username;
+        $profile = $radchecks->find()
+            ->where(['Radchecks.username' => $username, 'Radchecks.attribute' => 'User-Profile'])
+            ->first();
+        if ($profile && (string)$profile->value !== '') {
+            $profileName = (string)$profile->value;
+        }
+
+        foreach ($radusergroups->find()->where(['Radusergroups.username' => $profileName]) as $group) {
+            if (OmadaQuotaPolicy::isFupGroup((string)$group->groupname)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function evaluateBreaches($session, array $counters): array
     {
         $breaches = [];
@@ -241,7 +281,7 @@ class EnforceOmadaQuotaCommand extends Command
 
         $dataCap = (int)($pu->data_cap ?? 0);
         $dataUsed = (int)($pu->data_used ?? 0);
-        if ($dataCap > 0 && $dataUsed >= $dataCap) {
+        if (OmadaQuotaPolicy::isHardCap((string)($pu->data_cap_type ?? ''), $dataCap, $dataUsed)) {
             $breaches[] = [
                 'type' => 'data',
                 'used' => $dataUsed,
@@ -252,7 +292,7 @@ class EnforceOmadaQuotaCommand extends Command
 
         $timeCap = (int)($pu->time_cap ?? 0);
         $timeUsed = (int)($pu->time_used ?? 0);
-        if ($timeCap > 0 && $timeUsed >= $timeCap) {
+        if (OmadaQuotaPolicy::isHardCap((string)($pu->time_cap_type ?? ''), $timeCap, $timeUsed)) {
             $breaches[] = [
                 'type' => 'time',
                 'used' => $timeUsed,
