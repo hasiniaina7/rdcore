@@ -178,6 +178,15 @@ ensure_rd_database_schema() {
   fi
 }
 
+ensure_fup_transition_dispatch_schema() {
+  if table_exists "${DB_NAME}" "fup_transition_dispatches"; then
+    log INFO "Validation OK : la table fup_transition_dispatches est présente."
+  else
+    log ERROR "La table fup_transition_dispatches est absente après les patchs SQL FUP."
+    exit 1
+  fi
+}
+
 apply_local_patches() {
   if compgen -G "${PATCHES_DIR}/*.patch" >/dev/null 2>&1; then
     for patch_file in "${PATCHES_DIR}"/*.patch; do
@@ -333,6 +342,7 @@ chown -R www-data:www-data /var/www/rdcore
 chown -R www-data:www-data /var/www/html
 
 ensure_rd_database_schema
+ensure_fup_transition_dispatch_schema
 ensure_mysql_timezone_support
 
 if [[ -x "${BASE_DIR}/scripts/cleanup_stale_radacct.sh" ]]; then

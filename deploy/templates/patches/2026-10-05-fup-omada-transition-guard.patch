@@ -1,0 +1,417 @@
+diff --git a/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+index 4728396d..83f5b82c 100644
+--- a/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
++++ b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+@@ -4,6 +4,7 @@ declare(strict_types=1);
+ namespace App\Command;
+ 
+ use App\Controller\Component\KickerComponent;
++use App\Service\OmadaQuotaPolicy;
+ use Cake\Cache\Cache;
+ use Cake\Console\Arguments;
+ use Cake\Console\Command;
+@@ -50,6 +51,7 @@ class EnforceOmadaQuotaCommand extends Command
+         $checked = 0;
+         $kicked = 0;
+         $skipped = 0;
++        $fupManagedSkipped = 0;
+         foreach ($sessions as $session) {
+             $checked++;
+             $username = (string)$session->username;
+@@ -58,6 +60,12 @@ class EnforceOmadaQuotaCommand extends Command
+                 continue;
+             }
+ 
++            if ($this->isFupManagedUsername($username)) {
++                $skipped++;
++                $fupManagedSkipped++;
++                continue;
++            }
++
+             $counters = $this->findCountersForUsername($username);
+             $breaches = $this->evaluateBreaches($session, $counters);
+             $breaches = array_merge($breaches, $this->evaluatePermanentUserCaps($permanentUsers, $username));
+@@ -71,6 +79,11 @@ class EnforceOmadaQuotaCommand extends Command
+                 $state = ['attempts' => 0, 'last_try' => 0, 'last_status' => null];
+             }
+ 
++            if (OmadaQuotaPolicy::isAcknowledged($state)) {
++                $skipped++;
++                continue;
++            }
++
+             $nowTs = time();
+             if (($nowTs - (int)$state['last_try']) < $cooldownSeconds) {
+                 $skipped++;
+@@ -97,16 +110,21 @@ class EnforceOmadaQuotaCommand extends Command
+                 'last_status' => $status,
+             ];
+ 
+-            if ($status === 'ack') {
+-                Cache::delete($cacheKey, 'default');
+-            } else {
+-                Cache::write($cacheKey, $state, 'default');
+-            }
++            // Keep an ACK for this radacctid so an open accounting row cannot be kicked again.
++            Cache::write($cacheKey, $state, 'default');
+ 
+             $this->logQuotaAudit($session, $status, $breaches, $kick);
+             $kicked++;
+         }
+ 
++        if ($fupManagedSkipped > 0) {
++            Log::info('[QuotaFupSkipAudit] ' . json_encode([
++                'timestamp' => gmdate('c'),
++                'sessions_skipped' => $fupManagedSkipped,
++                'reason' => 'fup_profile_owned_by_fup_shell',
++            ], JSON_UNESCAPED_SLASHES));
++        }
++
+         $io->success("checked={$checked} kicked={$kicked} skipped={$skipped} window={$windowSeconds}s");
+         return self::CODE_SUCCESS;
+     }
+@@ -200,6 +218,28 @@ class EnforceOmadaQuotaCommand extends Command
+         return $counters;
+     }
+ 
++    private function isFupManagedUsername(string $username): bool
++    {
++        $radusergroups = TableRegistry::getTableLocator()->get('Radusergroups');
++        $radchecks = TableRegistry::getTableLocator()->get('Radchecks');
++
++        $profileName = $username;
++        $profile = $radchecks->find()
++            ->where(['Radchecks.username' => $username, 'Radchecks.attribute' => 'User-Profile'])
++            ->first();
++        if ($profile && (string)$profile->value !== '') {
++            $profileName = (string)$profile->value;
++        }
++
++        foreach ($radusergroups->find()->where(['Radusergroups.username' => $profileName]) as $group) {
++            if (OmadaQuotaPolicy::isFupGroup((string)$group->groupname)) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++
+     private function evaluateBreaches($session, array $counters): array
+     {
+         $breaches = [];
+@@ -241,7 +281,7 @@ class EnforceOmadaQuotaCommand extends Command
+ 
+         $dataCap = (int)($pu->data_cap ?? 0);
+         $dataUsed = (int)($pu->data_used ?? 0);
+-        if ($dataCap > 0 && $dataUsed >= $dataCap) {
++        if (OmadaQuotaPolicy::isHardCap((string)($pu->data_cap_type ?? ''), $dataCap, $dataUsed)) {
+             $breaches[] = [
+                 'type' => 'data',
+                 'used' => $dataUsed,
+@@ -252,7 +292,7 @@ class EnforceOmadaQuotaCommand extends Command
+ 
+         $timeCap = (int)($pu->time_cap ?? 0);
+         $timeUsed = (int)($pu->time_used ?? 0);
+-        if ($timeCap > 0 && $timeUsed >= $timeCap) {
++        if (OmadaQuotaPolicy::isHardCap((string)($pu->time_cap_type ?? ''), $timeCap, $timeUsed)) {
+             $breaches[] = [
+                 'type' => 'time',
+                 'used' => $timeUsed,
+diff --git a/cake4/rd_cake/src/Shell/FupShell.php b/cake4/rd_cake/src/Shell/FupShell.php
+index b515d605..55f1d875 100644
+--- a/cake4/rd_cake/src/Shell/FupShell.php
++++ b/cake4/rd_cake/src/Shell/FupShell.php
+@@ -5,6 +5,7 @@
+ 
+ namespace App\Shell;
+ 
++use App\Service\FupTransitionPolicy;
+ use Cake\Console\Shell;
+ use Cake\Console\ConsoleOptionParser;
+ 
+@@ -13,6 +14,7 @@ use Cake\Datasource\ConnectionManager;
+ use Cake\I18n\FrozenTime;
+ use Cake\I18n\Time;
+ use Cake\Http\Client;
++use Cake\Log\Log;
+ 
+ class FupShell extends Shell {
+ 
+@@ -65,7 +67,7 @@ class FupShell extends Shell {
+     				$profile_id = $e_pu->profile_id;
+     				$profile_name = $e_pu->profile;
+     				$username	= $ra->username;
+-    				$this->fup($username,$profile_id,$timezone,$e_pu->cloud_id,$billing_cycle,$profile_name);
++                    $this->fup($username,$profile_id,$timezone,$e_pu->cloud_id,$billing_cycle,$profile_name,(int)$ra->radacctid);
+     			}
+     		}
+     	}
+@@ -78,7 +80,7 @@ class FupShell extends Shell {
+     				$timezone 	= $this->getTimezone($ra->nasidentifier);
+     				$profile_id = $e_v->profile_id;
+     				$username	= $ra->username;
+-    				$this->fup($username,$profile_id,$timezone,$e_v->cloud_id);
++                    $this->fup($username,$profile_id,$timezone,$e_v->cloud_id,false,'',(int)$ra->radacctid);
+     			}
+     		}
+     	}
+@@ -94,7 +96,7 @@ class FupShell extends Shell {
+     				//Need to find the Permanet User
+     				$e_pu_d = $this->{'PermanentUsers'}->find()->where(['PermanentUsers.id' => $e_d->permanent_user_id])->first();
+     				if($e_pu_d){
+-    					$this->fup($username,$profile_id,$timezone,$e_pu_d->cloud_id);
++                        $this->fup($username,$profile_id,$timezone,$e_pu_d->cloud_id,false,'',(int)$ra->radacctid);
+     				}
+     			}
+     		}
+@@ -142,7 +144,7 @@ class FupShell extends Shell {
+     	return $timezone;    
+     }
+     
+-    private function fup($username,$profile_id,$timezone,$cloud_id,$billing_cycle = false,$profile_name = ''){
++    private function fup($username,$profile_id,$timezone,$cloud_id,$billing_cycle = false,$profile_name = '',$radacctid = null){
+     
+     	#Get the current active applied_fup_component for the user (Then compare it with the one which SHOULD apply)
+     	#If different you then issue a disconnect request
+@@ -229,18 +231,28 @@ class FupShell extends Shell {
+ 		    }
+ 		}
+ 
+-		$this->out("<info>Current Applied $current_applied</info>");
+-    	$this->out("<info>Should Apply $should_apply</info>");
+-    	if($current_applied !== $should_apply){
+-    		$e_cloud = $this->{'Clouds'}->find()->where(['Clouds.id' => $cloud_id])->first();
+-    		if($e_cloud){
+-    			$user_id = $e_cloud->user_id;
+-    			$e_user = $this->{'Users'}->find()->where(['Users.id' => $user_id])->first();
+-    			if($e_user){
+-    			
+-    				$token 	 = $e_user->token;
+-    				$url 	 = 'http://127.0.0.1/cake4/rd_cake/radaccts/kick-active-username.json';
+-    				$request = ['cloud_id' => $cloud_id,'username' => $username,'token' => $token];
++		$dispatch = $this->findTransitionDispatch((int)$cloud_id,(string)$username);
++		if(FupTransitionPolicy::shouldReconcile($current_applied,$should_apply,$dispatch)){
++			$this->reconcileTransitionDispatch((int)$cloud_id,(string)$username,$should_apply);
++			$this->logTransitionAudit('reconciled',[
++				'cloud_id' => (int)$cloud_id,
++				'username' => (string)$username,
++				'from_component_id' => (int)$current_applied,
++				'to_component_id' => (int)$should_apply,
++				'radacctid' => $radacctid,
++			]);
++		}
++
++        if(FupTransitionPolicy::shouldDispatch($current_applied,$should_apply,$dispatch)){
++            $e_cloud = $this->{'Clouds'}->find()->where(['Clouds.id' => $cloud_id])->first();
++            if($e_cloud){
++                $user_id = $e_cloud->user_id;
++                $e_user = $this->{'Users'}->find()->where(['Users.id' => $user_id])->first();
++                if($e_user){
++
++                    $token = $e_user->token;
++                    $url = 'http://127.0.0.1/cake4/rd_cake/radaccts/kick-active-username.json';
++                    $request = ['cloud_id' => $cloud_id,'username' => $username,'token' => $token];
+     					
+     				//===================================================================	
+     				//-------------------------------------------------------------------
+@@ -274,18 +286,111 @@ class FupShell extends Shell {
+     				//---------------------------------------------------------------------
+     				//=====================================================================
+     			   			 				
+-    				$http  = new Client();
+-					$response = $http->get(
+-					  $url,
+-					  $request,
+-					  ['type' => 'json']
+-					);
+-					$reply          = $response->getStringBody();
+-					print($reply);
+-					    			
+-    			}    		
+-    		}
+-    	}  	   
++					// Persist before the call: an interrupted process must not create a kick loop.
++					$this->reserveTransitionDispatch((int)$cloud_id,(string)$username,$current_applied,$should_apply,$radacctid);
++					$this->logTransitionAudit('dispatch_pending',[
++						'cloud_id' => (int)$cloud_id,
++						'username' => (string)$username,
++						'from_component_id' => (int)$current_applied,
++						'to_component_id' => (int)$should_apply,
++						'radacctid' => $radacctid,
++					]);
++
++					$result = $this->requestTransitionKick($url,$request);
++					$status = $result['ack'] ? 'ack' : 'failed';
++					$this->completeTransitionDispatch((int)$cloud_id,(string)$username,$status,$result['error']);
++                    $this->logTransitionAudit($status,[
++						'cloud_id' => (int)$cloud_id,
++						'username' => (string)$username,
++						'from_component_id' => (int)$current_applied,
++						'to_component_id' => (int)$should_apply,
++						'radacctid' => $radacctid,
++						'http_code' => $result['http_code'],
++						'result_count' => $result['result_count'],
++						'error' => $result['error'],
++                    ]);
++                }
++            }
++        }
++    }
++
++    private function findTransitionDispatch($cloudId,$username){
++        $connection = ConnectionManager::get('default');
++        $row = $connection->execute(
++            'SELECT from_component_id,to_component_id,status FROM fup_transition_dispatches WHERE cloud_id=:cloud_id AND username=:username LIMIT 1',
++            ['cloud_id' => $cloudId,'username' => $username]
++        )->fetch('assoc');
++        return $row ?: null;
++    }
++
++    private function reserveTransitionDispatch($cloudId,$username,$fromComponentId,$toComponentId,$radacctid){
++        $connection = ConnectionManager::get('default');
++        $connection->execute(
++            "INSERT INTO fup_transition_dispatches (cloud_id,username,from_component_id,to_component_id,radacctid,status,dispatched_at,created,modified)
++             VALUES (:cloud_id,:username,:from_component_id,:to_component_id,:radacctid,'pending',NOW(),NOW(),NOW())
++             ON DUPLICATE KEY UPDATE from_component_id=VALUES(from_component_id),to_component_id=VALUES(to_component_id),radacctid=VALUES(radacctid),status='pending',dispatched_at=NOW(),acknowledged_at=NULL,reconciled_at=NULL,last_error=NULL,modified=NOW()",
++            ['cloud_id' => $cloudId,'username' => $username,'from_component_id' => $fromComponentId,'to_component_id' => $toComponentId,'radacctid' => $radacctid]
++        );
++    }
++
++    private function completeTransitionDispatch($cloudId,$username,$status,$error){
++        $connection = ConnectionManager::get('default');
++        $connection->execute(
++            "UPDATE fup_transition_dispatches
++             SET status=:status, acknowledged_at=IF(:status = 'ack',NOW(),NULL), last_error=:last_error, modified=NOW()
++             WHERE cloud_id=:cloud_id AND username=:username",
++            ['status' => $status,'last_error' => $error,'cloud_id' => $cloudId,'username' => $username]
++        );
++    }
++
++    private function reconcileTransitionDispatch($cloudId,$username,$componentId){
++        $connection = ConnectionManager::get('default');
++        $connection->execute(
++            "UPDATE fup_transition_dispatches
++             SET status='reconciled', reconciled_at=NOW(), modified=NOW()
++             WHERE cloud_id=:cloud_id AND username=:username AND to_component_id=:component_id AND status <> 'reconciled'",
++            ['cloud_id' => $cloudId,'username' => $username,'component_id' => $componentId]
++        );
++    }
++
++    private function requestTransitionKick($url,$request){
++        try {
++            $http = new Client();
++            $response = $http->get($url,$request,['type' => 'json']);
++            $httpCode = $response->getStatusCode();
++            $payload = json_decode($response->getStringBody(),true);
++            $results = is_array($payload['results'] ?? null) ? $payload['results'] : [];
++            $ack = $httpCode >= 200 && $httpCode < 300 && ($payload['success'] ?? false) === true && count($results) > 0;
++            foreach($results as $result){
++                $isOmada = ($result['strategy'] ?? null) === 'omada-openapi-v1';
++                // Omada provides a real ACK; legacy Kicker routes only confirm that their command was sent.
++                $accepted = $isOmada
++                    ? (($result['status'] ?? null) === 'ack' && ($result['ack'] ?? false) === true)
++                    : in_array(($result['status'] ?? null),['ack','sent'],true);
++                if(!$accepted){
++                    $ack = false;
++                    break;
++                }
++            }
++            return [
++                'ack' => $ack,
++                'http_code' => $httpCode,
++                'result_count' => count($results),
++                'error' => $ack ? null : 'kick_not_acknowledged',
++            ];
++        } catch (\Throwable $exception) {
++            return [
++                'ack' => false,
++                'http_code' => null,
++                'result_count' => 0,
++                'error' => substr($exception->getMessage(),0,255),
++            ];
++        }
++    }
++
++    private function logTransitionAudit($event,$details){
++        $payload = array_merge(['timestamp' => gmdate('c'),'event' => $event],$details);
++        Log::info('[FupTransitionAudit] '.json_encode($payload,JSON_UNESCAPED_SLASHES));
+     }
+     
+     private function check_time_of_day($row,$timezone) {
+diff --git a/cake4/rd_cake/src/Service/OmadaQuotaPolicy.php b/cake4/rd_cake/src/Service/OmadaQuotaPolicy.php
+new file mode 100644
+index 00000000..11111111
+--- /dev/null
++++ b/cake4/rd_cake/src/Service/OmadaQuotaPolicy.php
+@@ -0,0 +1,26 @@
++<?php
++declare(strict_types=1);
++
++namespace App\Service;
++
++class OmadaQuotaPolicy
++{
++    /**
++     * FUP groups are generated by RadiusDesk for profiles with dynamic rules.
++     * Their copied counters are policy inputs, never generic terminal quotas.
++     */
++    public static function isFupGroup(string $groupName): bool
++    {
++        return (bool)preg_match('/^FupAdd_[0-9]+$/', $groupName);
++    }
++
++    public static function isHardCap(string $capType, int $cap, int $used): bool
++    {
++        return $capType === 'hard' && $cap > 0 && $used >= $cap;
++    }
++
++    public static function isAcknowledged(array $state): bool
++    {
++        return ($state['last_status'] ?? null) === 'ack';
++    }
++}
+diff --git a/cake4/rd_cake/src/Service/FupTransitionPolicy.php b/cake4/rd_cake/src/Service/FupTransitionPolicy.php
+new file mode 100644
+index 00000000..11111111
+--- /dev/null
++++ b/cake4/rd_cake/src/Service/FupTransitionPolicy.php
+@@ -0,0 +1,38 @@
++<?php
++declare(strict_types=1);
++
++namespace App\Service;
++
++class FupTransitionPolicy
++{
++    /**
++     * A pending request is also terminal: after sending a disconnect, an
++     * interrupted process must never turn uncertainty into a kick loop.
++     */
++    public static function shouldDispatch(int $fromComponentId, int $toComponentId, ?array $state): bool
++    {
++        if ($fromComponentId === $toComponentId) {
++            return false;
++        }
++
++        if ($state === null) {
++            return true;
++        }
++
++        $sameTransition = (int)$state['from_component_id'] === $fromComponentId
++            && (int)$state['to_component_id'] === $toComponentId;
++        if (!$sameTransition) {
++            return true;
++        }
++
++        return !in_array((string)$state['status'], ['pending', 'ack', 'failed'], true);
++    }
++
++    public static function shouldReconcile(int $appliedComponentId, int $expectedComponentId, ?array $state): bool
++    {
++        return $appliedComponentId === $expectedComponentId
++            && $state !== null
++            && (int)$state['to_component_id'] === $expectedComponentId
++            && (string)$state['status'] !== 'reconciled';
++    }
++}
+
