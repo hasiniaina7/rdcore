@@ -191,15 +191,18 @@ class KickerComponent extends Component {
 					}
 				}         
 				unset($mt_data['proto']); 
-				$this->MikrotikApi->kickRadius($ent,$mt_data);
+				$mikrotikKick = $this->MikrotikApi->kickRadius($ent,$mt_data);
                 return [
                     'strategy'       => 'mikrotik-api',
-                    'status'         => 'sent',
-                    'ack'            => false,
-                    'stderr'         => null,
+					// RouterOS is acknowledged only after a post-removal lookup is empty.
+                    'status'         => (string)($mikrotikKick['status'] ?? 'error'),
+                    'ack'            => (bool)($mikrotikKick['ack'] ?? false),
+                    'stderr'         => $mikrotikKick['error'] ?? null,
                     'radacctid'      => $radacctid,
                     'nasidentifier'  => $nasidentifier,
                     'nasipaddress'   => $nasipaddress,
+					'matched'        => (int)($mikrotikKick['matched'] ?? 0),
+					'removed'        => (int)($mikrotikKick['removed'] ?? 0),
                 ];
      		}     		  		   	
      	}
@@ -242,15 +245,18 @@ class KickerComponent extends Component {
 					}
 				}         
 				unset($mt_data['proto']); 
-				$this->MikrotikApi->kickRadius($ent,$mt_data);
+				$mikrotikKick = $this->MikrotikApi->kickRadius($ent,$mt_data);
                 return [
                     'strategy'       => 'mikrotik-api',
-                    'status'         => 'sent',
-                    'ack'            => false,
-                    'stderr'         => null,
+					// RouterOS is acknowledged only after a post-removal lookup is empty.
+                    'status'         => (string)($mikrotikKick['status'] ?? 'error'),
+                    'ack'            => (bool)($mikrotikKick['ack'] ?? false),
+                    'stderr'         => $mikrotikKick['error'] ?? null,
                     'radacctid'      => $radacctid,
                     'nasidentifier'  => $nasidentifier,
                     'nasipaddress'   => $nasipaddress,
+					'matched'        => (int)($mikrotikKick['matched'] ?? 0),
+					'removed'        => (int)($mikrotikKick['removed'] ?? 0),
                 ];
      		}
      	        

@@ -36,44 +36,74 @@ class MikrotikApiComponent extends Component {
     }
     
     public function kickRadius($ent,$config){
-    	$client 	= new Client($config);
-    	
-    	//We need to guess what connection the user used based on cetrain fields in the $ent record
-    	$called_station_id 	= $ent->calledstationid;
-    	$mac_minus			= $ent->callingstationid;
-    	$mac_colon			= str_replace("-",":",$mac_minus);
-    	$servicetype		= $ent->servicetype;
-    	$framedprotocol		= $ent->framedprotocol;
-    	
-    	//=== If they connected using the PPPoE server the following will be in the accounting record
-    	if(($servicetype == 'Framed-User' )&&($framedprotocol == 'PPP' )){
-    	
-			$query 		=  (new Query('/ppp/active/print'))
-						->where('caller-id', $mac_colon); //here the mac address is called the 'caller-id'												
-			$response = $client->query($query)->read();
-			foreach($response as $r){
-				$id = $r[".id"];
-				$q  = new Query('/ppp/active/remove');
-				$q->equal('.id', $id);
-				$r  = $client->query($q)->read(); 
-			}  	 	
-    	}
-    	  	
-    	
-    	//=== If they connected using the captive portal / hotspot
-    	if(preg_match('/^hotspot/',$called_station_id)){ //We only look at calledstationid since the hotspot can potentially also be used through the LAN
-    	
-			$query 		=  (new Query('/ip/hotspot/active/print'))
-						->where('mac-address', $mac_colon);						
-			$response = $client->query($query)->read();
-			foreach($response as $r){
-				$id = $r[".id"];
-				$q  = new Query('/ip/hotspot/active/remove');
-				$q->equal('.id', $id);
-				$r  = $client->query($q)->read(); 
-			}  	
-    	}
-     					
+	$client 	= new Client($config);
+
+	// Correlate the accounting row with the RouterOS active-session table.
+	$called_station_id 	= $ent->calledstationid;
+	$mac_minus			= $ent->callingstationid;
+	$mac_colon			= str_replace("-",":",$mac_minus);
+	$servicetype		= $ent->servicetype;
+	$framedprotocol		= $ent->framedprotocol;
+
+	if(($servicetype == 'Framed-User' )&&($framedprotocol == 'PPP' )){
+		return $this->removeAndVerifyRadiusSessions(
+			$client,
+			'/ppp/active/print',
+			'/ppp/active/remove',
+			'caller-id',
+			$mac_colon,
+			'pppoe'
+		);
+	}
+
+	// The hotspot called-station identifier is the reliable discriminator.
+	if(preg_match('/^hotspot/',$called_station_id)){
+		return $this->removeAndVerifyRadiusSessions(
+			$client,
+			'/ip/hotspot/active/print',
+			'/ip/hotspot/active/remove',
+			'mac-address',
+			$mac_colon,
+			'hotspot'
+		);
+	}
+
+    return [
+		'status' => 'not_applicable',
+		'ack' => false,
+		'matched' => 0,
+		'removed' => 0,
+		'error' => 'unsupported_radius_session_type',
+    ];
+    }
+
+    private function removeAndVerifyRadiusSessions($client,$listPath,$removePath,$field,$value,$mode){
+	$active = $this->findRadiusSessions($client,$listPath,$field,$value);
+	foreach($active as $session){
+		if(!isset($session['.id'])){
+			continue;
+		}
+		$remove = new Query($removePath);
+		$remove->equal('.id',$session['.id']);
+		$client->query($remove)->read();
+	}
+
+	// A second lookup makes a RouterOS API success meaningful for FUP state.
+	$remaining = $this->findRadiusSessions($client,$listPath,$field,$value);
+	$ack = count($remaining) === 0;
+	return [
+		'status' => $ack ? 'ack' : 'active_after_remove',
+		'ack' => $ack,
+		'matched' => count($active),
+		'removed' => count($active),
+		'mode' => $mode,
+		'error' => $ack ? null : 'routeros_session_still_active',
+	];
+    }
+
+    private function findRadiusSessions($client,$listPath,$field,$value){
+		$query = (new Query($listPath))->where($field,$value);
+		return $client->query($query)->read();
     }
     
     public function getHotspotActive($config){

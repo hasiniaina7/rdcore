@@ -362,9 +362,11 @@ class FupShell extends Shell {
             $results = is_array($payload['results'] ?? null) ? $payload['results'] : [];
             $ack = $httpCode >= 200 && $httpCode < 300 && ($payload['success'] ?? false) === true && count($results) > 0;
             foreach($results as $result){
-                $isOmada = ($result['strategy'] ?? null) === 'omada-openapi-v1';
-                // Omada provides a real ACK; legacy Kicker routes only confirm that their command was sent.
-                $accepted = $isOmada
+                $strategy = $result['strategy'] ?? null;
+                // Omada and RouterOS are queried after the removal, so FUP advances
+                // only when the session disappearance has been confirmed.
+                $requiresVerifiedAck = in_array($strategy,['omada-openapi-v1','mikrotik-api'],true);
+                $accepted = $requiresVerifiedAck
                     ? (($result['status'] ?? null) === 'ack' && ($result['ack'] ?? false) === true)
                     : in_array(($result['status'] ?? null),['ack','sent'],true);
                 if(!$accepted){
