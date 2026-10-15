@@ -1,0 +1,1263 @@
+diff --git a/cake4/rd_cake/src/Controller/Component/KickerComponent.php b/cake4/rd_cake/src/Controller/Component/KickerComponent.php
+index 60b358c4..e5d1280f 100644
+--- a/cake4/rd_cake/src/Controller/Component/KickerComponent.php
++++ b/cake4/rd_cake/src/Controller/Component/KickerComponent.php
+@@ -10,13 +10,17 @@ namespace App\Controller\Component;
+ 
+ use Cake\Controller\Component;
+ use Cake\Core\Configure;
++use Cake\Log\Log;
+ use Cake\ORM\TableRegistry;
+ use Cake\Http\Client;
+ 
+ 
+ class KickerComponent extends Component {
+ 
+-    protected $radclient;
++    protected $radclient = 'radclient';
++    protected $coaSecret = 'testing123';
++    protected $coaPort = 3799;
++    protected $radclientTimeout = 8;
+     //protected $pod_command = '/etc/MESHdesk/pod.lua';
+     protected $pod_command 	= 'chilli_query logout mac';
+     protected $podMdHostapd = '/etc/MESHdesk/utils/hostapd_disconnect.lua';
+@@ -47,14 +51,40 @@ class KickerComponent extends Component {
+         $this->NodeActions              = TableRegistry::get('NodeActions');     
+         //Accel
+         $this->AccelServers             = TableRegistry::get('AccelServers');
+-        $this->AccelSessions            = TableRegistry::get('AccelSessions');         
++        $this->AccelSessions            = TableRegistry::get('AccelSessions');
++
++        $this->radclient = (string)(Configure::read('RadiusDesk.radclient_bin') ?? $this->radclient);
++        $this->coaPort = (int)(Configure::read('RadiusDesk.coa_port') ?? $this->coaPort);
+     }
+ 
+     public function kick($ent,$token){
++        if(!$ent){
++            return [
++                'strategy'   => 'none',
++                'status'     => 'error',
++                'ack'        => false,
++                'stderr'     => 'Missing accounting entity',
++                'radacctid'  => null
++            ];
++        }
++
+         //---Location of radclient----
+         $nasidentifier  = $ent->nasidentifier;
+         $radacctid      = $ent->radacctid;
+         $nasipaddress   = $ent->nasipaddress;
++        $result = [
++            'strategy'       => 'none',
++            'status'         => 'not_supported',
++            'ack'            => false,
++            'stderr'         => null,
++            'radacctid'      => $radacctid,
++            'nasidentifier'  => $nasidentifier,
++            'nasipaddress'   => $nasipaddress,
++        ];
++
++        if($this->isOmadaNas($ent)){
++            return $this->kickOmadaSession($ent, 'nasidentifier');
++        }
+                 
+      	//First we try to locate the client under dynamic_clients
+      	$dc = $this->DynamicClients->find()
+@@ -63,9 +93,21 @@ class KickerComponent extends Component {
+      		->first();
+      		
+      	if($dc){
++            if($this->isOmadaDynamicClient($dc, $ent)){
++                return $this->kickOmadaSession($ent, 'dynamic-client');
++            }
+      	   	    
+      	    if($dc->type == $this->typeAccel){ //It is type AccelRadiusdesk -> try to locate the session and set the disconnect flag of the session
+      	        $this->kickAccelSession($ent);
++                return [
++                    'strategy'       => 'accel-flag',
++                    'status'         => 'sent',
++                    'ack'            => false,
++                    'stderr'         => null,
++                    'radacctid'      => $radacctid,
++                    'nasidentifier'  => $nasidentifier,
++                    'nasipaddress'   => $nasipaddress,
++                ];
+      	    }
+      	
+      	    //--------------------
+@@ -80,6 +122,15 @@ class KickerComponent extends Component {
+      				$this->kickApUser($ent,$dc->cloud_id,$token); 			
+      			}
+      			sleep(1); //Give MQTT time to do its thing....  			
++                return [
++                    'strategy'       => 'coova-command',
++                    'status'         => 'sent',
++                    'ack'            => false,
++                    'stderr'         => null,
++                    'radacctid'      => $radacctid,
++                    'nasidentifier'  => $nasidentifier,
++                    'nasipaddress'   => $nasipaddress,
++                ];
+      		}
+      		
+      		//-------------------
+@@ -96,11 +147,20 @@ class KickerComponent extends Component {
+      				$this->kickApHostaMac($ent,$dc->cloud_id,$token); 			
+      			}
+      			sleep(1); //Give MQTT time to do its thing....    		
++                return [
++                    'strategy'       => 'hostapd-command',
++                    'status'         => 'sent',
++                    'ack'            => false,
++                    'stderr'         => null,
++                    'radacctid'      => $radacctid,
++                    'nasidentifier'  => $nasidentifier,
++                    'nasipaddress'   => $nasipaddress,
++                ];
+      		}
+      	
+      		
+      		if($dc->type == $this->typeJuniper){ //SEND IT A POD
+-     	        $this->kickJuniperSession($ent);
++     	        return $this->kickJuniperSession($ent);
+      	    }
+      		    		
+      		if($dc->type == $this->typeMtApi){ 
+@@ -126,7 +186,16 @@ class KickerComponent extends Component {
+ 					}
+ 				}         
+ 				unset($mt_data['proto']); 
+-				$this->MikrotikApi->kickRadius($ent,$mt_data);   		   		
++				$this->MikrotikApi->kickRadius($ent,$mt_data);
++                return [
++                    'strategy'       => 'mikrotik-api',
++                    'status'         => 'sent',
++                    'ack'            => false,
++                    'stderr'         => null,
++                    'radacctid'      => $radacctid,
++                    'nasidentifier'  => $nasidentifier,
++                    'nasipaddress'   => $nasipaddress,
++                ];
+      		}     		  		   	
+      	}
+      	
+@@ -137,9 +206,12 @@ class KickerComponent extends Component {
+      		->first();
+      		
+         if($nas){
++            if($this->isOmadaNas($nas)){
++                return $this->kickOmadaSession($ent, 'nas-table');
++            }
+         
+             if($nas->type == $this->typeJuniper){ //SEND IT A POD
+-     	        $this->kickJuniperSession($ent);
++     	        return $this->kickJuniperSession($ent);
+      	    }
+      	    
+      	    if($nas->type == $this->typeMtApi){ 
+@@ -165,13 +237,22 @@ class KickerComponent extends Component {
+ 					}
+ 				}         
+ 				unset($mt_data['proto']); 
+-				$this->MikrotikApi->kickRadius($ent,$mt_data);   		   		
++				$this->MikrotikApi->kickRadius($ent,$mt_data);
++                return [
++                    'strategy'       => 'mikrotik-api',
++                    'status'         => 'sent',
++                    'ack'            => false,
++                    'stderr'         => null,
++                    'radacctid'      => $radacctid,
++                    'nasidentifier'  => $nasidentifier,
++                    'nasipaddress'   => $nasipaddress,
++                ];
+      		}
+      	        
+         }
+         //--- END NAS TABLE ---
+              
+-        return $data = [];       
++        return $result;       
+     }
+     
+     private function kickAccelSession($ent){
+@@ -186,14 +267,17 @@ class KickerComponent extends Component {
+     }
+     
+     private function kickJuniperSession($ent){  
+-        //-- Sample Disconnect ---
+-        //echo "Acct-​Session-​ID='2040',User-Name='zaguy@zarealm.co.za'" |radclient -c '1' -n '3' -r '3' -t '3' -x '127.0.0.1:3799' 'disconnect' 'testing123'       
+-        $sessionid = $ent->acctsessionid;
+-        $username  = $ent->username;
+-        $ip        = $ent->nasipaddress;       
+-        $fwd_ip    = $ip; // You can replace this with a central IP to forward it to       
+-        $secret    = 'testing123';      
+-        shell_exec("echo \"Acct-Session-ID='$sessionid',User-Name='$username',NAS-IP-Address='$ip'\" |radclient -c '1' -n '3' -r '3' -t '3' -x '$fwd_ip:3799' 'disconnect' '$secret'");
++        $attributes = [
++            'Acct-Session-Id' => (string)$ent->acctsessionid,
++            'User-Name'       => (string)$ent->username,
++            'NAS-IP-Address'  => (string)$ent->nasipaddress
++        ];
++        return $this->sendRadclientDisconnect(
++            (string)$ent->nasipaddress,
++            $attributes,
++            $this->coaSecret,
++            'juniper_disconnect'
++        );
+     } 
+          
+     private function kickMeshNodeUser($ent,$cloud_id,$token){      
+@@ -306,4 +390,195 @@ class KickerComponent extends Component {
+     	}   
+     }
+ 
++    public function isOmadaNas($nas): bool
++    {
++        $identifier = (string)($nas->nasidentifier ?? '');
++        $type = (string)($nas->type ?? '');
++        $name = (string)($nas->nasname ?? '');
++
++        return $this->isOmadaIdentifier($identifier)
++            || $this->isOmadaIdentifier($name)
++            || stripos($type, 'omada') !== false;
++    }
++
++    public function isOmadaDynamicClient($dc, $ent = null): bool
++    {
++        $type = (string)($dc->type ?? '');
++        $identifier = (string)($dc->nasidentifier ?? '');
++        if (stripos($type, 'omada') !== false || $this->isOmadaIdentifier($identifier)) {
++            return true;
++        }
++
++        if ($ent) {
++            return $this->isOmadaNas($ent);
++        }
++
++        return false;
++    }
++
++    public function buildOmadaDisconnectAttributes($ent): array
++    {
++        $attributes = [
++            'User-Name'          => (string)($ent->username ?? ''),
++            'Calling-Station-Id' => (string)($ent->callingstationid ?? ''),
++            'Acct-Session-Id'    => (string)($ent->acctsessionid ?? ''),
++        ];
++
++        $nasPort = $ent->nasportid ?? $ent->nasport ?? null;
++        if ($nasPort !== null && $nasPort !== '') {
++            $attributes['NAS-Port'] = (string)$nasPort;
++        }
++
++        return $attributes;
++    }
++
++    public function parseDisconnectResult(string $stdout, int $exitCode): array
++    {
++        $status = 'stderr';
++        $ack = false;
++
++        if (stripos($stdout, 'Disconnect-ACK') !== false) {
++            $status = 'ack';
++            $ack = true;
++        } elseif (stripos($stdout, 'Disconnect-NAK') !== false) {
++            $status = 'nak';
++        } elseif (
++            $exitCode === 124
++            || stripos($stdout, 'No reply from server') !== false
++            || stripos($stdout, 'no response') !== false
++            || stripos($stdout, 'timed out') !== false
++        ) {
++            $status = 'timeout';
++        }
++
++        return [
++            'status' => $status,
++            'ack'    => $ack
++        ];
++    }
++
++    private function kickOmadaSession($ent, string $route): array
++    {
++        $nasIp = (string)($ent->nasipaddress ?? '');
++        $attributes = $this->buildOmadaDisconnectAttributes($ent);
++        $result = $this->sendRadclientDisconnect($nasIp, $attributes, $this->coaSecret, 'omada_disconnect');
++        $result['route'] = $route;
++        $result['request'] = [
++            'target' => "{$nasIp}:{$this->coaPort}",
++            'attributes' => $attributes
++        ];
++
++        return $result;
++    }
++
++    protected function sendRadclientDisconnect(string $nasIp, array $attributes, string $secret, string $strategy): array
++    {
++        $base = [
++            'strategy'      => $strategy,
++            'status'        => 'error',
++            'ack'           => false,
++            'stderr'        => null,
++            'nasipaddress'  => $nasIp,
++            'port'          => $this->coaPort,
++        ];
++
++        if ($nasIp === '') {
++            $base['stderr'] = 'Missing NAS IP';
++            return $base;
++        }
++
++        $payload = $this->buildRadclientPayload($attributes);
++        if ($payload === '') {
++            $base['stderr'] = 'Missing disconnect attributes';
++            return $base;
++        }
++
++        $tmp = tempnam(sys_get_temp_dir(), 'rd-coa-');
++        if ($tmp === false) {
++            $base['stderr'] = 'Unable to create temporary request file';
++            return $base;
++        }
++
++        $start = microtime(true);
++        $output = '';
++        $exitCode = 1;
++
++        try {
++            file_put_contents($tmp, $payload . PHP_EOL);
++            $target = $nasIp . ':' . $this->coaPort;
++            $command = sprintf(
++                'timeout %d %s -x -r 1 -t 3 %s disconnect %s < %s 2>&1',
++                $this->radclientTimeout,
++                escapeshellcmd($this->radclient),
++                escapeshellarg($target),
++                escapeshellarg($secret),
++                escapeshellarg($tmp)
++            );
++
++            $lines = [];
++            exec($command, $lines, $exitCode);
++            $output = trim(implode("\n", $lines));
++        } finally {
++            @unlink($tmp);
++        }
++
++        $parsed = $this->parseDisconnectResult($output, $exitCode);
++        $latencyMs = (int)round((microtime(true) - $start) * 1000);
++
++        $audit = [
++            'timestamp'    => gmdate('c'),
++            'nas_target'   => $nasIp . ':' . $this->coaPort,
++            'session_id'   => (string)($attributes['Acct-Session-Id'] ?? ''),
++            'username'     => (string)($attributes['User-Name'] ?? ''),
++            'status'       => $parsed['status'],
++            'latency_ms'   => $latencyMs,
++            'exit_code'    => $exitCode,
++        ];
++        Log::info('[KickAudit] ' . json_encode($audit, JSON_UNESCAPED_SLASHES));
++
++        return [
++            'strategy'      => $strategy,
++            'status'        => $parsed['status'],
++            'ack'           => $parsed['ack'],
++            'stderr'        => ($parsed['status'] === 'stderr' || $parsed['status'] === 'timeout' || $parsed['status'] === 'nak')
++                ? $output
++                : null,
++            'stdout'        => $output,
++            'nasipaddress'  => $nasIp,
++            'port'          => $this->coaPort,
++            'latency_ms'    => $latencyMs,
++            'exit_code'     => $exitCode,
++        ];
++    }
++
++    protected function buildRadclientPayload(array $attributes): string
++    {
++        $lines = [];
++        foreach ($attributes as $key => $value) {
++            if ($value === null || $value === '') {
++                continue;
++            }
++            if ($key === 'NAS-Port' && is_numeric($value)) {
++                $lines[] = $key . ' = ' . (int)$value;
++                continue;
++            }
++            $escaped = str_replace(['\\', '"'], ['\\\\', '\"'], (string)$value);
++            $lines[] = $key . ' = "' . $escaped . '"';
++        }
++
++        $lines[] = 'Message-Authenticator = 0x00';
++        return implode(PHP_EOL, $lines);
++    }
++
++    private function isOmadaIdentifier(string $value): bool
++    {
++        if ($value === '') {
++            return false;
++        }
++
++        return stripos($value, 'tp-link') !== false
++            || stripos($value, 'omada') !== false
++            || stripos($value, 'tplink') !== false;
++    }
++
+ }
+diff --git a/cake4/rd_cake/src/Controller/RadacctsFastController.php b/cake4/rd_cake/src/Controller/RadacctsFastController.php
+index eeada14a..29a40fed 100644
+--- a/cake4/rd_cake/src/Controller/RadacctsFastController.php
++++ b/cake4/rd_cake/src/Controller/RadacctsFastController.php
+@@ -335,12 +335,15 @@ class RadacctsFastController extends AppController {
+ 		
+ 		
+ 		$e_username = $this->{$this->main_model}->find()->where(['Radaccts.username' => $username,'Radaccts.acctstoptime IS NULL'])->all();
++        $results = [];
+ 		foreach($e_username as $ent){
+ 			$data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++            $results[] = array_merge(['radacctid' => (int)$ent->radacctid], $data);
+ 		}	
+ 		$this->set([
+             'success'       => true,
+-            'data'          => $data
++            'data'          => $data,
++            'results'       => $results
+         ]);
+         $this->viewBuilder()->setOption('serialize', true);
+ 	
+@@ -360,8 +363,10 @@ class RadacctsFastController extends AppController {
+         $token 	= $q_data['token'];
+ 
+         
+-        $some_session_closed    = false;
+         $count                  = 0;
++        $closedCount            = 0;
++        $stats                  = ['ack' => 0, 'nak' => 0, 'timeout' => 0, 'stderr' => 0, 'sent' => 0, 'not_supported' => 0];
++        $results                = [];
+         $msg                    = 'Could not locate session';
+         $data                   = ['title' => 'Session Not Found', 'message' => $msg, 'type' =>'warn'];
+         $req_q      			= $this->request->getQuery();
+@@ -369,26 +374,31 @@ class RadacctsFastController extends AppController {
+         foreach(array_keys($req_q) as $key){
+             if(preg_match('/^\d+/',$key)){
+                 $ent = $this->{$this->main_model}->find()->where(['Radaccts.radacctid' => $key])->first();
++                if(!$ent){
++                    continue;
++                }
+                 $count++;               
+                 if($ent->acctstoptime !== null){
+-                    $some_session_closed = true;
++                    $closedCount++;
++                    $results[] = [
++                        'radacctid' => (int)$key,
++                        'status'    => 'already_closed',
++                        'ack'       => false
++                    ];
+                 }else{
+-                    $data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++                    $result = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++                    $results[] = array_merge(['radacctid' => (int)$key], $result);
++                    $status = (string)($result['status'] ?? 'stderr');
++                    if(array_key_exists($status, $stats)){
++                        $stats[$status] = $stats[$status] + 1;
++                    }else{
++                        $stats['stderr'] = $stats['stderr'] + 1;
++                    }
+                 }
+             }
+         }  
+         
+-        if($count >0){      
+-            $data = ['title' => 'Disconnect Sent', 'message' => 'Disconnect Instructions Sent', 'type' =>'info'];
+-        }   
+-
+-        if(($some_session_closed)&&($count>0)){
+-            $msg = 'Sessions Is already Closed';
+-            if($count > 1){
+-                $msg = 'Some Sessions Are already Closed';
+-            }
+-            $data = ['title' => 'Session Closed Already', 'message' => $msg, 'type' =>'warn'];
+-        }
++        $data = $this->buildKickActiveResponseData($count, $closedCount, $stats, $results);
+     
+         $this->set([
+             'success'       => true,
+@@ -397,6 +407,40 @@ class RadacctsFastController extends AppController {
+         $this->viewBuilder()->setOption('serialize', true);
+     }
+ 
++    public function buildKickActiveResponseData(int $count, int $closedCount, array $stats, array $results): array
++    {
++        $default = ['title' => 'Session Not Found', 'message' => 'Could not locate session', 'type' =>'warn'];
++        if($count === 0){
++            return $default;
++        }
++
++        if($closedCount === $count){
++            $msg = 'Sessions Is already Closed';
++            if($count > 1){
++                $msg = 'Some Sessions Are already Closed';
++            }
++            return ['title' => 'Session Closed Already', 'message' => $msg, 'type' =>'warn'];
++        }
++
++        if(($stats['nak'] + $stats['timeout'] + $stats['stderr']) > 0){
++            return [
++                'title'      => 'Disconnect Partially Failed',
++                'message'    => "ACK {$stats['ack']}, NAK {$stats['nak']}, timeout {$stats['timeout']}, errors {$stats['stderr']}",
++                'type'       => 'warn',
++                'kick_stats' => $stats,
++                'results'    => $results
++            ];
++        }
++
++        return [
++            'title'      => 'Disconnect Sent',
++            'message'    => "Disconnect completed (ACK {$stats['ack']})",
++            'type'       => 'info',
++            'kick_stats' => $stats,
++            'results'    => $results
++        ];
++    }
++
+     public function closeOpen(){
+ 
+         //__ Authentication + Authorization __
+diff --git a/cake4/rd_cake/src/Controller/RadacctsController.php b/cake4/rd_cake/src/Controller/RadacctsController.php
+index 79f4eb1b..af3078ef 100644
+--- a/cake4/rd_cake/src/Controller/RadacctsController.php
++++ b/cake4/rd_cake/src/Controller/RadacctsController.php
+@@ -556,12 +556,15 @@ class RadacctsController extends AppController {
+ 		
+ 		
+ 		$e_username = $this->{$this->workingModel}->find()->where(['username' => $username,'acctstoptime IS NULL'])->all();
++        $results = [];
+ 		foreach($e_username as $ent){
+ 			$data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++            $results[] = array_merge(['radacctid' => (int)$ent->radacctid], $data);
+ 		}	
+ 		$this->set([
+             'success'       => true,
+-            'data'          => $data
++            'data'          => $data,
++            'results'       => $results
+         ]);
+         $this->viewBuilder()->setOption('serialize', true);	
+ 	}
+@@ -580,8 +583,10 @@ class RadacctsController extends AppController {
+         $token 	= $q_data['token'];
+ 
+         
+-        $some_session_closed    = false;
+         $count                  = 0;
++        $closedCount            = 0;
++        $stats                  = ['ack' => 0, 'nak' => 0, 'timeout' => 0, 'stderr' => 0, 'sent' => 0, 'not_supported' => 0];
++        $results                = [];
+         $msg                    = 'Could not locate session';
+         $data                   = ['title' => 'Session Not Found', 'message' => $msg, 'type' =>'warn'];
+         $req_q      			= $this->request->getQuery();
+@@ -589,26 +594,31 @@ class RadacctsController extends AppController {
+         foreach(array_keys($req_q) as $key){
+             if(preg_match('/^\d+/',$key)){
+                 $ent = $this->{$this->workingModel}->find()->where(['radacctid' => $key])->first();
++                if(!$ent){
++                    continue;
++                }
+                 $count++;               
+                 if($ent->acctstoptime !== null){
+-                    $some_session_closed = true;
++                    $closedCount++;
++                    $results[] = [
++                        'radacctid' => (int)$key,
++                        'status'    => 'already_closed',
++                        'ack'       => false
++                    ];
+                 }else{
+-                    $data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++                    $result = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++                    $results[] = array_merge(['radacctid' => (int)$key], $result);
++                    $status = (string)($result['status'] ?? 'stderr');
++                    if(array_key_exists($status, $stats)){
++                        $stats[$status] = $stats[$status] + 1;
++                    }else{
++                        $stats['stderr'] = $stats['stderr'] + 1;
++                    }
+                 }
+             }
+         }  
+         
+-        if($count >0){      
+-            $data = ['title' => 'Disconnect Sent', 'message' => 'Disconnect Instructions Sent', 'type' =>'info'];
+-        }   
+-
+-        if(($some_session_closed)&&($count>0)){
+-            $msg = 'Sessions Is already Closed';
+-            if($count > 1){
+-                $msg = 'Some Sessions Are already Closed';
+-            }
+-            $data = ['title' => 'Session Closed Already', 'message' => $msg, 'type' =>'warn'];
+-        }
++        $data = $this->buildKickActiveResponseData($count, $closedCount, $stats, $results);
+     
+         $this->set([
+             'success'       => true,
+@@ -617,6 +627,40 @@ class RadacctsController extends AppController {
+         $this->viewBuilder()->setOption('serialize', true);
+     }
+ 
++    public function buildKickActiveResponseData(int $count, int $closedCount, array $stats, array $results): array
++    {
++        $default = ['title' => 'Session Not Found', 'message' => 'Could not locate session', 'type' =>'warn'];
++        if($count === 0){
++            return $default;
++        }
++
++        if($closedCount === $count){
++            $msg = 'Sessions Is already Closed';
++            if($count > 1){
++                $msg = 'Some Sessions Are already Closed';
++            }
++            return ['title' => 'Session Closed Already', 'message' => $msg, 'type' =>'warn'];
++        }
++
++        if(($stats['nak'] + $stats['timeout'] + $stats['stderr']) > 0){
++            return [
++                'title'      => 'Disconnect Partially Failed',
++                'message'    => "ACK {$stats['ack']}, NAK {$stats['nak']}, timeout {$stats['timeout']}, errors {$stats['stderr']}",
++                'type'       => 'warn',
++                'kick_stats' => $stats,
++                'results'    => $results
++            ];
++        }
++
++        return [
++            'title'      => 'Disconnect Sent',
++            'message'    => "Disconnect completed (ACK {$stats['ack']})",
++            'type'       => 'info',
++            'kick_stats' => $stats,
++            'results'    => $results
++        ];
++    }
++
+     public function closeOpen(){
+ 
+         //__ Authentication + Authorization __
+diff --git a/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+new file mode 100644
+index 00000000..031974f9
+--- /dev/null
++++ b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+@@ -0,0 +1,358 @@
++<?php
++declare(strict_types=1);
++
++namespace App\Command;
++
++use App\Controller\Component\KickerComponent;
++use Cake\Cache\Cache;
++use Cake\Console\Arguments;
++use Cake\Console\Command;
++use Cake\Console\ConsoleIo;
++use Cake\Controller\ComponentRegistry;
++use Cake\Controller\Controller;
++use Cake\Datasource\ConnectionManager;
++use Cake\Http\Response;
++use Cake\Http\ServerRequest;
++use Cake\I18n\FrozenTime;
++use Cake\Log\Log;
++use Cake\ORM\TableRegistry;
++
++class EnforceOmadaQuotaCommand extends Command
++{
++    public static function defaultName(): string
++    {
++        return 'omada:enforce-quota';
++    }
++
++    public function execute(Arguments $args, ConsoleIo $io)
++    {
++        $windowSeconds = (int)($args->getOption('window') ?? 180);
++        $retryMax = (int)($args->getOption('retry-max') ?? 3);
++        $cooldownSeconds = (int)($args->getOption('cooldown') ?? 90);
++        $nasFilter = (string)($args->getOption('nas-filter') ?? 'TP-Link');
++        $dryRun = (bool)$args->getOption('dry-run');
++
++        $radaccts = TableRegistry::getTableLocator()->get('Radaccts');
++        $permanentUsers = TableRegistry::getTableLocator()->get('PermanentUsers');
++        $now = FrozenTime::now();
++        $minUpdated = $now->subSeconds($windowSeconds);
++        $where = [
++            'Radaccts.acctstoptime IS' => null,
++            'Radaccts.acctupdatetime >=' => $minUpdated,
++        ];
++        if ($nasFilter !== '') {
++            $where['Radaccts.nasidentifier LIKE'] = '%' . $nasFilter . '%';
++        }
++
++        $sessions = $radaccts->find()->where($where)->all();
++        $kicker = $this->makeKicker();
++
++        $checked = 0;
++        $kicked = 0;
++        $skipped = 0;
++        foreach ($sessions as $session) {
++            $checked++;
++            $username = (string)$session->username;
++            if ($username === '') {
++                $skipped++;
++                continue;
++            }
++
++            $counters = $this->findCountersForUsername($username);
++            $breaches = $this->evaluateBreaches($session, $counters);
++            $breaches = array_merge($breaches, $this->evaluatePermanentUserCaps($permanentUsers, $username));
++            if (count($breaches) === 0) {
++                continue;
++            }
++
++            $cacheKey = 'omada_quota_kick_' . (int)$session->radacctid;
++            $state = Cache::read($cacheKey, 'default');
++            if (!is_array($state)) {
++                $state = ['attempts' => 0, 'last_try' => 0, 'last_status' => null];
++            }
++
++            $nowTs = time();
++            if (($nowTs - (int)$state['last_try']) < $cooldownSeconds) {
++                $skipped++;
++                continue;
++            }
++
++            if ((int)$state['attempts'] >= $retryMax && ($state['last_status'] ?? '') !== 'ack') {
++                $this->logQuotaAudit($session, 'retry_exhausted', $breaches, null);
++                $skipped++;
++                continue;
++            }
++
++            if ($dryRun) {
++                $this->logQuotaAudit($session, 'dry_run_quota_exceeded', $breaches, null);
++                $kicked++;
++                continue;
++            }
++
++            $kick = $kicker->kick($session, 'quota-worker');
++            $status = (string)($kick['status'] ?? 'stderr');
++            $state = [
++                'attempts' => ((int)$state['attempts']) + 1,
++                'last_try' => $nowTs,
++                'last_status' => $status,
++            ];
++
++            if ($status === 'ack') {
++                Cache::delete($cacheKey, 'default');
++            } else {
++                Cache::write($cacheKey, $state, 'default');
++            }
++
++            $this->logQuotaAudit($session, $status, $breaches, $kick);
++            $kicked++;
++        }
++
++        $io->success("checked={$checked} kicked={$kicked} skipped={$skipped} window={$windowSeconds}s");
++        return self::CODE_SUCCESS;
++    }
++
++    protected function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
++    {
++        $parser = parent::buildOptionParser($parser);
++        $parser->addOptions([
++            'window' => ['help' => 'Only evaluate sessions updated in the last N seconds', 'short' => 'w'],
++            'retry-max' => ['help' => 'Maximum retries per session before cooldown skip', 'short' => 'r'],
++            'cooldown' => ['help' => 'Seconds between retries per session', 'short' => 'c'],
++            'nas-filter' => ['help' => 'Filter Radacct NAS-Identifier contains value', 'short' => 'n'],
++            'dry-run' => ['help' => 'Only log quota breaches without disconnect', 'boolean' => true],
++        ]);
++        return $parser;
++    }
++
++    private function makeKicker(): KickerComponent
++    {
++        $controller = new Controller(new ServerRequest(), new Response());
++        $registry = new ComponentRegistry($controller);
++        return new KickerComponent($registry);
++    }
++
++    private function findCountersForUsername(string $username): array
++    {
++        $radusergroups = TableRegistry::getTableLocator()->get('Radusergroups');
++        $radgroupchecks = TableRegistry::getTableLocator()->get('Radgroupchecks');
++        $radchecks = TableRegistry::getTableLocator()->get('Radchecks');
++
++        $counterInfo = [];
++        $groups = $radusergroups->find()
++            ->where(['Radusergroups.username' => $username])
++            ->order(['Radusergroups.priority ASC'])
++            ->all();
++
++        foreach ($groups as $group) {
++            $checks = $radgroupchecks->find()->where(['Radgroupchecks.groupname' => $group->groupname])->all();
++            foreach ($checks as $check) {
++                $counterInfo[(string)$check->attribute] = (string)$check->value;
++            }
++        }
++
++        $counters = [];
++        if (($counterInfo['Rd-Cap-Type-Time'] ?? '') === 'hard') {
++            $timeValue = $counterInfo['Rd-Total-Time'] ?? null;
++            if ($timeValue === null || $timeValue === '') {
++                $row = $radchecks->find()->where(['Radchecks.username' => $username, 'Radchecks.attribute' => 'Rd-Total-Time'])->first();
++                if ($row) {
++                    $timeValue = $row->value;
++                }
++            }
++            if ($timeValue !== null && $timeValue !== '') {
++                $counters['time'] = [
++                    'cap' => 'hard',
++                    'value' => (int)$timeValue,
++                    'reset' => (string)($counterInfo['Rd-Reset-Type-Time'] ?? 'never'),
++                    'reset_interval' => (int)($counterInfo['Rd-Reset-Interval-Time'] ?? 0),
++                    'mac_counter' => (($counterInfo['Rd-Mac-Counter-Time'] ?? '0') === '1'),
++                ];
++            }
++        }
++
++        if (($counterInfo['Rd-Cap-Type-Data'] ?? '') === 'hard') {
++            $dataValue = $counterInfo['Rd-Total-Data'] ?? null;
++            if ($dataValue === null || $dataValue === '') {
++                $row = $radchecks->find()->where(['Radchecks.username' => $username, 'Radchecks.attribute' => 'Rd-Total-Data'])->first();
++                if ($row) {
++                    $dataValue = $row->value;
++                }
++            }
++            if ($dataValue !== null && $dataValue !== '') {
++                $counters['data'] = [
++                    'cap' => 'hard',
++                    'value' => (int)$dataValue,
++                    'reset' => (string)($counterInfo['Rd-Reset-Type-Data'] ?? 'never'),
++                    'reset_interval' => (int)($counterInfo['Rd-Reset-Interval-Data'] ?? 0),
++                    'mac_counter' => (($counterInfo['Rd-Mac-Counter-Data'] ?? '0') === '1'),
++                ];
++            }
++        }
++
++        return $counters;
++    }
++
++    private function evaluateBreaches($session, array $counters): array
++    {
++        $breaches = [];
++        $username = (string)$session->username;
++        $mac = (string)$session->callingstationid;
++
++        if (isset($counters['time'])) {
++            $used = $this->queryTimeUsage($username, $counters['time'], $counters['time']['mac_counter'] ? $mac : null);
++            if ($used >= (int)$counters['time']['value']) {
++                $breaches[] = [
++                    'type' => 'time',
++                    'used' => $used,
++                    'cap' => (int)$counters['time']['value'],
++                ];
++            }
++        }
++
++        if (isset($counters['data'])) {
++            $used = $this->queryDataUsage($username, $counters['data'], $counters['data']['mac_counter'] ? $mac : null);
++            if ($used >= (int)$counters['data']['value']) {
++                $breaches[] = [
++                    'type' => 'data',
++                    'used' => $used,
++                    'cap' => (int)$counters['data']['value'],
++                ];
++            }
++        }
++
++        return $breaches;
++    }
++
++    private function evaluatePermanentUserCaps($permanentUsers, string $username): array
++    {
++        $breaches = [];
++        $pu = $permanentUsers->find()->where(['PermanentUsers.username' => $username])->first();
++        if (!$pu) {
++            return $breaches;
++        }
++
++        $dataCap = (int)($pu->data_cap ?? 0);
++        $dataUsed = (int)($pu->data_used ?? 0);
++        if ($dataCap > 0 && $dataUsed >= $dataCap) {
++            $breaches[] = [
++                'type' => 'data',
++                'used' => $dataUsed,
++                'cap' => $dataCap,
++                'source' => 'permanent_users'
++            ];
++        }
++
++        $timeCap = (int)($pu->time_cap ?? 0);
++        $timeUsed = (int)($pu->time_used ?? 0);
++        if ($timeCap > 0 && $timeUsed >= $timeCap) {
++            $breaches[] = [
++                'type' => 'time',
++                'used' => $timeUsed,
++                'cap' => $timeCap,
++                'source' => 'permanent_users'
++            ];
++        }
++
++        return $breaches;
++    }
++
++    private function queryTimeUsage(string $username, array $counter, ?string $mac = null): int
++    {
++        $conn = ConnectionManager::get('default');
++        $params = ['username' => $username];
++        $types = ['username' => 'string'];
++        $conditions = "username = :username";
++        if ($mac !== null && $mac !== '') {
++            $conditions .= " AND callingstationid = :mac";
++            $params['mac'] = $mac;
++            $types['mac'] = 'string';
++        }
++
++        $startTs = $this->findResetStartUnix((string)$counter['reset'], (int)$counter['reset_interval']);
++        if ($startTs === null) {
++            $sql = "SELECT IFNULL(SUM(GREATEST(UNIX_TIMESTAMP(`timestamp`) - UNIX_TIMESTAMP(created), 0)), 0) AS used
++                    FROM user_stats
++                    WHERE {$conditions}";
++            $row = $conn->execute($sql, $params, $types)->fetch('assoc');
++            return (int)($row['used'] ?? 0);
++        }
++
++        $sql = "SELECT IFNULL(SUM(GREATEST(UNIX_TIMESTAMP(`timestamp`) - GREATEST(UNIX_TIMESTAMP(created), :start_ts), 0)), 0) AS used
++                FROM user_stats
++                WHERE {$conditions}
++                  AND UNIX_TIMESTAMP(`timestamp`) > :start_ts";
++        $params['start_ts'] = $startTs;
++        $types['start_ts'] = 'integer';
++        $row = $conn->execute($sql, $params, $types)->fetch('assoc');
++        return (int)($row['used'] ?? 0);
++    }
++
++    private function queryDataUsage(string $username, array $counter, ?string $mac = null): int
++    {
++        $conn = ConnectionManager::get('default');
++        $params = ['username' => $username];
++        $types = ['username' => 'string'];
++        $conditions = "username = :username";
++        if ($mac !== null && $mac !== '') {
++            $conditions .= " AND callingstationid = :mac";
++            $params['mac'] = $mac;
++            $types['mac'] = 'string';
++        }
++
++        $startTs = $this->findResetStartUnix((string)$counter['reset'], (int)$counter['reset_interval']);
++        if ($startTs === null) {
++            $sql = "SELECT IFNULL(SUM(acctinputoctets) + SUM(acctoutputoctets), 0) AS used
++                    FROM user_stats
++                    WHERE {$conditions}";
++            $row = $conn->execute($sql, $params, $types)->fetch('assoc');
++            return (int)($row['used'] ?? 0);
++        }
++
++        $sql = "SELECT IFNULL(SUM(acctinputoctets) + SUM(acctoutputoctets), 0) AS used
++                FROM user_stats
++                WHERE {$conditions}
++                  AND created > FROM_UNIXTIME(:start_ts)";
++        $params['start_ts'] = $startTs;
++        $types['start_ts'] = 'integer';
++        $row = $conn->execute($sql, $params, $types)->fetch('assoc');
++        return (int)($row['used'] ?? 0);
++    }
++
++    private function findResetStartUnix(string $reset, int $interval): ?int
++    {
++        if ($reset === '' || $reset === 'never') {
++            return null;
++        }
++
++        if ($reset === 'daily') {
++            return (int)mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
++        }
++        if ($reset === 'weekly') {
++            return (int)(mktime(0, 0, 0, (int)date('n'), (int)date('j'), (int)date('Y')) - ((int)date('N') - 1) * 86400);
++        }
++        if ($reset === 'monthly') {
++            return (int)mktime(0, 0, 0, (int)date('m'), 1, (int)date('Y'));
++        }
++        if ($reset === 'dynamic') {
++            return time() - max($interval, 0);
++        }
++
++        return null;
++    }
++
++    private function logQuotaAudit($session, string $status, array $breaches, ?array $kick): void
++    {
++        $payload = [
++            'timestamp' => gmdate('c'),
++            'radacctid' => (int)$session->radacctid,
++            'username' => (string)$session->username,
++            'nas' => (string)$session->nasidentifier,
++            'nas_ip' => (string)$session->nasipaddress,
++            'acct_session_id' => (string)$session->acctsessionid,
++            'status' => $status,
++            'breaches' => $breaches,
++            'kick' => $kick,
++        ];
++        Log::info('[QuotaKickAudit] ' . json_encode($payload, JSON_UNESCAPED_SLASHES));
++    }
++}
+diff --git a/cake4/rd_cake/src/Command/SyncOmadaRadiusSecretCommand.php b/cake4/rd_cake/src/Command/SyncOmadaRadiusSecretCommand.php
+new file mode 100644
+index 00000000..ba1ddb7d
+--- /dev/null
++++ b/cake4/rd_cake/src/Command/SyncOmadaRadiusSecretCommand.php
+@@ -0,0 +1,110 @@
++<?php
++declare(strict_types=1);
++
++namespace App\Command;
++
++use Cake\Console\Arguments;
++use Cake\Console\Command;
++use Cake\Console\ConsoleIo;
++use Cake\ORM\Table;
++use Cake\ORM\TableRegistry;
++
++class SyncOmadaRadiusSecretCommand extends Command
++{
++    public static function defaultName(): string
++    {
++        return 'omada:sync-secrets';
++    }
++
++    public function execute(Arguments $args, ConsoleIo $io)
++    {
++        $secret = (string)($args->getOption('secret') ?? 'testing123');
++        $apply = (bool)$args->getOption('apply');
++        $filter = (string)($args->getOption('nas-filter') ?? 'TP-Link');
++
++        $nasTable = TableRegistry::getTableLocator()->get('Nas');
++        $dynamicClientsTable = TableRegistry::getTableLocator()->get('DynamicClients');
++
++        [$nasChecked, $nasChanged] = $this->syncTableSecrets($nasTable, $secret, $filter, $apply, $io);
++        [$dcChecked, $dcChanged] = $this->syncTableSecrets($dynamicClientsTable, $secret, $filter, $apply, $io);
++
++        $io->success(
++            sprintf(
++                'secret=%s apply=%s nas_checked=%d nas_changed=%d dynamic_checked=%d dynamic_changed=%d',
++                $secret,
++                $apply ? 'yes' : 'no',
++                $nasChecked,
++                $nasChanged,
++                $dcChecked,
++                $dcChanged
++            )
++        );
++
++        return self::CODE_SUCCESS;
++    }
++
++    protected function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
++    {
++        $parser = parent::buildOptionParser($parser);
++        $parser->addOptions([
++            'secret' => ['help' => 'Secret to enforce for Omada/TP-Link Radius clients', 'short' => 's'],
++            'nas-filter' => ['help' => 'Filter by NAS-Identifier/Name containing this value', 'short' => 'n'],
++            'apply' => ['help' => 'Persist changes (otherwise dry-run)', 'boolean' => true],
++        ]);
++        return $parser;
++    }
++
++    private function syncTableSecrets(Table $table, string $secret, string $filter, bool $apply, ConsoleIo $io): array
++    {
++        $schema = $table->getSchema();
++        $columns = $schema->columns();
++        $secretFields = array_values(array_intersect(
++            ['secret', 'auth_secret', 'acct_secret', 'coa_secret'],
++            $columns
++        ));
++        if (count($secretFields) === 0) {
++            return [0, 0];
++        }
++
++        $alias = $table->getAlias();
++        $query = $table->find();
++        $or = [];
++        if (in_array('nasidentifier', $columns, true) && $filter !== '') {
++            $or[] = ["{$alias}.nasidentifier LIKE" => '%' . $filter . '%'];
++        }
++        if (in_array('nasname', $columns, true) && $filter !== '') {
++            $or[] = ["{$alias}.nasname LIKE" => '%' . $filter . '%'];
++        }
++        if (in_array('type', $columns, true)) {
++            $or[] = ["{$alias}.type LIKE" => '%Omada%'];
++        }
++        if (count($or) > 0) {
++            $query->where(['OR' => $or]);
++        }
++
++        $rows = $query->all();
++        $checked = 0;
++        $changed = 0;
++        foreach ($rows as $row) {
++            $checked++;
++            $dirty = false;
++            foreach ($secretFields as $field) {
++                if ((string)$row->{$field} !== $secret) {
++                    $row->{$field} = $secret;
++                    $dirty = true;
++                }
++            }
++
++            if ($dirty) {
++                $changed++;
++                if ($apply) {
++                    $table->save($row);
++                } else {
++                    $io->out("[dry-run] {$alias} id=" . (string)($row->id ?? 'n/a') . " secrets -> {$secret}");
++                }
++            }
++        }
++
++        return [$checked, $changed];
++    }
++}
+diff --git a/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php b/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php
+new file mode 100644
+index 00000000..cc059cd6
+--- /dev/null
++++ b/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php
+@@ -0,0 +1,91 @@
++<?php
++declare(strict_types=1);
++
++namespace App\Test\TestCase\Controller\Component;
++
++use App\Controller\Component\KickerComponent;
++use Cake\Controller\ComponentRegistry;
++use Cake\Controller\Controller;
++use Cake\Http\Response;
++use Cake\Http\ServerRequest;
++use Cake\TestSuite\TestCase;
++
++class KickerComponentTest extends TestCase
++{
++    public function testKickRoutesTpLinkToOmadaDisconnectWithRequiredAttributes(): void
++    {
++        $component = new TestableKickerComponent(
++            new ComponentRegistry(new Controller(new ServerRequest(), new Response()))
++        );
++
++        $ent = (object)[
++            'radacctid' => 55,
++            'nasidentifier' => 'TP-Link',
++            'nasipaddress' => '10.10.10.10',
++            'username' => 'alice',
++            'callingstationid' => 'AA-BB-CC-DD-EE-FF',
++            'acctsessionid' => 'session-1',
++            'nasportid' => 22,
++        ];
++
++        $result = $component->kick($ent, 'token-1');
++
++        $this->assertSame('ack', $result['status']);
++        $this->assertSame('omada_disconnect', $result['strategy']);
++        $this->assertSame('10.10.10.10:3799', $result['request']['target']);
++        $this->assertCount(1, $component->captured);
++
++        $sent = $component->captured[0];
++        $this->assertSame('10.10.10.10', $sent['nas_ip']);
++        $this->assertSame('testing123', $sent['secret']);
++        $this->assertSame('alice', $sent['attributes']['User-Name']);
++        $this->assertSame('AA-BB-CC-DD-EE-FF', $sent['attributes']['Calling-Station-Id']);
++        $this->assertSame('session-1', $sent['attributes']['Acct-Session-Id']);
++        $this->assertSame('22', $sent['attributes']['NAS-Port']);
++    }
++
++    public function testParseDisconnectResult(): void
++    {
++        $component = new KickerComponent(
++            new ComponentRegistry(new Controller(new ServerRequest(), new Response()))
++        );
++
++        $ack = $component->parseDisconnectResult('Received Disconnect-ACK', 0);
++        $nak = $component->parseDisconnectResult('Received Disconnect-NAK', 0);
++        $timeout = $component->parseDisconnectResult('No reply from server', 1);
++
++        $this->assertSame('ack', $ack['status']);
++        $this->assertTrue($ack['ack']);
++        $this->assertSame('nak', $nak['status']);
++        $this->assertFalse($nak['ack']);
++        $this->assertSame('timeout', $timeout['status']);
++        $this->assertFalse($timeout['ack']);
++    }
++}
++
++class TestableKickerComponent extends KickerComponent
++{
++    public array $captured = [];
++
++    protected function sendRadclientDisconnect(string $nasIp, array $attributes, string $secret, string $strategy): array
++    {
++        $this->captured[] = [
++            'nas_ip' => $nasIp,
++            'attributes' => $attributes,
++            'secret' => $secret,
++            'strategy' => $strategy,
++        ];
++
++        return [
++            'strategy' => $strategy,
++            'status' => 'ack',
++            'ack' => true,
++            'stderr' => null,
++            'stdout' => 'Received Disconnect-ACK',
++            'nasipaddress' => $nasIp,
++            'port' => 3799,
++            'latency_ms' => 4,
++            'exit_code' => 0,
++        ];
++    }
++}
+diff --git a/cake4/rd_cake/tests/TestCase/Controller/RadacctsFastControllerTest.php b/cake4/rd_cake/tests/TestCase/Controller/RadacctsFastControllerTest.php
+new file mode 100644
+index 00000000..0abfca24
+--- /dev/null
++++ b/cake4/rd_cake/tests/TestCase/Controller/RadacctsFastControllerTest.php
+@@ -0,0 +1,38 @@
++<?php
++declare(strict_types=1);
++
++namespace App\Test\TestCase\Controller;
++
++use App\Controller\RadacctsFastController;
++use Cake\Http\Response;
++use Cake\Http\ServerRequest;
++use Cake\TestSuite\TestCase;
++
++class RadacctsFastControllerTest extends TestCase
++{
++    public function testBuildKickActiveResponseDataForTimeoutFailure(): void
++    {
++        $controller = new RadacctsFastController(new ServerRequest(), new Response());
++        $stats = ['ack' => 0, 'nak' => 0, 'timeout' => 1, 'stderr' => 0, 'sent' => 0, 'not_supported' => 0];
++        $results = [['radacctid' => 9, 'status' => 'timeout']];
++
++        $data = $controller->buildKickActiveResponseData(1, 0, $stats, $results);
++
++        $this->assertSame('Disconnect Partially Failed', $data['title']);
++        $this->assertSame('warn', $data['type']);
++        $this->assertStringContainsString('timeout 1', $data['message']);
++    }
++
++    public function testBuildKickActiveResponseDataForAckSuccess(): void
++    {
++        $controller = new RadacctsFastController(new ServerRequest(), new Response());
++        $stats = ['ack' => 1, 'nak' => 0, 'timeout' => 0, 'stderr' => 0, 'sent' => 0, 'not_supported' => 0];
++        $results = [['radacctid' => 10, 'status' => 'ack']];
++
++        $data = $controller->buildKickActiveResponseData(1, 0, $stats, $results);
++
++        $this->assertSame('Disconnect Sent', $data['title']);
++        $this->assertSame('info', $data['type']);
++        $this->assertStringContainsString('ACK 1', $data['message']);
++    }
++}

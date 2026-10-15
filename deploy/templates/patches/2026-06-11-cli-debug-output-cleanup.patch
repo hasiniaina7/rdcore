@@ -1,0 +1,20 @@
+diff --git a/cake4/rd_cake/src/Shell/Task/UsageTask.php b/cake4/rd_cake/src/Shell/Task/UsageTask.php
+index a4ee0d64..0fd03200 100644
+--- a/cake4/rd_cake/src/Shell/Task/UsageTask.php
++++ b/cake4/rd_cake/src/Shell/Task/UsageTask.php
+@@ -91,7 +91,6 @@ class UsageTask extends Shell {
+         }
+ 
+         if($query_string){
+-            print_r($query_string);
+             $conn = ConnectionManager::get('default');
+             $stmt = $conn->execute($query_string);
+             $row = $stmt->fetch('assoc');
+@@ -121,7 +120,6 @@ class UsageTask extends Shell {
+         }
+ 
+         if($query_string){
+-            print_r($query_string);
+             $conn = ConnectionManager::get('default');
+             $stmt = $conn->execute($query_string);
+             $row = $stmt->fetch('assoc');

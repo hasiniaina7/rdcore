@@ -1,0 +1,161 @@
+diff --git a/cake4/rd_cake/vendor/cakephp/cakephp/src/Console/ConsoleOptionParser.php b/cake4/rd_cake/vendor/cakephp/cakephp/src/Console/ConsoleOptionParser.php
+index 846f94fd..81bd050a 100644
+--- a/cake4/rd_cake/vendor/cakephp/cakephp/src/Console/ConsoleOptionParser.php
++++ b/cake4/rd_cake/vendor/cakephp/cakephp/src/Console/ConsoleOptionParser.php
+@@ -684,10 +684,10 @@ class ConsoleOptionParser
+     public function parse(array $argv, ?ConsoleIo $io = null): array
+     {
+         $command = isset($argv[0]) ? Inflector::underscore($argv[0]) : null;
+-        if (isset($this->_subcommands[$command])) {
++        if ($command !== null && isset($this->_subcommands[$command])) {
+             array_shift($argv);
+         }
+-        if (isset($this->_subcommands[$command]) && $this->_subcommands[$command]->parser()) {
++        if ($command !== null && isset($this->_subcommands[$command]) && $this->_subcommands[$command]->parser()) {
+             /** @psalm-suppress PossiblyNullReference */
+             return $this->_subcommands[$command]->parser()->parse($argv, $io);
+         }
+diff --git a/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Driver/Mysql.php b/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Driver/Mysql.php
+index b7d30b69..66ae4d47 100644
+--- a/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Driver/Mysql.php
++++ b/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Driver/Mysql.php
+@@ -140,16 +140,16 @@ class Mysql extends Driver
+ 
+         $config['flags'] += [
+             PDO::ATTR_PERSISTENT => $config['persistent'],
+-            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
++            $this->mysqlAttribute('ATTR_USE_BUFFERED_QUERY') => true,
+             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+         ];
+ 
+         if (!empty($config['ssl_key']) && !empty($config['ssl_cert'])) {
+-            $config['flags'][PDO::MYSQL_ATTR_SSL_KEY] = $config['ssl_key'];
+-            $config['flags'][PDO::MYSQL_ATTR_SSL_CERT] = $config['ssl_cert'];
++            $config['flags'][$this->mysqlAttribute('ATTR_SSL_KEY')] = $config['ssl_key'];
++            $config['flags'][$this->mysqlAttribute('ATTR_SSL_CERT')] = $config['ssl_cert'];
+         }
+         if (!empty($config['ssl_ca'])) {
+-            $config['flags'][PDO::MYSQL_ATTR_SSL_CA] = $config['ssl_ca'];
++            $config['flags'][$this->mysqlAttribute('ATTR_SSL_CA')] = $config['ssl_ca'];
+         }
+ 
+         if (empty($config['unix_socket'])) {
+@@ -342,4 +342,14 @@ class Mysql extends Driver
+ 
+         return $this->supports(static::FEATURE_WINDOW);
+     }
++
++    private function mysqlAttribute(string $name): int
++    {
++        $pdoMysqlConstant = 'Pdo\Mysql::' . $name;
++        if (defined($pdoMysqlConstant)) {
++            return constant($pdoMysqlConstant);
++        }
++
++        return constant('PDO::MYSQL_' . $name);
++    }
+ }
+diff --git a/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Statement/MysqlStatement.php b/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Statement/MysqlStatement.php
+index 2ad4ec00..3d8a87cb 100644
+--- a/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Statement/MysqlStatement.php
++++ b/cake4/rd_cake/vendor/cakephp/cakephp/src/Database/Statement/MysqlStatement.php
+@@ -35,12 +35,22 @@ class MysqlStatement extends PDOStatement
+         $connection = $this->_driver->getConnection();
+ 
+         try {
+-            $connection->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $this->_bufferResults);
++            $connection->setAttribute($this->bufferedQueryAttribute(), $this->_bufferResults);
+             $result = $this->_statement->execute($params);
+         } finally {
+-            $connection->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
++            $connection->setAttribute($this->bufferedQueryAttribute(), true);
+         }
+ 
+         return $result;
+     }
++
++    private function bufferedQueryAttribute(): int
++    {
++        $pdoMysqlConstant = 'Pdo\Mysql::ATTR_USE_BUFFERED_QUERY';
++        if (defined($pdoMysqlConstant)) {
++            return constant($pdoMysqlConstant);
++        }
++
++        return constant('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY');
++    }
+ }
+diff --git a/cake4/rd_cake/vendor/cakephp/cakephp/src/Error/PhpError.php b/cake4/rd_cake/vendor/cakephp/cakephp/src/Error/PhpError.php
+index 0b9944ed..e16707f5 100644
+--- a/cake4/rd_cake/vendor/cakephp/cakephp/src/Error/PhpError.php
++++ b/cake4/rd_cake/vendor/cakephp/cakephp/src/Error/PhpError.php
+@@ -63,7 +63,7 @@ class PhpError
+         E_RECOVERABLE_ERROR => 'warning',
+         E_NOTICE => 'notice',
+         E_USER_NOTICE => 'notice',
+-        E_STRICT => 'strict',
++        2048 => 'strict',
+         E_DEPRECATED => 'deprecated',
+         E_USER_DEPRECATED => 'deprecated',
+     ];
+diff --git a/cake4/rd_cake/vendor/league/container/src/Container.php b/cake4/rd_cake/vendor/league/container/src/Container.php
+index c3aa35d6..195dba7c 100644
+--- a/cake4/rd_cake/vendor/league/container/src/Container.php
++++ b/cake4/rd_cake/vendor/league/container/src/Container.php
+@@ -40,9 +40,9 @@ class Container implements DefinitionContainerInterface
+     protected $delegates = [];
+ 
+     public function __construct(
+-        DefinitionAggregateInterface $definitions = null,
+-        ServiceProviderAggregateInterface $providers = null,
+-        InflectorAggregateInterface $inflectors = null
++        ?DefinitionAggregateInterface $definitions = null,
++        ?ServiceProviderAggregateInterface $providers = null,
++        ?InflectorAggregateInterface $inflectors = null
+     ) {
+         $this->definitions = $definitions ?? new DefinitionAggregate();
+         $this->providers   = $providers   ?? new ServiceProviderAggregate();
+@@ -153,7 +153,7 @@ class Container implements DefinitionContainerInterface
+         return false;
+     }
+ 
+-    public function inflector(string $type, callable $callback = null): InflectorInterface
++    public function inflector(string $type, ?callable $callback = null): InflectorInterface
+     {
+         return $this->inflectors->add($type, $callback);
+     }
+diff --git a/cake4/rd_cake/vendor/league/container/src/DefinitionContainerInterface.php b/cake4/rd_cake/vendor/league/container/src/DefinitionContainerInterface.php
+index 7e7e57e3..d7d53381 100644
+--- a/cake4/rd_cake/vendor/league/container/src/DefinitionContainerInterface.php
++++ b/cake4/rd_cake/vendor/league/container/src/DefinitionContainerInterface.php
+@@ -16,5 +16,5 @@ interface DefinitionContainerInterface extends ContainerInterface
+     public function addShared(string $id, $concrete = null): DefinitionInterface;
+     public function extend(string $id): DefinitionInterface;
+     public function getNew($id);
+-    public function inflector(string $type, callable $callback = null): InflectorInterface;
++    public function inflector(string $type, ?callable $callback = null): InflectorInterface;
+ }
+diff --git a/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregate.php b/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregate.php
+index c7193322..70922d49 100644
+--- a/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregate.php
++++ b/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregate.php
+@@ -16,7 +16,7 @@ class InflectorAggregate implements InflectorAggregateInterface
+      */
+     protected $inflectors = [];
+ 
+-    public function add(string $type, callable $callback = null): Inflector
++    public function add(string $type, ?callable $callback = null): Inflector
+     {
+         $inflector = new Inflector($type, $callback);
+         $this->inflectors[] = $inflector;
+diff --git a/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregateInterface.php b/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregateInterface.php
+index 474276b3..c95ac172 100644
+--- a/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregateInterface.php
++++ b/cake4/rd_cake/vendor/league/container/src/Inflector/InflectorAggregateInterface.php
+@@ -9,6 +9,6 @@ use League\Container\ContainerAwareInterface;
+ 
+ interface InflectorAggregateInterface extends ContainerAwareInterface, IteratorAggregate
+ {
+-    public function add(string $type, callable $callback = null): Inflector;
++    public function add(string $type, ?callable $callback = null): Inflector;
+     public function inflect(object $object);
+ }

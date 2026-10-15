@@ -1,0 +1,58 @@
+--- a/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
++++ b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+@@ -33,6 +33,7 @@
+         $dryRun = (bool)$args->getOption('dry-run');
+ 
+         $radaccts = TableRegistry::getTableLocator()->get('Radaccts');
++        $permanentUsers = TableRegistry::getTableLocator()->get('PermanentUsers');
+         $now = FrozenTime::now();
+         $minUpdated = $now->subSeconds($windowSeconds);
+         $where = [
+@@ -59,6 +60,7 @@
+ 
+             $counters = $this->findCountersForUsername($username);
+             $breaches = $this->evaluateBreaches($session, $counters);
++            $breaches = array_merge($breaches, $this->evaluatePermanentUserCaps($permanentUsers, $username));
+             if (count($breaches) === 0) {
+                 continue;
+             }
+@@ -219,6 +221,39 @@
+         }
+ 
+         return $breaches;
++    }
++
++    private function evaluatePermanentUserCaps($permanentUsers, string $username): array
++    {
++        $breaches = [];
++        $pu = $permanentUsers->find()->where(['PermanentUsers.username' => $username])->first();
++        if (!$pu) {
++            return $breaches;
++        }
++
++        $dataCap = (int)($pu->data_cap ?? 0);
++        $dataUsed = (int)($pu->data_used ?? 0);
++        if ($dataCap > 0 && $dataUsed >= $dataCap) {
++            $breaches[] = [
++                'type' => 'data',
++                'used' => $dataUsed,
++                'cap' => $dataCap,
++                'source' => 'permanent_users'
++            ];
++        }
++
++        $timeCap = (int)($pu->time_cap ?? 0);
++        $timeUsed = (int)($pu->time_used ?? 0);
++        if ($timeCap > 0 && $timeUsed >= $timeCap) {
++            $breaches[] = [
++                'type' => 'time',
++                'used' => $timeUsed,
++                'cap' => $timeCap,
++                'source' => 'permanent_users'
++            ];
++        }
++
++        return $breaches;
+     }
+ 
+     private function queryTimeUsage(string $username, array $counter, ?string $mac = null): int

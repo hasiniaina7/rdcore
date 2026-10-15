@@ -1,0 +1,190 @@
+diff --git a/cake4/rd_cake/setup/cron/cron4 b/cake4/rd_cake/setup/cron/cron4
+index 8e40b2fe..9676d8a0 100644
+--- a/cake4/rd_cake/setup/cron/cron4
++++ b/cake4/rd_cake/setup/cron/cron4
+@@ -1,35 +1,35 @@
+ #Every five minutes, run the stored procedure to check for 'down' nodes
+-*/5 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake update_node_downtime >> /dev/null 2>&1
+-
+-* * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd mon >> /dev/null 2>&1
+-* * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd debug_check >> /dev/null 2>&1
+-* * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd auto_close >> /dev/null 2>&1
+-* * * * * www-data cd /var/www/html/cake4/rd_cake && (bin/cake accounting >> /dev/null 2>&1 || /usr/bin/logger -t rdcron-accounting "bin/cake accounting failed")
+-*/15 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake voucher >> /dev/null 2>&1
+-*/10 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake update_user_stats >> /dev/null 2>&1
+-*/10 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake auto_add_devices >> /dev/null 2>&1
+-30 2 * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake auto_clean_mesh_desk >> /dev/null 2>&1
+-30 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake update_nas_data_usage >> /dev/null 2>&1
++*/5 * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake update_node_downtime >> /dev/null 2>&1
++
++* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake rd mon >> /dev/null 2>&1
++* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake rd debug_check >> /dev/null 2>&1
++* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake rd auto_close >> /dev/null 2>&1
++* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && (bin/cake accounting >> /dev/null 2>&1 || /usr/bin/logger -t rdcron-accounting "bin/cake accounting failed")
++*/15 * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake voucher >> /dev/null 2>&1
++*/10 * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake update_user_stats >> /dev/null 2>&1
++*/10 * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake auto_add_devices >> /dev/null 2>&1
++30 2 * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake auto_clean_mesh_desk >> /dev/null 2>&1
++30 * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake update_nas_data_usage >> /dev/null 2>&1
+ 
+ #Compacting and daily user_stats
+-10 3 * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake compacting >> /dev/null 2>&1
+-10 4 * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake update_user_stats_dailies >> /dev/null 2>&1 
++10 3 * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake compacting >> /dev/null 2>&1
++10 4 * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake update_user_stats_dailies >> /dev/null 2>&1 
+ 
+ #Improved reporting for meshes (also modify the Nginx config file accordingly)
+ #Every five minutes, process any reports from the temp_reports table (also check the syslog file there will be a report from this script saying how long it took ... should be under 5 min!!)
+-*/5 * * * * www-data php /var/www/html/cake4/rd_cake/setup/scripts/reporting/process_report.php >> /dev/null 2>&1
++*/5 * * * * www-data php /var/www/rdcore/cake4/rd_cake/setup/scripts/reporting/process_report.php >> /dev/null 2>&1
+ 
+ #FUP Run every minute 
+-* * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake fup >> /dev/null 2>&1
++* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake fup >> /dev/null 2>&1
+ 
+ #FUP monthly usage cache reset at 00:01 on day 1
+-1 0 1 * * www-data cd /var/www/html/cake4/rd_cake && bin/cake fup_monthly_reset >> /dev/null 2>&1
++1 0 1 * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake fup_monthly_reset >> /dev/null 2>&1
+ 
+ #Omada quota enforcement (hard cap) every minute for near-real-time disconnect attempts
+ * * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake omada:enforce-quota --window 180 --nas-filter TP-Link --retry-max 2 --cooldown 45 >> /dev/null 2>&1
+ 
+ #OTP Cleanup  
+-*/5 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake otp_cleanup >> /dev/null 2>&1
++*/5 * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake otp_cleanup >> /dev/null 2>&1
+ 
+ #* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats --server 127.0.0.1 --port 18121 --secret adminsecret --attrs /etc/freeradius/status-all.txt --tag main >> /var/log/freeradius-stats.log 2>&1
+ * * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats >> /dev/null 2>&1
+diff --git a/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+index e69574ff..4728396d 100644
+--- a/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
++++ b/cake4/rd_cake/src/Command/EnforceOmadaQuotaCommand.php
+@@ -138,8 +138,16 @@ class EnforceOmadaQuotaCommand extends Command
+         $radchecks = TableRegistry::getTableLocator()->get('Radchecks');
+ 
+         $counterInfo = [];
++        $profileName = $username;
++        $profile = $radchecks->find()
++            ->where(['Radchecks.username' => $username, 'Radchecks.attribute' => 'User-Profile'])
++            ->first();
++        if ($profile && (string)$profile->value !== '') {
++            $profileName = (string)$profile->value;
++        }
++
+         $groups = $radusergroups->find()
+-            ->where(['Radusergroups.username' => $username])
++            ->where(['Radusergroups.username' => $profileName])
+             ->order(['Radusergroups.priority ASC'])
+             ->all();
+ 
+diff --git a/cake4/rd_cake/src/Controller/VouchersController.php b/cake4/rd_cake/src/Controller/VouchersController.php
+index 7a489bb9..69d86700 100644
+--- a/cake4/rd_cake/src/Controller/VouchersController.php
++++ b/cake4/rd_cake/src/Controller/VouchersController.php
+@@ -335,12 +335,14 @@ class VouchersController extends AppController{
+                 }        
+             }
+ 
+-            // Backfill percentages for legacy rows where caps/usages exist but percentages stayed null.
+-            if (($row['perc_time_used'] === null) && !empty($row['time_cap']) && ($row['time_used'] !== null)) {
+-                $row['perc_time_used'] = max(0, min(100, intval(($row['time_used'] / $row['time_cap']) * 100)));
++            // Derive voucher percentages from raw counters so over-quota usage remains visible.
++            if (!empty($row['time_cap']) && ($row['time_used'] !== null)) {
++                $time_pct = ($row['time_used'] / $row['time_cap']) * 100;
++                $row['perc_time_used'] = max(0, ($row['time_used'] > $row['time_cap']) ? intval(ceil($time_pct)) : intval($time_pct));
+             }
+-            if (($row['perc_data_used'] === null) && !empty($row['data_cap']) && ($row['data_used'] !== null)) {
+-                $row['perc_data_used'] = max(0, min(100, intval(($row['data_used'] / $row['data_cap']) * 100)));
++            if (!empty($row['data_cap']) && ($row['data_used'] !== null)) {
++                $data_pct = ($row['data_used'] / $row['data_cap']) * 100;
++                $row['perc_data_used'] = max(0, ($row['data_used'] > $row['data_cap']) ? intval(ceil($data_pct)) : intval($data_pct));
+             }
+             if (
+                 ($row['status'] === 'new') &&
+diff --git a/cake4/rd_cake/src/Shell/AccountingShell.php b/cake4/rd_cake/src/Shell/AccountingShell.php
+index 52d16f53..e091f093 100644
+--- a/cake4/rd_cake/src/Shell/AccountingShell.php
++++ b/cake4/rd_cake/src/Shell/AccountingShell.php
+@@ -157,11 +157,16 @@ class AccountingShell extends Shell {
+                     $counters['data']['usage'] = $this->Usage->data_usage($counters['data'],$username,'username');
+                     //$counters['data']['usage'] =$this->Usage->find_no_reset_data_usage($username); 
+                     //--People are actually issuing vouchers which resets monthly-- 
+-                    $perc_data_used = intval(($counters['data']['usage'] / $counters['data']['value'])* 100);
++                    $data_pct = ($counters['data']['usage'] / $counters['data']['value']) * 100;
++                    $perc_data_used = intval($data_pct);
++                    if(intval($counters['data']['usage']) > intval($counters['data']['value'])){
++                        $perc_data_used = intval(ceil($data_pct));
++                    }
+                     $q_r = $this->{'Vouchers'}->find()->where(['Vouchers.name' => $username])->first();
+                     if($q_r){
+                         $d = [];
+-                        $d['perc_data_used'] = max(0, min(100, $perc_data_used));
++                        $d['perc_data_used'] = max(0, $perc_data_used);
++                        $kick_active_sessions = false;
+                         if($q_r->status !== 'expired'){
+                             $d['status'] = 'used';
+                             if(
+@@ -169,12 +174,16 @@ class AccountingShell extends Shell {
+                                 (intval($counters['data']['usage']) >= intval($counters['data']['value']))
+                             ){
+                                 $d['status'] = 'depleted';
++                                $kick_active_sessions = true;
+                             }
+                         }
+ 		                $d['data_used']	= intval($counters['data']['usage']);
+ 		                $d['data_cap']	= $counters['data']['value'];
+                         $this->{'Vouchers'}->patchEntity($q_r,$d);
+                         $this->{'Vouchers'}->save($q_r);
++                        if($kick_active_sessions || ($q_r->status === 'depleted')){
++                            $this->_kickActiveSessionsByUsername($username, 'accounting-shell-hard-data-cap');
++                        }
+                     }
+                 }
+             }
+diff --git a/cake4/rd_cake/src/Shell/VoucherShell.php b/cake4/rd_cake/src/Shell/VoucherShell.php
+index b3618896..0552180d 100644
+--- a/cake4/rd_cake/src/Shell/VoucherShell.php
++++ b/cake4/rd_cake/src/Shell/VoucherShell.php
+@@ -35,7 +35,7 @@ class VoucherShell extends Shell {
+ 
+     public function main() {
+         $qr = $this->{'Vouchers'}->find()
+-            ->where(['OR'=> [['Vouchers.status' => 'new'],['Vouchers.status' => 'used']]])
++            ->where(['Vouchers.status IN' => ['new', 'used', 'depleted', 'expired']])
+             ->all();
+         foreach($qr as $i){
+             $this->process_voucher($i->name);
+@@ -122,11 +122,16 @@ class VoucherShell extends Shell {
+             if(array_key_exists('data', $counters) && !empty($counters['data']['value'])){
+                 $used = $this->Usage->data_usage($counters['data'],$name,'username');
+                 if($used !== false){
+-                    $perc_used = intval(($used / $counters['data']['value']) * 100);
++                    $data_pct = ($used / $counters['data']['value']) * 100;
++                    $perc_used = intval($data_pct);
++                    if(intval($used) > intval($counters['data']['value'])){
++                        $perc_used = intval(ceil($data_pct));
++                    }
+                     $d = [];
+-                    $d['perc_data_used'] = max(0, min(100, $perc_used));
++                    $d['perc_data_used'] = max(0, $perc_used);
+                     $d['data_used']      = intval($used);
+                     $d['data_cap']       = $counters['data']['value'];
++                    $kick_active_sessions = false;
+ 
+                     if($q_r->status !== 'expired'){
+                         $d['status'] = 'used';
+@@ -135,10 +140,14 @@ class VoucherShell extends Shell {
+                             (intval($used) >= intval($counters['data']['value']))
+                         ){
+                             $d['status'] = 'depleted';
++                            $kick_active_sessions = true;
+                         }
+                     }
+                     $this->{'Vouchers'}->patchEntity($q_r,$d);
+                     $this->{'Vouchers'}->save($q_r);
++                    if($kick_active_sessions || ($q_r->status === 'depleted')){
++                        $this->_kickActiveSessionsByUsername($name, 'voucher-shell-hard-data-cap');
++                    }
+                 }
+             }
+         }

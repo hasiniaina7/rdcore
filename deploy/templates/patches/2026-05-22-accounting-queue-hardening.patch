@@ -1,0 +1,141 @@
+diff --git a/cake4/rd_cake/setup/cron/cron4 b/cake4/rd_cake/setup/cron/cron4
+index 01c3d037..cd94e092 100644
+--- a/cake4/rd_cake/setup/cron/cron4
++++ b/cake4/rd_cake/setup/cron/cron4
+@@ -4,7 +4,7 @@
+ * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd mon >> /dev/null 2>&1
+ * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd debug_check >> /dev/null 2>&1
+ * * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake rd auto_close >> /dev/null 2>&1
+-* * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake accounting >> /dev/null 2>&1
++* * * * * www-data cd /var/www/html/cake4/rd_cake && (bin/cake accounting >> /dev/null 2>&1 || /usr/bin/logger -t rdcron-accounting "bin/cake accounting failed")
+ */15 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake voucher >> /dev/null 2>&1
+ */10 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake update_user_stats >> /dev/null 2>&1
+ */10 * * * * www-data cd /var/www/html/cake4/rd_cake && bin/cake auto_add_devices >> /dev/null 2>&1
+@@ -30,4 +30,3 @@
+ 
+ #* * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats --server 127.0.0.1 --port 18121 --secret adminsecret --attrs /etc/freeradius/status-all.txt --tag main >> /var/log/freeradius-stats.log 2>&1
+ * * * * * www-data cd /var/www/rdcore/cake4/rd_cake && bin/cake freeradius:collect-stats >> /dev/null 2>&1
+-
+diff --git a/cake4/rd_cake/setup/db/rd.sql b/cake4/rd_cake/setup/db/rd.sql
+index 5cf7518b..d5469aba 100644
+--- a/cake4/rd_cake/setup/db/rd.sql
++++ b/cake4/rd_cake/setup/db/rd.sql
+@@ -3590,9 +3590,13 @@ DROP TABLE IF EXISTS `new_accountings`;
+ /*!40101 SET @saved_cs_client     = @@character_set_client */;
+ /*!40101 SET character_set_client = utf8mb4 */;
+ CREATE TABLE `new_accountings` (
+-  `mac` varchar(17) NOT NULL,
++  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+   `username` varchar(255) NOT NULL DEFAULT '',
+-  PRIMARY KEY (`mac`)
++  `mac` varchar(17) NOT NULL,
++  PRIMARY KEY (`id`),
++  UNIQUE KEY `uq_new_accountings_username_mac` (`username`,`mac`),
++  KEY `idx_new_accountings_username` (`username`),
++  KEY `idx_new_accountings_mac` (`mac`)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+ /*!40101 SET character_set_client = @saved_cs_client */;
+ 
+diff --git a/cake4/rd_cake/src/Shell/AccountingShell.php b/cake4/rd_cake/src/Shell/AccountingShell.php
+index 949297c0..dfd50e1e 100644
+--- a/cake4/rd_cake/src/Shell/AccountingShell.php
++++ b/cake4/rd_cake/src/Shell/AccountingShell.php
+@@ -28,7 +28,11 @@ class AccountingShell extends Shell {
+     public $tasks = ['Counters','Usage'];
+ 
+     public function main() {
+-        $qr = $this->NewAccountings->find()->all();
++        // Process a stable snapshot of queued username/mac pairs.
++        $qr = $this->NewAccountings->find()
++            ->select(['username','mac'])
++            ->distinct(['username','mac'])
++            ->all();
+         foreach($qr as $i){
+             $this->process_username($i->username,$i->mac);
+         }
+diff --git a/cake4/rd_cake/setup/db/8.111_harden_new_accountings_queue.sql b/cake4/rd_cake/setup/db/8.111_harden_new_accountings_queue.sql
+new file mode 100644
+index 00000000..06d3035e
+--- /dev/null
++++ b/cake4/rd_cake/setup/db/8.111_harden_new_accountings_queue.sql
+@@ -0,0 +1,80 @@
++-- Harden async accounting queue to avoid drops when multiple usernames share one MAC.
++-- Old schema used PRIMARY KEY(mac), which caused INSERT IGNORE collisions.
++
++SET @db_name := DATABASE();
++
++-- Drop legacy PRIMARY KEY(mac) if still present.
++SET @pk_col_count := (
++    SELECT COUNT(*) FROM information_schema.key_column_usage
++    WHERE table_schema = @db_name
++      AND table_name = 'new_accountings'
++      AND constraint_name = 'PRIMARY'
++);
++SET @pk_first_col := (
++    SELECT column_name FROM information_schema.key_column_usage
++    WHERE table_schema = @db_name
++      AND table_name = 'new_accountings'
++      AND constraint_name = 'PRIMARY'
++    ORDER BY ordinal_position ASC
++    LIMIT 1
++);
++SET @sql := IF(
++    @pk_col_count = 1 AND @pk_first_col = 'mac',
++    'ALTER TABLE new_accountings DROP PRIMARY KEY',
++    'SELECT 1'
++);
++PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++
++-- Add surrogate key once.
++SET @has_id := (
++    SELECT COUNT(*) FROM information_schema.columns
++    WHERE table_schema = @db_name
++      AND table_name = 'new_accountings'
++      AND column_name = 'id'
++);
++SET @sql := IF(
++    @has_id = 0,
++    'ALTER TABLE new_accountings ADD COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST',
++    'SELECT 1'
++);
++PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++
++-- Ensure dedupe key and search indexes.
++SET @has_uq := (
++    SELECT COUNT(*) FROM information_schema.statistics
++    WHERE table_schema = @db_name
++      AND table_name = 'new_accountings'
++      AND index_name = 'uq_new_accountings_username_mac'
++);
++SET @sql := IF(
++    @has_uq = 0,
++    'ALTER TABLE new_accountings ADD UNIQUE KEY uq_new_accountings_username_mac (username, mac)',
++    'SELECT 1'
++);
++PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++
++SET @has_idx_username := (
++    SELECT COUNT(*) FROM information_schema.statistics
++    WHERE table_schema = @db_name
++      AND table_name = 'new_accountings'
++      AND index_name = 'idx_new_accountings_username'
++);
++SET @sql := IF(
++    @has_idx_username = 0,
++    'ALTER TABLE new_accountings ADD KEY idx_new_accountings_username (username)',
++    'SELECT 1'
++);
++PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++
++SET @has_idx_mac := (
++    SELECT COUNT(*) FROM information_schema.statistics
++    WHERE table_schema = @db_name
++      AND table_name = 'new_accountings'
++      AND index_name = 'idx_new_accountings_mac'
++);
++SET @sql := IF(
++    @has_idx_mac = 0,
++    'ALTER TABLE new_accountings ADD KEY idx_new_accountings_mac (mac)',
++    'SELECT 1'
++);
++PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
