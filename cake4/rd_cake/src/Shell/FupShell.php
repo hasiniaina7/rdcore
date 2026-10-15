@@ -429,14 +429,14 @@ class FupShell extends Shell {
 	
 	private function check_usage($username,$row,$timezone, $billing_cycle=false){
 
-	    	$time_start = $this->get_start_of($row->{'if_condition'},$timezone,$billing_cycle);
-	    	$period_start_epoch = $time_start->getTimestamp();
-	    	$nice = $time_start->toIso8601String();
-	    	$this->out("<info>TIME START $nice </info>");
-	    	$sql_usage 	= "SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) AS data_used FROM user_stats FORCE INDEX (us_username_timestamp) WHERE username=:username AND timestamp >= FROM_UNIXTIME(:period_start_epoch)";
+    	$time_start = $this->get_start_of($row->{'if_condition'},$timezone,$billing_cycle);
+    	$period_start_epoch = $time_start->getTimestamp();
+    	$nice = $time_start->toIso8601String();
+    	$this->out("<info>TIME START $nice </info>");
+    	$sql_usage 	= "SELECT IFNULL(SUM(acctinputoctets)+SUM(acctoutputoctets),0) AS data_used FROM user_stats FORCE INDEX (us_username_timestamp) WHERE username=:username AND timestamp >= FROM_UNIXTIME(:period_start_epoch)";
     	$connection = ConnectionManager::get('default');          
       	$results = $connection
-	    		->execute($sql_usage , ['username' => $username,'period_start_epoch' => $period_start_epoch])
+    		->execute($sql_usage , ['username' => $username,'period_start_epoch' => $period_start_epoch])
     		->fetchAll('assoc');
     	$data_used 	= $results[0]['data_used'];
     	$this->out("<info>DATA USED $data_used</info>");
