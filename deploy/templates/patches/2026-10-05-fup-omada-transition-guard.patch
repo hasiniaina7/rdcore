@@ -214,7 +214,7 @@ index b515d605..55f1d875 100644
      					
      				//===================================================================	
      				//-------------------------------------------------------------------
-@@ -274,18 +286,111 @@ class FupShell extends Shell {
+@@ -274,18 +286,113 @@ class FupShell extends Shell {
      				//---------------------------------------------------------------------
      				//=====================================================================
      			   			 				
@@ -306,9 +306,11 @@ index b515d605..55f1d875 100644
 +            $results = is_array($payload['results'] ?? null) ? $payload['results'] : [];
 +            $ack = $httpCode >= 200 && $httpCode < 300 && ($payload['success'] ?? false) === true && count($results) > 0;
 +            foreach($results as $result){
-+                $isOmada = ($result['strategy'] ?? null) === 'omada-openapi-v1';
-+                // Omada provides a real ACK; legacy Kicker routes only confirm that their command was sent.
-+                $accepted = $isOmada
++                $strategy = $result['strategy'] ?? null;
++                // Omada and RouterOS are queried after the removal, so FUP advances
++                // only when the session disappearance has been confirmed.
++                $requiresVerifiedAck = in_array($strategy,['omada-openapi-v1','mikrotik-api'],true);
++                $accepted = $requiresVerifiedAck
 +                    ? (($result['status'] ?? null) === 'ack' && ($result['ack'] ?? false) === true)
 +                    : in_array(($result['status'] ?? null),['ack','sent'],true);
 +                if(!$accepted){
@@ -414,4 +416,3 @@ index 00000000..11111111
 +            && (string)$state['status'] !== 'reconciled';
 +    }
 +}
-
