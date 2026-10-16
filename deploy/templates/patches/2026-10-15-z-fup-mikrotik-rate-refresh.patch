@@ -1,0 +1,352 @@
+diff --git a/cake4/rd_cake/src/Controller/Component/KickerComponent.php b/cake4/rd_cake/src/Controller/Component/KickerComponent.php
+index e1db94d7..3d9f410a 100644
+--- a/cake4/rd_cake/src/Controller/Component/KickerComponent.php
++++ b/cake4/rd_cake/src/Controller/Component/KickerComponent.php
+@@ -267,0 +268,99 @@ class KickerComponent extends Component {
++
++    /**
++     * Refresh a FUP rate without performing a generic disconnect. MikroTik
++     * receives its proven host/PPP refresh; non-MikroTik NASes wait for their
++     * next natural authentication rather than risking a captive-portal loop.
++     */
++    public function refreshRate($ent,$token){
++        if(!$ent){
++            return [
++                'strategy' => 'rate-deferred',
++                'status' => 'error',
++                'ack' => false,
++                'stderr' => 'Missing accounting entity',
++                'radacctid' => null,
++            ];
++        }
++
++        if($this->isOmadaNas($ent)){
++            return $this->deferRateRefresh($ent,'omada_rate_deferred');
++        }
++
++        $nasidentifier = $ent->nasidentifier;
++        $nasipaddress = $ent->nasipaddress;
++        $dc = $this->DynamicClients->find()
++            ->where(['DynamicClients.nasidentifier' => $nasidentifier])
++            ->contain(['DynamicClientSettings'])
++            ->first();
++        if($dc){
++            if($this->isOmadaDynamicClient($dc,$ent)){
++                return $this->deferRateRefresh($ent,'omada_rate_deferred');
++            }
++            if($dc->type == $this->typeMtApi){
++                return $this->refreshMikrotikRate($ent,$dc->dynamic_client_settings);
++            }
++        }
++
++        $nas = $this->Nas->find()
++            ->where(['OR' => ['Nas.nasidentifier' => $nasidentifier,'Nas.nasname' => $nasipaddress]])
++            ->contain(['NaSettings'])
++            ->first();
++        if($nas && $nas->type == $this->typeMtApi){
++            return $this->refreshMikrotikRate($ent,$nas->na_settings);
++        }
++
++        return $this->deferRateRefresh($ent,'unsupported_nas_rate_deferred');
++    }
++
++    private function refreshMikrotikRate($ent,$settings){
++        $mtData = $this->mikrotikApiConfig($settings);
++        $refresh = $this->MikrotikApi->refreshRadius($ent,$mtData);
++        return [
++            'strategy' => 'mikrotik-api',
++            'status' => (string)($refresh['status'] ?? 'error'),
++            'ack' => (bool)($refresh['ack'] ?? false),
++            'stderr' => $refresh['error'] ?? null,
++            'radacctid' => $ent->radacctid,
++            'nasidentifier' => $ent->nasidentifier,
++            'nasipaddress' => $ent->nasipaddress,
++            'matched' => (int)($refresh['matched'] ?? 0),
++            'removed' => (int)($refresh['removed'] ?? 0),
++            'mode' => $refresh['mode'] ?? 'rate_refresh',
++        ];
++    }
++
++    private function mikrotikApiConfig($settings){
++        $mtData = [];
++        foreach($settings as $setting){
++            if(preg_match('/^mt_/',$setting->name)){
++                $name = preg_replace('/^mt_/','',$setting->name);
++                $value = $setting->value;
++                if($name == 'port'){
++                    $value = intval($value);
++                }
++                $mtData[$name] = $value;
++            }
++        }
++        if(($mtData['proto'] ?? null) == 'https'){
++            $mtData['ssl'] = true;
++            if(($mtData['port'] ?? null) == 8728){
++                $mtData['port'] = 8729;
++            }
++        }
++        unset($mtData['proto']);
++        return $mtData;
++    }
++
++    private function deferRateRefresh($ent,$mode){
++        return [
++            // This is an acknowledged no-op, not a failed disconnect attempt.
++            'strategy' => 'rate-deferred',
++            'status' => 'ack',
++            'ack' => true,
++            'stderr' => null,
++            'radacctid' => $ent->radacctid,
++            'nasidentifier' => $ent->nasidentifier,
++            'nasipaddress' => $ent->nasipaddress,
++            'mode' => $mode,
++        ];
++    }
+diff --git a/cake4/rd_cake/src/Controller/Component/MikrotikApiComponent.php b/cake4/rd_cake/src/Controller/Component/MikrotikApiComponent.php
+index 062f8387..73eef108 100644
+--- a/cake4/rd_cake/src/Controller/Component/MikrotikApiComponent.php
++++ b/cake4/rd_cake/src/Controller/Component/MikrotikApiComponent.php
+@@ -79,0 +80,105 @@ class MikrotikApiComponent extends Component {
++    /**
++     * Re-apply RADIUS rate attributes without using the Hotspot active-session
++     * kick. RouterOS immediately recreates a removed Hotspot host, which makes
++     * the client re-authenticate without returning to the captive portal.
++     */
++    public function refreshRadius($ent,$config){
++	$client 	= new Client($config);
++
++	$called_station_id 	= (string)$ent->calledstationid;
++	$mac_minus			= (string)$ent->callingstationid;
++	$mac_colon			= str_replace('-',':',$mac_minus);
++	$servicetype		= (string)$ent->servicetype;
++	$framedprotocol		= (string)$ent->framedprotocol;
++	$username			= (string)$ent->username;
++
++	if(($servicetype === 'Framed-User') && ($framedprotocol === 'PPP')){
++		return $this->refreshPppRadiusSession($client,$username,$mac_colon);
++	}
++
++	if(preg_match('/^hotspot/',$called_station_id)){
++		return $this->refreshHotspotRadiusSession($client,$mac_colon);
++	}
++
++        return [
++		'status' => 'not_applicable',
++		'ack' => false,
++		'matched' => 0,
++		'removed' => 0,
++		'mode' => 'rate_refresh',
++		'error' => 'unsupported_radius_session_type',
++        ];
++    }
++
++    private function refreshHotspotRadiusSession($client,$macAddress){
++	$active = $this->findRadiusSessions($client,'/ip/hotspot/active/print','mac-address',$macAddress);
++	if(count($active) === 0){
++		return $this->missingRefreshTarget('hotspot_host_refresh','missing_hotspot_active_session');
++	}
++
++	$hosts = $this->findRadiusSessions($client,'/ip/hotspot/host/print','mac-address',$macAddress);
++	if(count($hosts) === 0){
++		return $this->missingRefreshTarget('hotspot_host_refresh','missing_hotspot_host');
++	}
++
++	// Verify only the old IDs: RouterOS can recreate a new host before this call returns.
++	return $this->removeAndVerifyOldIds($client,'/ip/hotspot/host/print','/ip/hotspot/host/remove',$hosts,'hotspot_host_refresh');
++    }
++
++    private function refreshPppRadiusSession($client,$username,$macAddress){
++	$active = $this->findRadiusSessions($client,'/ppp/active/print','name',$username);
++	if($macAddress !== ''){
++		$active = array_values(array_filter($active,function($session) use ($macAddress){
++			return (string)($session['caller-id'] ?? '') === $macAddress;
++		}));
++	}
++	if(count($active) === 0){
++		return $this->missingRefreshTarget('ppp_active_refresh','missing_ppp_active_session');
++	}
++
++	return $this->removeAndVerifyOldIds($client,'/ppp/active/print','/ppp/active/remove',$active,'ppp_active_refresh');
++    }
++
++    private function missingRefreshTarget($mode,$error){
++	return [
++		'status' => 'target_not_found',
++		'ack' => false,
++		'matched' => 0,
++		'removed' => 0,
++		'mode' => $mode,
++		'error' => $error,
++	];
++    }
++
++    private function removeAndVerifyOldIds($client,$listPath,$removePath,$sessions,$mode){
++	$oldIds = [];
++	foreach($sessions as $session){
++		if(!isset($session['.id'])){
++			continue;
++		}
++		$oldIds[] = (string)$session['.id'];
++		$remove = new Query($removePath);
++		$remove->equal('.id',$session['.id']);
++		$client->query($remove)->read();
++	}
++
++	if(count($oldIds) === 0){
++		return $this->missingRefreshTarget($mode,'routeros_target_without_id');
++	}
++
++	// Do not require an empty table: a fresh RouterOS host/session is expected.
++	$remaining = $client->query(new Query($listPath))->read();
++	$remainingOldIds = array_filter($remaining,function($session) use ($oldIds){
++		return isset($session['.id']) && in_array((string)$session['.id'],$oldIds,true);
++	});
++	$ack = count($remainingOldIds) === 0;
++	return [
++		'status' => $ack ? 'ack' : 'target_still_present',
++		'ack' => $ack,
++		'matched' => count($sessions),
++		'removed' => count($oldIds),
++		'mode' => $mode,
++		'error' => $ack ? null : 'routeros_refresh_target_still_present',
++	];
++    }
++
+diff --git a/cake4/rd_cake/src/Controller/RadacctsController.php b/cake4/rd_cake/src/Controller/RadacctsController.php
+index 7ef1e5eb..8911ce1a 100644
+--- a/cake4/rd_cake/src/Controller/RadacctsController.php
++++ b/cake4/rd_cake/src/Controller/RadacctsController.php
+@@ -552 +552 @@ class RadacctsController extends AppController {
+-        $q_data		= $this->request->getQuery();
++		$q_data		= $this->request->getQuery();
+@@ -554,0 +555,9 @@ class RadacctsController extends AppController {
++		$mode = (string)($q_data['mode'] ?? 'block');
++		if(!in_array($mode,['block','rate_refresh'],true)){
++			$this->set([
++                'success' => false,
++                'message' => 'Unsupported FUP transition mode'
++            ]);
++            $this->viewBuilder()->setOption('serialize', true);
++            return;
++        }
+@@ -561 +570,4 @@ class RadacctsController extends AppController {
+-			$data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
++			// Rate refresh is deliberately distinct from a hard FUP block.
++			$data = $mode === 'rate_refresh'
++				? $this->Kicker->refreshRate($ent,$token)
++				: $this->Kicker->kick($ent,$token);
+@@ -567 +579,2 @@ class RadacctsController extends AppController {
+-            'results'       => $results
++            'results'       => $results,
++            'mode'          => $mode
+diff --git a/cake4/rd_cake/src/Service/FupTransitionPolicy.php b/cake4/rd_cake/src/Service/FupTransitionPolicy.php
+index 77fc8f5c..3f8bc21f 100644
+--- a/cake4/rd_cake/src/Service/FupTransitionPolicy.php
++++ b/cake4/rd_cake/src/Service/FupTransitionPolicy.php
+@@ -7,0 +8,9 @@ class FupTransitionPolicy
++    /**
++     * A FUP block is an access decision. Every other FUP action only changes
++     * policy attributes and must use a non-portal rate refresh where available.
++     */
++    public static function dispatchModeForAction(?string $action): string
++    {
++        return $action === 'block' ? 'block' : 'rate_refresh';
++    }
++
+diff --git a/cake4/rd_cake/src/Shell/FupShell.php b/cake4/rd_cake/src/Shell/FupShell.php
+index 08dcaf7d..c8a571b6 100644
+--- a/cake4/rd_cake/src/Shell/FupShell.php
++++ b/cake4/rd_cake/src/Shell/FupShell.php
+@@ -255 +255,8 @@ class FupShell extends Shell {
+-                    $request = ['cloud_id' => $cloud_id,'username' => $username,'token' => $token];
++                    $action = $should_apply !== 0 && $apply_record ? (string)$apply_record->action : null;
++                    $dispatchMode = FupTransitionPolicy::dispatchModeForAction($action);
++                    $request = [
++                        'cloud_id' => $cloud_id,
++                        'username' => $username,
++                        'token' => $token,
++                        'mode' => $dispatchMode,
++                    ];
+@@ -290 +297 @@ class FupShell extends Shell {
+-					$this->reserveTransitionDispatch((int)$cloud_id,(string)$username,$current_applied,$should_apply,$radacctid);
++					$this->reserveTransitionDispatch((int)$cloud_id,(string)$username,$current_applied,$should_apply,$radacctid,$dispatchMode);
+@@ -296,0 +304,2 @@ class FupShell extends Shell {
++						'action' => $action,
++						'dispatch_mode' => $dispatchMode,
+@@ -310,0 +320,3 @@ class FupShell extends Shell {
++						'action' => $action,
++						'dispatch_mode' => $dispatchMode,
++						'results' => $result['result_summary'],
+@@ -320 +332 @@ class FupShell extends Shell {
+-            'SELECT from_component_id,to_component_id,status FROM fup_transition_dispatches WHERE cloud_id=:cloud_id AND username=:username LIMIT 1',
++            'SELECT from_component_id,to_component_id,dispatch_mode,status FROM fup_transition_dispatches WHERE cloud_id=:cloud_id AND username=:username LIMIT 1',
+@@ -326 +338 @@ class FupShell extends Shell {
+-    private function reserveTransitionDispatch($cloudId,$username,$fromComponentId,$toComponentId,$radacctid){
++    private function reserveTransitionDispatch($cloudId,$username,$fromComponentId,$toComponentId,$radacctid,$dispatchMode){
+@@ -329,4 +341,4 @@ class FupShell extends Shell {
+-            "INSERT INTO fup_transition_dispatches (cloud_id,username,from_component_id,to_component_id,radacctid,status,dispatched_at,created,modified)
+-             VALUES (:cloud_id,:username,:from_component_id,:to_component_id,:radacctid,'pending',NOW(),NOW(),NOW())
+-             ON DUPLICATE KEY UPDATE from_component_id=VALUES(from_component_id),to_component_id=VALUES(to_component_id),radacctid=VALUES(radacctid),status='pending',dispatched_at=NOW(),acknowledged_at=NULL,reconciled_at=NULL,last_error=NULL,modified=NOW()",
+-            ['cloud_id' => $cloudId,'username' => $username,'from_component_id' => $fromComponentId,'to_component_id' => $toComponentId,'radacctid' => $radacctid]
++            "INSERT INTO fup_transition_dispatches (cloud_id,username,from_component_id,to_component_id,radacctid,dispatch_mode,status,dispatched_at,created,modified)
++             VALUES (:cloud_id,:username,:from_component_id,:to_component_id,:radacctid,:dispatch_mode,'pending',NOW(),NOW(),NOW())
++             ON DUPLICATE KEY UPDATE from_component_id=VALUES(from_component_id),to_component_id=VALUES(to_component_id),radacctid=VALUES(radacctid),dispatch_mode=VALUES(dispatch_mode),status='pending',dispatched_at=NOW(),acknowledged_at=NULL,reconciled_at=NULL,last_error=NULL,modified=NOW()",
++            ['cloud_id' => $cloudId,'username' => $username,'from_component_id' => $fromComponentId,'to_component_id' => $toComponentId,'radacctid' => $radacctid,'dispatch_mode' => $dispatchMode]
+@@ -362,0 +375,6 @@ class FupShell extends Shell {
++            $resultSummary = array_map(function($result){
++                // Keep the audit useful without ever copying RADIUS/API secrets.
++                return array_intersect_key($result,array_flip([
++                    'radacctid','strategy','status','ack','mode','matched','removed'
++                ]));
++            },$results);
+@@ -381,0 +400 @@ class FupShell extends Shell {
++				'result_summary' => $resultSummary,
+@@ -388,0 +408 @@ class FupShell extends Shell {
++				'result_summary' => [],
+diff --git a/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php b/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php
+index ca2cd849..649ab109 100644
+--- a/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php
++++ b/cake4/rd_cake/tests/TestCase/Controller/Component/KickerComponentTest.php
+@@ -15,0 +16,20 @@ class KickerComponentTest extends TestCase
++    public function testRateRefreshDefersOmadaWithoutDisconnecting(): void
++    {
++        $component = new TestableKickerComponent(
++            new ComponentRegistry(new Controller(new ServerRequest(), new Response()))
++        );
++        $ent = (object)[
++            'radacctid' => 54,
++            'nasidentifier' => 'TP-Link',
++            'nasipaddress' => '10.10.10.10',
++            'username' => 'alice',
++        ];
++
++        $result = $component->refreshRate($ent, 'token-1');
++
++        $this->assertSame('rate-deferred', $result['strategy']);
++        $this->assertSame('ack', $result['status']);
++        $this->assertTrue($result['ack']);
++        $this->assertSame('omada_rate_deferred', $result['mode']);
++    }
++
+@@ -72 +92 @@ class KickerComponentTest extends TestCase
+-        $component = new KickerComponent(
++        $component = new TestableKickerComponent(
+@@ -109,0 +130,5 @@ class TestableKickerComponent extends KickerComponent
++    public function initialize(array $config): void
++    {
++        // These tests exercise only the Omada/rate routing and need no tables.
++    }
++
+diff --git a/cake4/rd_cake/tests/TestCase/Service/FupTransitionPolicyTest.php b/cake4/rd_cake/tests/TestCase/Service/FupTransitionPolicyTest.php
+index a550af59..17aff821 100644
+--- a/cake4/rd_cake/tests/TestCase/Service/FupTransitionPolicyTest.php
++++ b/cake4/rd_cake/tests/TestCase/Service/FupTransitionPolicyTest.php
+@@ -10,0 +11,8 @@ class FupTransitionPolicyTest extends TestCase
++    public function testOnlyBlockUsesTheBlockingDispatchMode(): void
++    {
++        $this->assertSame('block', FupTransitionPolicy::dispatchModeForAction('block'));
++        $this->assertSame('rate_refresh', FupTransitionPolicy::dispatchModeForAction('decrease_speed'));
++        $this->assertSame('rate_refresh', FupTransitionPolicy::dispatchModeForAction('increase_speed'));
++        $this->assertSame('rate_refresh', FupTransitionPolicy::dispatchModeForAction(null));
++    }
++

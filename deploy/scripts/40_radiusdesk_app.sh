@@ -92,6 +92,19 @@ table_exists() {
   [[ "${count}" -gt 0 ]]
 }
 
+# column_exists <database> <table> <column>
+column_exists() {
+  local schema="$1"
+  local table="$2"
+  local column="$3"
+  local sql="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='${schema}' AND table_name='${table}' AND column_name='${column}';"
+  local count
+  if ! count="$(mysql_exec "" "${sql}" 2>/dev/null)"; then
+    return 1
+  fi
+  [[ "${count}" -gt 0 ]]
+}
+
 ensure_mysql_timezone_support() {
   log INFO "Vérification du support MySQL CONVERT_TZ avec les timezones configurées."
   local tz_name=""
@@ -179,12 +192,17 @@ ensure_rd_database_schema() {
 }
 
 ensure_fup_transition_dispatch_schema() {
-  if table_exists "${DB_NAME}" "fup_transition_dispatches"; then
-    log INFO "Validation OK : la table fup_transition_dispatches est présente."
-  else
+  if ! table_exists "${DB_NAME}" "fup_transition_dispatches"; then
     log ERROR "La table fup_transition_dispatches est absente après les patchs SQL FUP."
     exit 1
   fi
+
+  if ! column_exists "${DB_NAME}" "fup_transition_dispatches" "dispatch_mode"; then
+    log ERROR "La colonne fup_transition_dispatches.dispatch_mode est absente après les patchs SQL FUP."
+    exit 1
+  fi
+
+  log INFO "Validation OK : fup_transition_dispatches et dispatch_mode sont présents."
 }
 
 apply_local_patches() {
