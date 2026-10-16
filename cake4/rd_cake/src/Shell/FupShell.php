@@ -252,7 +252,14 @@ class FupShell extends Shell {
 
                     $token = $e_user->token;
                     $url = 'http://127.0.0.1/cake4/rd_cake/radaccts/kick-active-username.json';
-                    $request = ['cloud_id' => $cloud_id,'username' => $username,'token' => $token];
+                    $action = $should_apply !== 0 && $apply_record ? (string)$apply_record->action : null;
+                    $dispatchMode = FupTransitionPolicy::dispatchModeForAction($action);
+                    $request = [
+                        'cloud_id' => $cloud_id,
+                        'username' => $username,
+                        'token' => $token,
+                        'mode' => $dispatchMode,
+                    ];
     					
     				//===================================================================	
     				//-------------------------------------------------------------------
@@ -287,13 +294,15 @@ class FupShell extends Shell {
     				//=====================================================================
     			   			 				
 					// Persist before the call: an interrupted process must not create a kick loop.
-					$this->reserveTransitionDispatch((int)$cloud_id,(string)$username,$current_applied,$should_apply,$radacctid);
+					$this->reserveTransitionDispatch((int)$cloud_id,(string)$username,$current_applied,$should_apply,$radacctid,$dispatchMode);
 					$this->logTransitionAudit('dispatch_pending',[
 						'cloud_id' => (int)$cloud_id,
 						'username' => (string)$username,
 						'from_component_id' => (int)$current_applied,
 						'to_component_id' => (int)$should_apply,
 						'radacctid' => $radacctid,
+						'action' => $action,
+						'dispatch_mode' => $dispatchMode,
 					]);
 
 					$result = $this->requestTransitionKick($url,$request);
@@ -308,6 +317,9 @@ class FupShell extends Shell {
 						'http_code' => $result['http_code'],
 						'result_count' => $result['result_count'],
 						'error' => $result['error'],
+						'action' => $action,
+						'dispatch_mode' => $dispatchMode,
+						'results' => $result['result_summary'],
                     ]);
                 }
             }
@@ -317,19 +329,19 @@ class FupShell extends Shell {
     private function findTransitionDispatch($cloudId,$username){
         $connection = ConnectionManager::get('default');
         $row = $connection->execute(
-            'SELECT from_component_id,to_component_id,status FROM fup_transition_dispatches WHERE cloud_id=:cloud_id AND username=:username LIMIT 1',
+            'SELECT from_component_id,to_component_id,dispatch_mode,status FROM fup_transition_dispatches WHERE cloud_id=:cloud_id AND username=:username LIMIT 1',
             ['cloud_id' => $cloudId,'username' => $username]
         )->fetch('assoc');
         return $row ?: null;
     }
 
-    private function reserveTransitionDispatch($cloudId,$username,$fromComponentId,$toComponentId,$radacctid){
+    private function reserveTransitionDispatch($cloudId,$username,$fromComponentId,$toComponentId,$radacctid,$dispatchMode){
         $connection = ConnectionManager::get('default');
         $connection->execute(
-            "INSERT INTO fup_transition_dispatches (cloud_id,username,from_component_id,to_component_id,radacctid,status,dispatched_at,created,modified)
-             VALUES (:cloud_id,:username,:from_component_id,:to_component_id,:radacctid,'pending',NOW(),NOW(),NOW())
-             ON DUPLICATE KEY UPDATE from_component_id=VALUES(from_component_id),to_component_id=VALUES(to_component_id),radacctid=VALUES(radacctid),status='pending',dispatched_at=NOW(),acknowledged_at=NULL,reconciled_at=NULL,last_error=NULL,modified=NOW()",
-            ['cloud_id' => $cloudId,'username' => $username,'from_component_id' => $fromComponentId,'to_component_id' => $toComponentId,'radacctid' => $radacctid]
+            "INSERT INTO fup_transition_dispatches (cloud_id,username,from_component_id,to_component_id,radacctid,dispatch_mode,status,dispatched_at,created,modified)
+             VALUES (:cloud_id,:username,:from_component_id,:to_component_id,:radacctid,:dispatch_mode,'pending',NOW(),NOW(),NOW())
+             ON DUPLICATE KEY UPDATE from_component_id=VALUES(from_component_id),to_component_id=VALUES(to_component_id),radacctid=VALUES(radacctid),dispatch_mode=VALUES(dispatch_mode),status='pending',dispatched_at=NOW(),acknowledged_at=NULL,reconciled_at=NULL,last_error=NULL,modified=NOW()",
+            ['cloud_id' => $cloudId,'username' => $username,'from_component_id' => $fromComponentId,'to_component_id' => $toComponentId,'radacctid' => $radacctid,'dispatch_mode' => $dispatchMode]
         );
     }
 
@@ -360,6 +372,12 @@ class FupShell extends Shell {
             $httpCode = $response->getStatusCode();
             $payload = json_decode($response->getStringBody(),true);
             $results = is_array($payload['results'] ?? null) ? $payload['results'] : [];
+            $resultSummary = array_map(function($result){
+                // Keep the audit useful without ever copying RADIUS/API secrets.
+                return array_intersect_key($result,array_flip([
+                    'radacctid','strategy','status','ack','mode','matched','removed'
+                ]));
+            },$results);
             $ack = $httpCode >= 200 && $httpCode < 300 && ($payload['success'] ?? false) === true && count($results) > 0;
             foreach($results as $result){
                 $strategy = $result['strategy'] ?? null;
@@ -379,6 +397,7 @@ class FupShell extends Shell {
                 'http_code' => $httpCode,
                 'result_count' => count($results),
                 'error' => $ack ? null : 'kick_not_acknowledged',
+				'result_summary' => $resultSummary,
             ];
         } catch (\Throwable $exception) {
             return [
@@ -386,6 +405,7 @@ class FupShell extends Shell {
                 'http_code' => null,
                 'result_count' => 0,
                 'error' => substr($exception->getMessage(),0,255),
+				'result_summary' => [],
             ];
         }
     }

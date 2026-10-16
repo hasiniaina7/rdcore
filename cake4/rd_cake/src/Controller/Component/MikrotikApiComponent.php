@@ -77,6 +77,111 @@ class MikrotikApiComponent extends Component {
     ];
     }
 
+    /**
+     * Re-apply RADIUS rate attributes without using the Hotspot active-session
+     * kick. RouterOS immediately recreates a removed Hotspot host, which makes
+     * the client re-authenticate without returning to the captive portal.
+     */
+    public function refreshRadius($ent,$config){
+	$client 	= new Client($config);
+
+	$called_station_id 	= (string)$ent->calledstationid;
+	$mac_minus			= (string)$ent->callingstationid;
+	$mac_colon			= str_replace('-',':',$mac_minus);
+	$servicetype		= (string)$ent->servicetype;
+	$framedprotocol		= (string)$ent->framedprotocol;
+	$username			= (string)$ent->username;
+
+	if(($servicetype === 'Framed-User') && ($framedprotocol === 'PPP')){
+		return $this->refreshPppRadiusSession($client,$username,$mac_colon);
+	}
+
+	if(preg_match('/^hotspot/',$called_station_id)){
+		return $this->refreshHotspotRadiusSession($client,$mac_colon);
+	}
+
+        return [
+		'status' => 'not_applicable',
+		'ack' => false,
+		'matched' => 0,
+		'removed' => 0,
+		'mode' => 'rate_refresh',
+		'error' => 'unsupported_radius_session_type',
+        ];
+    }
+
+    private function refreshHotspotRadiusSession($client,$macAddress){
+	$active = $this->findRadiusSessions($client,'/ip/hotspot/active/print','mac-address',$macAddress);
+	if(count($active) === 0){
+		return $this->missingRefreshTarget('hotspot_host_refresh','missing_hotspot_active_session');
+	}
+
+	$hosts = $this->findRadiusSessions($client,'/ip/hotspot/host/print','mac-address',$macAddress);
+	if(count($hosts) === 0){
+		return $this->missingRefreshTarget('hotspot_host_refresh','missing_hotspot_host');
+	}
+
+	// Verify only the old IDs: RouterOS can recreate a new host before this call returns.
+	return $this->removeAndVerifyOldIds($client,'/ip/hotspot/host/print','/ip/hotspot/host/remove',$hosts,'hotspot_host_refresh');
+    }
+
+    private function refreshPppRadiusSession($client,$username,$macAddress){
+	$active = $this->findRadiusSessions($client,'/ppp/active/print','name',$username);
+	if($macAddress !== ''){
+		$active = array_values(array_filter($active,function($session) use ($macAddress){
+			return (string)($session['caller-id'] ?? '') === $macAddress;
+		}));
+	}
+	if(count($active) === 0){
+		return $this->missingRefreshTarget('ppp_active_refresh','missing_ppp_active_session');
+	}
+
+	return $this->removeAndVerifyOldIds($client,'/ppp/active/print','/ppp/active/remove',$active,'ppp_active_refresh');
+    }
+
+    private function missingRefreshTarget($mode,$error){
+	return [
+		'status' => 'target_not_found',
+		'ack' => false,
+		'matched' => 0,
+		'removed' => 0,
+		'mode' => $mode,
+		'error' => $error,
+	];
+    }
+
+    private function removeAndVerifyOldIds($client,$listPath,$removePath,$sessions,$mode){
+	$oldIds = [];
+	foreach($sessions as $session){
+		if(!isset($session['.id'])){
+			continue;
+		}
+		$oldIds[] = (string)$session['.id'];
+		$remove = new Query($removePath);
+		$remove->equal('.id',$session['.id']);
+		$client->query($remove)->read();
+	}
+
+	if(count($oldIds) === 0){
+		return $this->missingRefreshTarget($mode,'routeros_target_without_id');
+	}
+
+	// Do not require an empty table: a fresh RouterOS host/session is expected.
+	$remaining = $client->query(new Query($listPath))->read();
+	$remainingOldIds = array_filter($remaining,function($session) use ($oldIds){
+		return isset($session['.id']) && in_array((string)$session['.id'],$oldIds,true);
+	});
+	$ack = count($remainingOldIds) === 0;
+	return [
+		'status' => $ack ? 'ack' : 'target_still_present',
+		'ack' => $ack,
+		'matched' => count($sessions),
+		'removed' => count($oldIds),
+		'mode' => $mode,
+		'error' => $ack ? null : 'routeros_refresh_target_still_present',
+	];
+    }
+
     private function removeAndVerifyRadiusSessions($client,$listPath,$removePath,$field,$value,$mode){
 	$active = $this->findRadiusSessions($client,$listPath,$field,$value);
 	foreach($active as $session){

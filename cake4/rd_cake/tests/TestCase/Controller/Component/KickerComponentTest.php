@@ -13,6 +13,26 @@ use Cake\TestSuite\TestCase;
 
 class KickerComponentTest extends TestCase
 {
+    public function testRateRefreshDefersOmadaWithoutDisconnecting(): void
+    {
+        $component = new TestableKickerComponent(
+            new ComponentRegistry(new Controller(new ServerRequest(), new Response()))
+        );
+        $ent = (object)[
+            'radacctid' => 54,
+            'nasidentifier' => 'TP-Link',
+            'nasipaddress' => '10.10.10.10',
+            'username' => 'alice',
+        ];
+
+        $result = $component->refreshRate($ent, 'token-1');
+
+        $this->assertSame('rate-deferred', $result['strategy']);
+        $this->assertSame('ack', $result['status']);
+        $this->assertTrue($result['ack']);
+        $this->assertSame('omada_rate_deferred', $result['mode']);
+    }
+
     public function testKickRoutesTpLinkToOmadaOpenApiAndReturnsAck(): void
     {
         $component = new TestableKickerComponent(
@@ -69,7 +89,7 @@ class KickerComponentTest extends TestCase
 
     public function testParseDisconnectResult(): void
     {
-        $component = new KickerComponent(
+        $component = new TestableKickerComponent(
             new ComponentRegistry(new Controller(new ServerRequest(), new Response()))
         );
 
@@ -106,6 +126,11 @@ class TestableKickerComponent extends KickerComponent
         'latency_ms' => 5,
         'correlation' => ['client_found' => true],
     ];
+
+    public function initialize(array $config): void
+    {
+        // These tests exercise only the Omada/rate routing and need no tables.
+    }
 
     protected function resolveOmadaApiSettings(): ?array
     {

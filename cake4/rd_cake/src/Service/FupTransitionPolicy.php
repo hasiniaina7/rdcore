@@ -6,6 +6,15 @@ namespace App\Service;
 class FupTransitionPolicy
 {
     /**
+     * A FUP block is an access decision. Every other FUP action only changes
+     * policy attributes and must use a non-portal rate refresh where available.
+     */
+    public static function dispatchModeForAction(?string $action): string
+    {
+        return $action === 'block' ? 'block' : 'rate_refresh';
+    }
+
+    /**
      * A pending request is also terminal: after sending a disconnect, an
      * interrupted process must never turn uncertainty into a kick loop.
      */

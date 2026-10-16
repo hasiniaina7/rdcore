@@ -549,22 +549,35 @@ class RadacctsController extends AppController {
         }
         
         //It should have a token if it made it to here :-)
-        $q_data		= $this->request->getQuery();
+		$q_data		= $this->request->getQuery();
         $token 		= $q_data['token'];
         $username 	= $q_data['username'];
+		$mode = (string)($q_data['mode'] ?? 'block');
+		if(!in_array($mode,['block','rate_refresh'],true)){
+			$this->set([
+                'success' => false,
+                'message' => 'Unsupported FUP transition mode'
+            ]);
+            $this->viewBuilder()->setOption('serialize', true);
+            return;
+        }
 		$data		= [];
 		
 		
 		$e_username = $this->{$this->workingModel}->find()->where(['username' => $username,'acctstoptime IS NULL'])->all();
         $results = [];
 		foreach($e_username as $ent){
-			$data = $this->Kicker->kick($ent,$token); //Sent it to the Kicker (We include the token in order to make API calls if needed
+			// Rate refresh is deliberately distinct from a hard FUP block.
+			$data = $mode === 'rate_refresh'
+				? $this->Kicker->refreshRate($ent,$token)
+				: $this->Kicker->kick($ent,$token);
             $results[] = array_merge(['radacctid' => (int)$ent->radacctid], $data);
 		}	
 		$this->set([
             'success'       => true,
             'data'          => $data,
-            'results'       => $results
+            'results'       => $results,
+            'mode'          => $mode
         ]);
         $this->viewBuilder()->setOption('serialize', true);	
 	}

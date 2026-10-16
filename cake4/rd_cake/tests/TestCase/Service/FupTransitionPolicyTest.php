@@ -8,6 +8,14 @@ use Cake\TestSuite\TestCase;
 
 class FupTransitionPolicyTest extends TestCase
 {
+    public function testOnlyBlockUsesTheBlockingDispatchMode(): void
+    {
+        $this->assertSame('block', FupTransitionPolicy::dispatchModeForAction('block'));
+        $this->assertSame('rate_refresh', FupTransitionPolicy::dispatchModeForAction('decrease_speed'));
+        $this->assertSame('rate_refresh', FupTransitionPolicy::dispatchModeForAction('increase_speed'));
+        $this->assertSame('rate_refresh', FupTransitionPolicy::dispatchModeForAction(null));
+    }
+
     public function testNewTransitionIsDispatched(): void
     {
         $this->assertTrue(FupTransitionPolicy::shouldDispatch(0, 37, null));

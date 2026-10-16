@@ -265,6 +265,105 @@ class KickerComponent extends Component {
              
         return $result;       
     }
+
+    /**
+     * Refresh a FUP rate without performing a generic disconnect. MikroTik
+     * receives its proven host/PPP refresh; non-MikroTik NASes wait for their
+     * next natural authentication rather than risking a captive-portal loop.
+     */
+    public function refreshRate($ent,$token){
+        if(!$ent){
+            return [
+                'strategy' => 'rate-deferred',
+                'status' => 'error',
+                'ack' => false,
+                'stderr' => 'Missing accounting entity',
+                'radacctid' => null,
+            ];
+        }
+
+        if($this->isOmadaNas($ent)){
+            return $this->deferRateRefresh($ent,'omada_rate_deferred');
+        }
+
+        $nasidentifier = $ent->nasidentifier;
+        $nasipaddress = $ent->nasipaddress;
+        $dc = $this->DynamicClients->find()
+            ->where(['DynamicClients.nasidentifier' => $nasidentifier])
+            ->contain(['DynamicClientSettings'])
+            ->first();
+        if($dc){
+            if($this->isOmadaDynamicClient($dc,$ent)){
+                return $this->deferRateRefresh($ent,'omada_rate_deferred');
+            }
+            if($dc->type == $this->typeMtApi){
+                return $this->refreshMikrotikRate($ent,$dc->dynamic_client_settings);
+            }
+        }
+
+        $nas = $this->Nas->find()
+            ->where(['OR' => ['Nas.nasidentifier' => $nasidentifier,'Nas.nasname' => $nasipaddress]])
+            ->contain(['NaSettings'])
+            ->first();
+        if($nas && $nas->type == $this->typeMtApi){
+            return $this->refreshMikrotikRate($ent,$nas->na_settings);
+        }
+
+        return $this->deferRateRefresh($ent,'unsupported_nas_rate_deferred');
+    }
+
+    private function refreshMikrotikRate($ent,$settings){
+        $mtData = $this->mikrotikApiConfig($settings);
+        $refresh = $this->MikrotikApi->refreshRadius($ent,$mtData);
+        return [
+            'strategy' => 'mikrotik-api',
+            'status' => (string)($refresh['status'] ?? 'error'),
+            'ack' => (bool)($refresh['ack'] ?? false),
+            'stderr' => $refresh['error'] ?? null,
+            'radacctid' => $ent->radacctid,
+            'nasidentifier' => $ent->nasidentifier,
+            'nasipaddress' => $ent->nasipaddress,
+            'matched' => (int)($refresh['matched'] ?? 0),
+            'removed' => (int)($refresh['removed'] ?? 0),
+            'mode' => $refresh['mode'] ?? 'rate_refresh',
+        ];
+    }
+
+    private function mikrotikApiConfig($settings){
+        $mtData = [];
+        foreach($settings as $setting){
+            if(preg_match('/^mt_/',$setting->name)){
+                $name = preg_replace('/^mt_/','',$setting->name);
+                $value = $setting->value;
+                if($name == 'port'){
+                    $value = intval($value);
+                }
+                $mtData[$name] = $value;
+            }
+        }
+        if(($mtData['proto'] ?? null) == 'https'){
+            $mtData['ssl'] = true;
+            if(($mtData['port'] ?? null) == 8728){
+                $mtData['port'] = 8729;
+            }
+        }
+        unset($mtData['proto']);
+        return $mtData;
+    }
+
+    private function deferRateRefresh($ent,$mode){
+        return [
+            // This is an acknowledged no-op, not a failed disconnect attempt.
+            'strategy' => 'rate-deferred',
+            'status' => 'ack',
+            'ack' => true,
+            'stderr' => null,
+            'radacctid' => $ent->radacctid,
+            'nasidentifier' => $ent->nasidentifier,
+            'nasipaddress' => $ent->nasipaddress,
+            'mode' => $mode,
+        ];
+    }
     
     private function kickAccelSession($ent){
     
